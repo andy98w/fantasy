@@ -441,10 +441,10 @@ h2 {
   display: flex;
   align-items: center;
   gap: 18px;
-  font: 500 76px/0.9 var(--pixel);
+  font: 600 76px/0.9 var(--body);
 }
 .score-digits strong {
-  font-weight: 500;
+  font-weight: 600;
   text-shadow: 3px 3px 0 var(--shadow);
 }
 .score-digits > span {
@@ -722,8 +722,8 @@ h2 {
 }
 .rank-cell {
   color: var(--muted);
-  font-family: var(--pixel);
-  font-size: 16px;
+  font-family: var(--body);
+  font-size: 13px;
 }
 .power-badge {
   display: inline-flex;
@@ -731,7 +731,7 @@ h2 {
   align-items: center;
   gap: 3px;
   min-width: 32px;
-  font: 500 20px/1 var(--pixel);
+  font: 600 18px/1 var(--body);
   color: #c2cae4;
   padding: 2px 0;
 }
@@ -995,7 +995,7 @@ select {
   font-size: 12px;
 }
 .team-profile > div > strong {
-  font: 500 26px var(--pixel);
+  font: 600 26px var(--body);
 }
 .matchup-picker {
   display: grid;
@@ -1016,7 +1016,7 @@ select {
   font-size: 10px;
 }
 .matchup-picker button strong {
-  font: 500 20px var(--pixel);
+  font: 600 20px var(--body);
   color: var(--text);
 }
 .matchup-picker button[aria-pressed="true"] {
@@ -1125,7 +1125,7 @@ select {
 }
 .player-facts strong {
   display: block;
-  font: 500 23px var(--pixel);
+  font: 600 23px var(--body);
   color: var(--text);
   margin-top: 4px;
 }
@@ -1588,4 +1588,14 @@ select {
     padding: 8px 0;
     white-space: nowrap;
   }
+}
+
+.score-digits,
+.rank-cell,
+.power-badge,
+.team-profile > div > strong,
+.matchup-picker button strong,
+.player-facts strong,
+.roster-summary > span > strong {
+  font-variant-numeric: lining-nums tabular-nums;
 }

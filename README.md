@@ -48,7 +48,7 @@ See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share
 
 ## Frontend
 
-The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings and scores, IBM Plex Sans for data, and a shared palette in `app/globals.css`. No component library or animation runtime is required.
+The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings, IBM Plex Sans with tabular numerals for scores and data, and a shared palette in `app/globals.css`. No component library or animation runtime is required.
 
 - `components/ui/`: shared buttons, panels, segmented controls, and pixel SVG icons.
 - `components/league/`: navigation, avatars, matchup board, player tables and details, standings, rankings, news, filters, and connection status.

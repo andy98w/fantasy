@@ -21,6 +21,8 @@ import { teamOptions } from "./team-select";
 import { PlayerAvatar, TeamAvatar } from "./avatars";
 import { CategoryValue } from "./team-views";
 import { signedZ as signed, statusText } from "./format";
+import { CategoryMeter } from "../ui/category-meter";
+import { ValueFeedback } from "../ui/value-feedback";
 
 const score = (value: number | null) => (value === null ? "—" : signed(value));
 
@@ -95,7 +97,7 @@ function TradeRoster({
                     : statusText(player.status)}
                 </small>
               </span>
-              <span title="Unweighted player value, in z-scores">
+              <span title="Player value">
                 {score(player.zTotal)}
               </span>
             </label>
@@ -105,18 +107,12 @@ function TradeRoster({
         ) && <Empty>No matching players.</Empty>}
       </div>
       <div className="trade-outgoing">
-        <strong>{outgoing.length} outgoing</strong>
+        <strong><ValueFeedback>{`${outgoing.length} outgoing`}</ValueFeedback></strong>
         <span>
-          Value z: {outgoing.length ? score(value.score) : "0.0"}
-          {value.provisional ? "*" : ""}
+          Value: {outgoing.length ? score(value.score) : "0.0"}
+          {value.provisional ? " (est.)" : ""}
         </span>
       </div>
-      {value.missing.length > 0 && (
-        <p className="panel-note">
-          * Unrated: {value.missing.map((p) => p.name).join(", ")}. Exchange
-          value is provisional.
-        </p>
-      )}
     </Panel>
   );
 }
@@ -150,6 +146,7 @@ function TradeImpact({
   const gains = CATEGORIES.filter((c) => weights[c] > 0 && delta(c) >= 0.05);
   const losses = CATEGORIES.filter((c) => weights[c] > 0 && delta(c) <= -0.05);
   const allPunted = CATEGORIES.every((c) => weights[c] === 0);
+  const deltaRange = Math.max(1, ...CATEGORIES.map((c) => Math.abs(delta(c))));
   return (
     <Panel>
       <div className="trade-impact-heading">
@@ -181,8 +178,8 @@ function TradeImpact({
           </div>
           <div>
             <span>
-              Fit z
-              {before.provisional || after.provisional ? " (provisional)" : ""}
+              Team fit
+              {before.provisional || after.provisional ? " (est.)" : ""}
             </span>
             <strong>
               {score(before.score)} → {score(after.score)}
@@ -199,42 +196,31 @@ function TradeImpact({
                     : "negative-text"
               }
             >
-              {allPunted
+              <ValueFeedback>{allPunted
                 ? "No categories"
                 : hasData
                   ? signed(after.score! - before.score!)
-                  : "—"}
+                  : "—"}</ValueFeedback>
             </strong>
           </div>
         </div>
         {after.size > capacity && (
           <p className="inline-notice">
-            {after.size - capacity} over the league’s {capacity} total roster
-            slots. Additional moves would be required.
+            Roster exceeds the {capacity}-player limit by {after.size - capacity}.
           </p>
         )}
-        {(before.provisional || after.provisional) && (
-          <p className="inline-notice">
-            Provisional values use reference-average estimates for unrated
-            players. After trade:{" "}
-            {after.missing.map((p) => p.name).join(", ") || "all players rated"}
-            .
-          </p>
-        )}
-        <p className="trade-verdict" aria-live="polite">
-          {!active
-            ? "Choose players above to compare the trade."
-            : !hasData
-              ? "Not enough measured player data to compare category changes."
+        <p className="trade-verdict" aria-live="polite" hidden={!active}>
+          {!hasData
+              ? "Not enough stats to compare."
               : allPunted
-                ? "Choose at least one category to evaluate fit."
+                ? "Select at least one category."
                 : [
                     gains.length ? `Improves ${gains.join(", ")}.` : "",
                     losses.length ? `Weakens ${losses.join(", ")}.` : "",
                   ]
                     .filter(Boolean)
                     .join(" ") ||
-                  "No meaningful change in the selected categories."}
+                  "No notable category changes."}
         </p>
       </div>
       <div
@@ -268,6 +254,7 @@ function TradeImpact({
                 </td>
                 <td>
                   <CategoryValue value={hasData ? delta(category) : null} />
+                  <CategoryMeter value={hasData ? delta(category) : null} range={deltaRange} />
                 </td>
                 <td>
                   <Select
@@ -275,9 +262,9 @@ function TradeImpact({
                     value={String(weights[category])}
                     onChange={(value) => onWeight(category, Number(value))}
                     options={[
-                      { value: "0", label: "Punt · 0×" },
-                      { value: "1", label: "Normal · 1×" },
-                      { value: "2", label: "Priority · 2×" },
+                      { value: "0", label: "Punt" },
+                      { value: "1", label: "Normal" },
+                      { value: "2", label: "Priority" },
                     ]}
                     className="weight-select"
                   />
@@ -335,9 +322,6 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
   return (
     <>
       <Toolbar>
-        <span className="muted">
-          Season per-game values · Hypothetical trade
-        </span>
         <Button variant="quiet" onClick={reset}>
           Reset trade
         </Button>
@@ -414,10 +398,6 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
           />
         </div>
       )}
-      <p className="footnote">
-        No changes are sent to ESPN. Injury recovery, future schedules,
-        starting-lineup eligibility and trade approval rules are not simulated.
-      </p>
     </>
   );
 }

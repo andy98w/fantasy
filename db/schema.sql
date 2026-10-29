@@ -16,3 +16,17 @@ CREATE TABLE IF NOT EXISTS sync_runs (
   message text NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sync_runs_latest ON sync_runs (league_id, season, finished_at DESC);
+
+-- Anonymous trade battles. Each explicit vote counts; request IDs only deduplicate transport retries.
+CREATE TABLE IF NOT EXISTS battle_ratings (
+  scope TEXT NOT NULL, mode TEXT NOT NULL, entry_id TEXT NOT NULL,
+  rating DOUBLE PRECISION NOT NULL DEFAULT 1000,
+  votes INTEGER NOT NULL DEFAULT 0, wins INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (scope, mode, entry_id)
+);
+CREATE TABLE IF NOT EXISTS battle_votes (
+  scope TEXT NOT NULL, request_id TEXT NOT NULL, mode TEXT NOT NULL,
+  left_id TEXT NOT NULL, right_id TEXT NOT NULL, winner_id TEXT NOT NULL,
+  result TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (scope, request_id)
+);

@@ -1,0 +1,98 @@
+.rivalry-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.rivalry-toolbar > .select-trigger { min-width: 180px; }
+.rivalry-selectors { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px; }
+.rivalry-selectors .select-trigger { width: 100%; min-width: 0; }
+.rivalry-duel { border: 2px solid var(--line); overflow: hidden; background: var(--surface); }
+.rivalry-stage { display: grid; grid-template-columns: 1fr 100px 1fr; position: relative; min-height: 300px; overflow: hidden; }
+.rivalry-fighter { position: relative; z-index: 1; text-align: center; padding: 36px 24px 22px; display: flex; align-items: center; flex-direction: column; gap: 12px; animation: rival-enter-left 550ms cubic-bezier(.2,.8,.3,1) both; }
+.rivalry-fighter.away { animation-name: rival-enter-right; }
+.rivalry-fighter .avatar-large { width: 84px; height: 84px; border: 3px solid var(--teal); box-shadow: 5px 5px 0 var(--shadow); }
+.rivalry-fighter.away .avatar-large { border-color: var(--coral); }
+.rivalry-fighter h2 { font: 500 26px/1.2 var(--pixel); overflow-wrap: anywhere; max-width: 100%; margin: 0; text-shadow: 2px 2px var(--shadow); }
+.rivalry-fighter > strong { font-size: 44px; line-height: 1; }
+.rivalry-vs { z-index: 1; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.rivalry-vs > span { background: var(--surface-deep); padding: 10px 16px; color: var(--gold); border: 2px solid var(--gold); box-shadow: 4px 4px var(--shadow); font: 600 40px var(--pixel); animation: vs-land 650ms ease-out both; }
+.rivalry-vs small { background: var(--surface-deep); padding: 3px 8px; color: var(--muted); }
+.rivalry-history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; align-items: start; }
+.rivalry-record { color: var(--gold); font-size: 24px; font-variant-numeric: tabular-nums; }
+.rivalry-history-caption { padding: 14px 20px 0; color: var(--muted); font-size: 12px; }
+.rivalry-meetings { padding: 0; margin: 0; list-style: none; }
+.rivalry-meetings li { display: grid; grid-template-columns: 65px 85px 1fr; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line-soft); align-items: center; }
+.rivalry-meetings li > span:last-child { text-align: right; overflow-wrap: anywhere; }
+.rivalry-trades summary { padding: 16px 20px; cursor: pointer; color: var(--text); }
+.rivalry-trades summary span { float: right; color: var(--muted); font-size: 12px; }
+.rivalry-trade-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
+.rivalry-trade-sides .trade-side { padding: 12px; border: 0; }
+.rivalry-trade-sides .trade-side > header { display: block; }
+.rivalry-trade-sides .trade-side > header .avatar, .rivalry-trade-sides .trade-side time, .rivalry-trade-sides .trade-side p { display: none; }
+.rivalry-trade-sides .trade-side h3 { font-size: 16px; }
+.rivalry-trade-sides .trade-side-assets { grid-template-columns: 1fr; margin: 15px 0; }
+.history-warning { color: var(--muted); margin: 14px 0; font-size: 12px; }
+.what-if-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.what-if-heading h2 { font: 500 28px var(--pixel); margin: 0; }
+.what-if-heading > span, .records-period { color: var(--muted); font-size: 12px; }
+.category-switches { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.category-switches button { padding: 10px 16px; border: 2px solid var(--line); background: var(--surface-deep); color: var(--muted); cursor: pointer; min-width: 70px; font: inherit; }
+.category-switches button[aria-pressed="true"] { border-color: var(--gold); background: var(--gold); color: var(--bg); box-shadow: 3px 3px var(--shadow); }
+.category-switches button:active { transform: translate(2px,2px); box-shadow: none; }
+.category-switches button:disabled { cursor: default; }
+.what-if-table .identity-col { width: 50%; }
+.record-cabinet { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 3px solid var(--line); background: var(--surface-deep); gap: 3px; }
+.record-card { height: 100%; position: relative; background: var(--surface); padding: 28px 22px 22px; border-bottom: 8px solid var(--line); text-align: center; }
+.record-card::after { content: ""; position: absolute; inset: auto 0 -8px; height: 3px; background: var(--shadow); }
+.record-emblem { height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: end; gap: 8px; margin-bottom: 20px; }
+.record-emblem .award-trophy { color: var(--gold); filter: drop-shadow(4px 4px 0 var(--shadow)); }
+.trophy-plinth { width: 74px; height: 12px; background: var(--line); border-top: 3px solid var(--gold); box-shadow: 5px 5px var(--shadow); }
+.record-card h2 { font: 500 25px var(--pixel); color: var(--gold); margin: 0 0 12px; }
+.record-value { display: block; font-size: 38px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.record-unit { color: var(--muted); font-size: 12px; }
+.record-holders { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 20px; text-align: left; }
+.record-holder { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.record-holder:last-child { margin-bottom: 0; }
+.record-holder > span { min-width: 0; overflow-wrap: anywhere; }
+.record-holder small { color: var(--muted); font-size: 11px; display: block; }
+.record-holders summary { cursor: pointer; color: var(--muted); font-size: 12px; padding: 4px 0 12px; }
+.dubious-record h2, .dubious-record .award-trophy { color: var(--coral); }
+.dubious-record .trophy-plinth { border-color: var(--coral); }
+.record-new { position: absolute; right: 12px; top: 12px; padding: 4px 7px; background: var(--gold); color: var(--bg); font: 15px var(--pixel); }
+.record-broken { animation: record-break 1.8s ease-out; }
+.record-vacant { text-align: center; padding: 65px 24px; border: 2px solid var(--line); background: var(--surface-deep); }
+.record-vacant > svg { color: var(--line); }
+.record-vacant h2 { font: 500 30px var(--pixel); color: var(--gold); margin: 24px 0 0; }
+.record-vacant .empty-state { padding-bottom: 0; }
+@keyframes rival-enter-left { from { transform: translateX(-40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes rival-enter-right { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes vs-land { 0%,25% { transform: scale(1.6) rotate(-10deg); opacity: 0; } 65% { transform: scale(.92) rotate(2deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes record-break { 0%,100% { box-shadow: inset 0 0 0 0 transparent; } 30% { box-shadow: inset 0 0 0 4px var(--gold); } }
+@media (max-width: 900px) { .rivalry-history-grid { grid-template-columns: 1fr; } .record-cabinet { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 650px) {
+  .rivalry-toolbar { flex-wrap: wrap; gap: 12px; }
+  .rivalry-toolbar .tabs { flex: 1; }
+  .rivalry-toolbar .tabs button { flex: 1; }
+  .rivalry-selectors { gap: 8px; }
+  .rivalry-selectors .select-trigger { font-size: 11px; padding: 8px; gap: 6px; }
+  .rivalry-selectors .select-trigger .select-option-icon { display: none; }
+  .rivalry-stage { grid-template-columns: 1fr 56px 1fr; min-height: 240px; }
+  .rivalry-fighter { padding: 26px 10px 20px; gap: 10px; }
+  .rivalry-fighter .avatar-large { width: 56px; height: 56px; }
+  .rivalry-fighter h2 { font-size: 18px; }
+  .rivalry-fighter > strong { font-size: 34px; }
+  .rivalry-vs > span { font-size: 25px; padding: 6px; }
+  .rivalry-vs small { font-size: 10px; padding: 3px; }
+  .what-if-heading h2 { font-size: 24px; }
+  .category-switches { gap: 6px; }
+  .category-switches button { min-width: 54px; padding: 9px 10px; font-size: 12px; }
+  .record-card { padding: 18px 12px; }
+  .record-card h2 { font-size: 21px; }
+  .record-value { font-size: 30px; }
+  .record-holder { font-size: 12px; }
+  .record-holder .avatar { width: 26px; height: 26px; }
+  .record-new { position: static; display: inline-block; margin-bottom: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .rivalry-fighter, .rivalry-vs > span, .record-broken { animation: none; } .category-switches button:active { transform: none; } }
+.closest-meeting { display: block; color: var(--gold); font-size: 10px; }
+@media (max-width: 650px) {
+  .rivalry-toolbar .tabs { flex: 1 0 100%; }
+  .rivalry-toolbar .tabs button { white-space: nowrap; }
+  .rivalry-toolbar > .select-trigger { width: 100%; }
+}

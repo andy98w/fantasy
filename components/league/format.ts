@@ -27,8 +27,8 @@ export const ratingReason = (player: Player, minimum: number) =>
 export type Sort = { key: string; descending: boolean };
 export function sortPlayers(players: Player[], sort: Sort) {
   return [...players].sort((a, b) => {
-    const av = sort.key === "power" ? a.zTotal : a.stats[sort.key];
-    const bv = sort.key === "power" ? b.zTotal : b.stats[sort.key];
+    const av = sort.key === "power" ? a.zTotal : sort.key === "powerChange7d" ? a.powerChange7d : a.stats[sort.key];
+    const bv = sort.key === "power" ? b.zTotal : sort.key === "powerChange7d" ? b.powerChange7d : b.stats[sort.key];
     if (av == null) return bv == null ? a.name.localeCompare(b.name) : 1;
     if (bv == null) return -1;
     return (sort.descending ? bv - av : av - bv) || a.id - b.id;

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from .espn import SyncError
 from .rankings import rank_players, rank_teams, CATS
+from .weekly import weekly_players
 
 STAT_IDS={'0':'PTS','1':'BLK','2':'STL','3':'AST','6':'REB','11':'TO','13':'FGM','14':'FGA','15':'FTM','16':'FTA','17':'3PM','19':'FG%','20':'FT%','40':'MIN','42':'GP'}
 SLOTS={0:'PG',1:'SG',2:'SF',3:'PF',4:'C',5:'G',6:'F',7:'SG/SF',8:'G/F',9:'PF/C',10:'F/C',11:'UTIL',12:'BE',13:'IR',15:'Rookie'}
@@ -15,6 +16,17 @@ def team_logo(value):
         return value if parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password else None
     except ValueError:
         return None
+
+def normalize_matchup(m, season, include_players=True):
+    def side(s):
+        cumulative=s.get('cumulativeScore') or {}
+        stats={STAT_IDS.get(str(k),str(k)):v.get('score') for k,v in (cumulative.get('scoreByStat') or {}).items()}
+        performers, complete = weekly_players(s, season) if include_players else ([], False)
+        return {'teamId':s['teamId'],'wins':cumulative.get('wins'),
+                'ties':cumulative.get('ties'),'stats':stats,'performers':performers,'performanceComplete':complete}
+    winner=m.get('winner','UNDECIDED')
+    return {'id':m['id'],'period':m['matchupPeriodId'],'home':side(m['home']),'away':side(m['away']),
+            'result':winner if winner in ('HOME','AWAY','TIE') else 'UNDECIDED'}
 
 def normalize(raw, league_id, season, team_id):
     league=raw['league']
@@ -77,12 +89,7 @@ def normalize(raw, league_id, season, team_id):
     for m in raw['scores'].get('schedule',[]):
         if m.get('matchupPeriodId') != league['status']['currentMatchupPeriod']: continue
         if not m.get('home') or not m.get('away'): continue # bye
-        def side(s):
-            cumulative=s.get('cumulativeScore',{})
-            stats={STAT_IDS.get(str(k),str(k)):v.get('score') for k,v in cumulative.get('scoreByStat',{}).items()}
-            return {'teamId':s['teamId'],'wins':cumulative.get('wins'),
-                    'ties':cumulative.get('ties'),'stats':stats}
-        matchups.append({'id':m['id'],'period':m['matchupPeriodId'],'home':side(m['home']),'away':side(m['away'])})
+        matchups.append(normalize_matchup(m,season))
     slot_counts=settings.get('rosterSettings',{}).get('lineupSlotCounts',{})
     roster_size=sum(v for k,v in slot_counts.items() if str(k)!='13') or 13
     model=rank_players(players,len(teams)*roster_size+24)

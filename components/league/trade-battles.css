@@ -1,0 +1,63 @@
+.battle-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.battle-heading h2 { font: 500 26px/1.2 var(--pixel); }
+.battle-arena, .trade-history-deal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; position: relative; }
+.trade-history { display: grid; gap: 28px; }
+.trade-history-deal { gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.trade-side { min-width: 0; padding: 24px; background: var(--surface); border: 2px solid var(--line); display: flex; flex-direction: column; }
+.battle-arena > .trade-side:first-child { border-top: 3px solid var(--teal); }
+.battle-arena > .trade-side:nth-child(2) { border-top: 3px solid var(--coral); }
+.trade-side > header { display: flex; align-items: center; gap: 12px; }
+.trade-side > header > div { min-width: 0; flex: 1; }
+.trade-side h3 { font: 500 22px/1.2 var(--pixel); overflow-wrap: anywhere; }
+.trade-side p, .trade-side time { font-size: 11px; color: var(--muted); }
+.trade-side p { margin: 4px 0 0; }
+.trade-side time { align-self: flex-start; white-space: nowrap; }
+.trade-side .avatar-large { width: 48px; height: 48px; }
+.trade-side-assets { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 24px 0; flex: 1; }
+.trade-side-assets section { min-width: 0; }
+.trade-side-assets h4 { color: var(--teal); font-size: 12px; font-weight: 500; margin: 0 0 12px; }
+.trade-side-assets section + section h4 { color: var(--coral); }
+.battle-players { padding: 0; margin: 0; list-style: none; display: grid; align-content: start; gap: 10px; }
+.battle-players li { display: flex; align-items: center; gap: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.battle-players .avatar { flex-shrink: 0; width: 34px; height: 34px; }
+.trade-side > .button { width: 100%; }
+.battle-versus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--surface-deep); color: var(--gold); padding: 8px 4px; font: 500 22px var(--pixel); }
+.battle-feedback { min-height: 38px; padding: 8px 0; font-size: 12px; color: var(--gold); }
+.battle-error { padding: 12px; color: var(--coral); font-size: 13px; }
+.battle-rankings { width: 100%; border-collapse: collapse; font-size: 14px; }
+.battle-rankings th { color: var(--muted); font-size: 11px; font-weight: 500; background: var(--surface-deep); }
+.battle-rankings td, .battle-rankings th { padding: 14px 20px; text-align: right; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+.battle-rankings td:nth-child(2), .battle-rankings th:nth-child(2) { text-align: left; width: 70%; }
+.battle-rankings summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.battle-rankings summary::after { content: "+"; color: var(--muted); margin-left: auto; }
+.battle-rankings details[open] > summary::after { content: "−"; }
+.battle-rankings summary small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.battle-rankings summary span { overflow-wrap: anywhere; min-width: 0; }
+.battle-rankings summary .avatar { flex-shrink: 0; }
+.ranked-deal { margin-top: 16px; }
+.ranked-deal .trade-side { padding: 16px; }
+.ranked-deal .trade-side > header { display: none; }
+.ranked-deal .trade-side-assets { margin: 0; }
+@media (max-width: 760px) {
+  .trade-hub-tabs .tabs { width: 100%; }
+  .trade-hub-tabs .tabs button { flex: 1; min-width: 0; padding: 12px 8px; font-size: 16px; }
+  .battle-arena, .trade-history-deal { grid-template-columns: 1fr; gap: 20px; }
+  .trade-history-deal { gap: 1px; }
+  .battle-versus { display: none; }
+  .trade-side { padding: 16px; }
+  .battle-heading h2 { font-size: 22px; }
+  .trade-side h3 { font-size: 20px; }
+  .battle-rankings td, .battle-rankings th { padding: 12px 8px; }
+  .battle-rankings { font-size: 12px; }
+  .battle-rankings td:nth-child(2), .battle-rankings th:nth-child(2) { width: auto; }
+  .battle-rankings summary .avatar { display: none; }
+  .ranked-deal .trade-side-assets { grid-template-columns: 1fr; }
+  .battle-ranking-scroll { overflow-x: auto; }
+}
+.battle-arena .trade-side { position: relative; }
+.battle-picked { z-index: 2; animation: battle-pick 950ms ease-out both; }
+.battle-passed { transition: opacity 250ms, transform 350ms; opacity: .4; transform: scale(.97); }
+.battle-mmr-gain { position: absolute; top: -12px; right: 20px; z-index: 3; padding: 6px 12px; background: var(--gold); color: var(--bg); font: 600 22px var(--pixel); pointer-events: none; animation: mmr-rise 950ms ease-out both; }
+@keyframes battle-pick { 0% { transform: scale(1); } 25% { transform: scale(1.025); box-shadow: 0 0 0 3px var(--gold), 0 8px 30px #ffcd7520; } 80%, 100% { transform: scale(1.01); box-shadow: 0 0 0 2px var(--gold); } }
+@keyframes mmr-rise { 0% { opacity: 0; transform: translateY(16px) scale(.85); } 25%, 70% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-14px); } }
+@media (prefers-reduced-motion: reduce) { .battle-picked, .battle-mmr-gain { animation: none; } .battle-passed { transition: none; transform: none; } }

@@ -2,6 +2,7 @@
 import { CATEGORIES, type Player, type Team } from "@/lib/schema";
 import { PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText, type Sort } from "./format";
+import { PowerChange } from "./power-movers";
 import { Empty } from "../ui/primitives";
 export function PlayerTable({
   players,
@@ -12,6 +13,8 @@ export function PlayerTable({
   onSelect,
   compact = false,
   ownership = false,
+  trends = false,
+  baselineAt,
 }: {
   players: Player[];
   teams: Team[];
@@ -21,6 +24,8 @@ export function PlayerTable({
   onSelect: (player: Player) => void;
   compact?: boolean;
   ownership?: boolean;
+  trends?: boolean;
+  baselineAt?: string | null;
 }) {
   const categories = compact ? ["PTS", "REB", "AST"] : CATEGORIES;
   return (
@@ -35,7 +40,7 @@ export function PlayerTable({
           <tr>
             <th className="identity-col">Player</th>
             <th title="Overall player rank">Rank</th>
-            {["power", ...categories].map((key) => (
+            {["power", ...(trends ? ["powerChange7d"] : []), ...categories].map((key) => (
               <th
                 key={key}
                 aria-sort={
@@ -47,7 +52,7 @@ export function PlayerTable({
                 }
               >
                 <button onClick={() => onSort(key)}>
-                  {key === "power" ? "Power" : key}
+                  {key === "power" ? "Power" : key === "powerChange7d" ? "7d change" : key}
                   <span className="sort-arrow" aria-hidden="true">
                     {sort.key === key ? (sort.descending ? "↓" : "↑") : ""}
                   </span>
@@ -92,6 +97,7 @@ export function PlayerTable({
                   reason={ratingReason(player, minimumGames)}
                 />
               </td>
+              {trends && <td><PowerChange player={player} baselineAt={baselineAt} /></td>}
               {categories.map((category) => (
                 <td key={category}>{stat(player.stats[category], category)}</td>
               ))}
@@ -122,7 +128,7 @@ export function PlayerTable({
         </tbody>
       </table>
       {!players.length && (
-        <Empty>No matching players. Clear a filter to see more.</Empty>
+        <Empty>No matching players.</Empty>
       )}
     </div>
   );

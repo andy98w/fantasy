@@ -16,6 +16,10 @@ from .espn import ESPNClient, SyncError
 from .normalize import normalize
 from .news import collect_news
 from .logos import cache_team_logos
+from .trades import fetch_trades
+from .history import fetch_history, previous_history
+from .power_history import add_power_history
+from .retention import retention_days, prune_snapshots
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -47,6 +51,9 @@ def run(args):
     path=Path(os.environ.get('SNAPSHOT_PATH','data/league.json'))
     if not path.is_absolute(): path=ROOT/path
     db_url=os.environ.get('DATABASE_URL')
+    if os.environ.get('REQUIRE_DATABASE') == '1' and not db_url:
+        raise SyncError('DATABASE_URL is required for the hosted sync worker.')
+    retention=retention_days()
     connection=None
     if args.probe:
         with ESPNClient(league_id,season,os.environ.get('ESPN_S2',''),os.environ.get('ESPN_SWID','')) as client:
@@ -57,7 +64,7 @@ def run(args):
     with local_lock(path.parent/'sync.lock'):
         try:
             if db_url:
-                connection=psycopg.connect(db_url,autocommit=True,connect_timeout=10)
+                connection=psycopg.connect(db_url,autocommit=True,connect_timeout=10,options='-c statement_timeout=30000 -c lock_timeout=10000')
                 if not connection.execute('SELECT pg_try_advisory_lock(%s, %s)',(league_id,season)).fetchone()[0]:
                     raise SyncError('A database sync is already running.')
                 connection.execute((ROOT/'db/schema.sql').read_text())
@@ -72,7 +79,26 @@ def run(args):
             else:
                 with ESPNClient(league_id,season,os.environ.get('ESPN_S2',''),os.environ.get('ESPN_SWID','')) as client:
                     raw=client.fetch()
+                    try:
+                        history=fetch_history(client, raw['league'])
+                        history_error=None
+                    except Exception:
+                        history=previous_history(previous,league_id,season)
+                        history_error='Matchup history could not refresh.'
+                    try:
+                        trades=fetch_trades(client)
+                        trade_error=None
+                    except Exception:
+                        # An optional history outage must not erase previous trades or stop league updates.
+                        old=previous if previous and previous.get('league',{}).get('id')==league_id and previous.get('league',{}).get('season')==season else {}
+                        trades=old.get('trades',[])
+                        trade_error='Trade history could not refresh.'
                 snapshot=normalize(raw,league_id,season,team_id)
+                add_power_history(snapshot, previous)
+                snapshot['matchupHistory']=history
+                snapshot['historySyncError']=history_error
+                snapshot['trades']=trades
+                snapshot['tradeSyncError']=trade_error
                 snapshot['warnings'] += cache_team_logos(snapshot['teams'], os.environ.get('ESPN_S2',''), os.environ.get('ESPN_SWID',''))
             snapshot['news'],news_warnings=collect_news(snapshot['players'],(previous or {}).get('news'))
             snapshot['warnings']=[w for w in snapshot.get('warnings',[]) if 'news unavailable' not in w]+news_warnings
@@ -82,6 +108,7 @@ def run(args):
                 with connection.transaction():
                     connection.execute('INSERT INTO league_snapshots (league_id,season,payload,raw_payload) VALUES (%s,%s,%s,%s)',(league_id,season,Jsonb(snapshot),Jsonb(raw)))
                     connection.execute('INSERT INTO sync_runs (league_id,season,succeeded,message) VALUES (%s,%s,true,%s)',(league_id,season,message))
+                    prune_snapshots(connection,league_id,season,retention)
             else:
                 if raw: atomic_json(path.parent/'raw-latest.json',raw)
                 atomic_json(path,snapshot)

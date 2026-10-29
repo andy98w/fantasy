@@ -7,6 +7,7 @@ import { MatchupBoard } from "./league/matchup-board";
 import { MatchupGrid } from "./league/matchup-grid";
 import { PlayerTable } from "./league/player-table";
 import { PlayerDialog } from "./league/player-dialog";
+import { PowerMovers } from "./league/power-movers";
 import { PlayerFilters } from "./league/player-filters";
 import { TeamSelect } from "./league/team-select";
 import {
@@ -15,8 +16,14 @@ import {
   TeamProfile,
   RankingHelp,
 } from "./league/team-views";
-import { TradeCalculator } from "./league/trade-calculator";
+import { Rivalries } from "./league/rivalries";
+import { Records } from "./league/records";
+import { TradeHub } from "./league/trade-hub";
 import { Connection } from "./league/connection";
+import { LeagueAwards } from "./league/weekly-highlights";
+import { weeklyMVPs } from "@/lib/weekly";
+import { Today } from "./league/today";
+import type { TodayData } from "@/lib/nba";
 import { NewsFeed } from "./league/news-feed";
 import { sortPlayers, type Sort } from "./league/format";
 import {
@@ -31,9 +38,11 @@ import {
 export default function Dashboard({
   data,
   syncFailure,
+  today,
 }: {
   data: Snapshot;
   syncFailure: string | null;
+  today?: TodayData;
 }) {
   const [view, setView] = useState<View>("league");
   const [teamId, setTeamId] = useState<number | null>(null);
@@ -122,6 +131,7 @@ export default function Dashboard({
     () => relevantNews(data.news, data.players),
     [data.news, data.players],
   );
+  const weeklyRatings = useMemo(() => weeklyMVPs(data.matchups), [data.matchups]);
   const teamNews = team ? relevantNews(data.news, data.players, team.id) : [];
   const espn = `https://fantasy.espn.com/basketball/league?leagueId=${data.league.id}&seasonId=${data.league.season}`;
   const tableProps = {
@@ -202,7 +212,7 @@ export default function Dashboard({
             </button>
           }
         />
-        {(["players", "team", "trades"] as View[]).includes(view) && (
+        {(["players", "team"] as View[]).includes(view) && (
           <RankingHelp model={data.model} />
         )}
         {view === "league" && (
@@ -216,16 +226,19 @@ export default function Dashboard({
                 go("matchup");
               }}
             />
+            <LeagueAwards matchups={data.matchups} teams={data.teams} onTeam={openTeam} />
             <div className="overview-grid">
               <Standings
                 title="Standings"
                 teams={data.teams}
-                scoringType={data.league.scoringType}
                 onTeam={openTeam}
               />
-              <Panel title="Roster news">
-                <NewsFeed items={news} limit={6} />
-              </Panel>
+              <div className="league-sidebar">
+                <Panel title="Roster news">
+                  <NewsFeed items={news} limit={6} />
+                </Panel>
+                <Today data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
+              </div>
             </div>
           </>
         )}
@@ -237,15 +250,13 @@ export default function Dashboard({
               </Button>
             </Toolbar>
             <MatchupBoard
+              ratings={weeklyRatings}
               matchup={
                 data.matchups.find((matchup) => matchup.id === matchupId) ??
                 data.matchups[0]
               }
               teams={data.teams}
             />
-            <p className="footnote">
-              ESPN scored lineups. Fewer turnovers wins.
-            </p>
           </>
         )}
         {view === "team" && (
@@ -305,14 +316,17 @@ export default function Dashboard({
                 setAvailability("all");
               }}
             />
+            <PowerMovers players={visiblePlayers} teams={data.teams} baselineAt={data.powerBaselineAt} onSelect={tableProps.onSelect} />
             <Panel>
-              <PlayerTable players={visiblePlayers} {...tableProps} ownership />
+              <PlayerTable players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt} />
             </Panel>
           </>
         )}
         <div hidden={view !== "trades"}>
-          <TradeCalculator data={data} />
+          <TradeHub data={data} active={view === "trades"} />
         </div>
+        {view === "rivalries" && <Rivalries data={data} />}
+        {view === "records" && <Records data={data} />}
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />
         )}

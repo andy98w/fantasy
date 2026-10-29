@@ -1,0 +1,118 @@
+/* Short, action-driven feedback. Ambient motion stays in the matchup clash. */
+.button, .select-trigger, .matchup-card {
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+.button:active, .select-trigger:active, .matchup-card:active {
+  transform: translate(1px, 2px);
+  box-shadow: none;
+}
+.navigation-row nav a { transition: color 140ms ease, background-color 140ms ease; }
+.navigation-row nav a > svg { transition: transform 160ms steps(3, end); }
+.navigation-row nav a:is(:hover, :focus-visible) > svg { transform: translateY(-2px); }
+.brand .brand-ball { transition: transform 220ms steps(4, end); }
+.brand:is(:hover, :focus-visible) .brand-ball { transform: rotate(90deg); }
+.identity .avatar, .trade-player .avatar { transition: border-color 160ms ease, transform 160ms ease; }
+.identity:is(:hover, :focus-visible) .avatar { border-color: var(--gold); transform: translateY(-2px); }
+.data-table tbody tr:focus-within td { background: var(--surface-raised); }
+.news-feed > a { transition: background-color 140ms ease, box-shadow 140ms ease; }
+.news-feed > a:is(:hover, :focus-visible) { box-shadow: inset 3px 0 var(--gold); }
+.select-chevron { transition: transform 160ms steps(4, end); }
+.select-menu[data-state="open"] {
+  transform-origin: top;
+  animation: game-menu-open 150ms ease-out;
+}
+.select-menu[data-side="top"] { transform-origin: bottom; }
+.player-dialog[open] { animation: game-dialog-open 180ms ease-out; }
+.player-dialog[open]::backdrop { animation: game-backdrop-open 180ms ease-out; }
+.player-dialog[open] .contribution-track > span {
+  transform-origin: left;
+  animation: game-meter-fill 350ms ease-out;
+}
+.player-dialog[open] .contribution-track > span.negative { transform-origin: right; }
+.player-dialog[open] .power-meter i { animation: game-meter-fill 350ms ease-out; transform-origin: left; }
+.category-strength-meter {
+  position: relative;
+  display: block;
+  height: 7px;
+  width: 100%;
+  background: var(--surface-deep);
+}
+.category-strength-meter::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--muted);
+}
+.category-strength-meter > i {
+  position: absolute;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  background: var(--teal);
+  transform: scaleX(var(--strength));
+  transform-origin: left;
+  transition: transform 350ms ease-out, background-color 180ms ease;
+}
+.category-strength-meter[data-negative="true"] > i {
+  left: 0;
+  background: var(--coral);
+  transform-origin: right;
+}
+@starting-style {
+  .category-strength-meter > i { transform: scaleX(0); }
+}
+.team-category-profile > div {
+  border-top: 2px solid var(--line);
+  padding-bottom: 14px;
+}
+.team-category-profile > div:has(.heat-cell.positive) { border-top-color: var(--teal); }
+.team-category-profile > div:has(.heat-cell.negative) { border-top-color: var(--coral); }
+.team-category-profile .category-strength-meter { margin-top: 4px; }
+.trade-impact-table .category-strength-meter { margin-top: 5px; height: 4px; }
+.trade-impact-table .punted-category .category-strength-meter { opacity: 0.25; }
+.trade-player { transition: background-color 140ms ease, box-shadow 140ms ease; }
+.trade-player.selected .avatar { border-color: var(--gold); }
+.trade-player.selected { animation: game-selection 250ms ease-out; }
+.trade-player input[type="checkbox"] {
+  appearance: none;
+  display: grid;
+  place-content: center;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  background: var(--surface-deep);
+}
+.trade-player input[type="checkbox"]::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--bg);
+  clip-path: polygon(0 40%, 20% 40%, 20% 60%, 40% 60%, 40% 40%, 60% 40%, 60% 20%, 80% 20%, 80% 0, 100% 0, 100% 40%, 80% 40%, 80% 60%, 60% 60%, 60% 80%, 40% 80%, 40% 100%, 20% 100%, 20% 80%, 0 80%);
+  transform: scale(0);
+  transition: transform 120ms steps(3, end);
+}
+.trade-player input[type="checkbox"]:checked { background: var(--gold); border-color: var(--gold); }
+.trade-player input[type="checkbox"]:checked::before { transform: scale(1); }
+.value-feedback { display: inline-block; animation: game-value-change 240ms ease-out; }
+.trade-metrics strong .value-feedback { color: inherit; font: inherit; }
+.sync-dot:not(.stale) { animation: game-sync-ping 900ms ease-out; }
+@keyframes game-menu-open {
+  from { opacity: 0; transform: scaleY(0.96); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+@keyframes game-dialog-open {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes game-backdrop-open { from { opacity: 0; } to { opacity: 1; } }
+@keyframes game-meter-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes game-selection { from { box-shadow: inset 6px 0 var(--gold); } to { box-shadow: inset 3px 0 var(--gold); } }
+@keyframes game-value-change { from { opacity: 0.5; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes game-sync-ping { from { box-shadow: 0 0 0 5px #7cd9c455; } to { box-shadow: 0 0 0 2px #7cd9c41a; } }
+@media (prefers-reduced-motion: reduce) {
+  .category-strength-meter > i, .value-feedback, .player-dialog[open],
+  .player-dialog[open]::backdrop, .select-menu[data-state="open"],
+  .trade-player.selected, .sync-dot:not(.stale) { animation: none; transition: none; }
+}

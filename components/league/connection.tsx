@@ -50,7 +50,6 @@ export function Connection({
       </Panel>
       <Panel title="Data notes">
         <div className="connection-notes">
-          <p>Public dashboard. ESPN credentials stay on the server.</p>
           {syncFailure && <p className="negative-text">{syncFailure}</p>}
           <ul>
             {data.warnings.map((warning) => (

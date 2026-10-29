@@ -8,16 +8,16 @@ import { recordRanks, rosterValue, teamPower } from "@/lib/analysis";
 import { TeamAvatar } from "./avatars";
 import { Panel } from "../ui/primitives";
 import { signedZ } from "./format";
+import { AnimatedRows, MotionNumber } from "../ui/motion";
+import { CategoryMeter } from "../ui/category-meter";
 
 export function Standings({
   teams,
   title,
-  scoringType,
   onTeam,
 }: {
   teams: Team[];
   title?: string;
-  scoringType: string;
   onTeam: (id: number) => void;
 }) {
   const ranks = recordRanks(teams);
@@ -39,13 +39,13 @@ export function Standings({
               <th>T</th>
             </tr>
           </thead>
-          <tbody>
+          <AnimatedRows revision={teams.map(t => `${t.id}:${t.wins}:${t.losses}:${t.ties}`).join("|")}>
             {[...teams]
               .sort(
                 (a, b) => ranks.get(a.id)! - ranks.get(b.id)! || a.id - b.id,
               )
               .map((team) => (
-                <tr key={team.id}>
+                <tr key={team.id} data-motion-key={team.id}>
                   <td className="rank-cell">{ranks.get(team.id)}</td>
                   <td className="identity-col">
                     <button
@@ -56,20 +56,14 @@ export function Standings({
                       <strong>{team.name}</strong>
                     </button>
                   </td>
-                  <td>{team.wins}</td>
-                  <td>{team.losses}</td>
-                  <td>{team.ties}</td>
+                  <td><MotionNumber>{team.wins}</MotionNumber></td>
+                  <td><MotionNumber>{team.losses}</MotionNumber></td>
+                  <td><MotionNumber>{team.ties}</MotionNumber></td>
                 </tr>
               ))}
-          </tbody>
+          </AnimatedRows>
         </table>
       </div>
-      <p className="panel-note">
-        {scoringType === "H2H_CATEGORY"
-          ? "Category record."
-          : "Weekly matchup record."}{" "}
-        Equal win percentages share a rank. ESPN seeds may differ.
-      </p>
     </Panel>
   );
 }
@@ -80,29 +74,16 @@ export function RankingHelp({ model }: { model: Snapshot["model"] }) {
       <summary>How power works</summary>
       <div>
         <p>
-          Players: nine category z-scores measure season per-game value. Power
-          is a 0–100 percentile against {model.poolSize} reference players.
-          Players need {model.minimumGames} games and complete stats. Equal
-          underlying values share a rank (1, 2, 2, 4); rounded display scores
-          can look equal.
+          + means stronger than average; − means weaker. For turnovers,
+          fewer is better. Category scores are relative values, not stat totals.
         </p>
         <p>
-          Teams: power is the sum of roster category values, including bench and
-          IR. Each unrated player is provisionally assigned the reference-player
-          average (zero in each category). Coverage shows how much is measured.
-          Teams with no rated players remain unranked. More roster slots can
-          change the total.
+          Player power runs from 0–100. Team power adds up the roster’s category
+          scores. Ratings use season averages and require {model.minimumGames} games.
         </p>
         <p>
-          Shooting impact is weighted by attempts; fewer turnovers adds value.
-          These are observed values, not forecasts or win probabilities.
-          Injuries, schedules and legal starting lineups are not projected.
-        </p>
-        <p>
-          Trades keep the same reference pool. Punt weights a category at 0×,
-          Normal at 1×, Priority at 2×. Category changes show unweighted value;
-          the overall fit score uses each team’s priorities. Missing players
-          retain the same provisional assumption.
+          Estimated scores treat unrated players as average. Trade priorities
+          adjust team fit: Punt ignores a category; Priority counts it twice.
         </p>
       </div>
     </details>
@@ -116,12 +97,12 @@ export function Coverage({ roster }: { roster: Player[] }) {
       className={`coverage-label ${value.provisional ? "provisional" : ""}`}
       title={
         value.missing.length
-          ? `Reference-average estimate for: ${value.missing.map((p) => p.name).join(", ")}`
-          : "All roster players have measured values"
+          ? `Unrated: ${value.missing.map((p) => p.name).join(", ")}`
+          : "All players rated"
       }
     >
       {value.rated}/{value.size} rated
-      {value.provisional ? " · provisional" : ""}
+      {value.provisional ? " · Estimated" : ""}
     </span>
   );
 }
@@ -149,16 +130,16 @@ export function TeamRankings({
             <tr>
               <th>Rank</th>
               <th className="identity-col">Team</th>
-              <th>Power z</th>
-              <th>Coverage</th>
+              <th>Power</th>
+              <th>Rated players</th>
               {CATEGORIES.map((c) => (
                 <th key={c}>{c}</th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <AnimatedRows revision={values.map(v => `${v.team.id}:${v.score}`).join("|")}>
             {values.map((value) => (
-              <tr key={value.team.id}>
+              <tr key={value.team.id} data-motion-key={value.team.id}>
                 <td className="rank-cell">
                   {value.rank === null ? "—" : `#${value.rank}`}
                 </td>
@@ -171,10 +152,7 @@ export function TeamRankings({
                     <strong>{value.team.name}</strong>
                   </button>
                 </td>
-                <td>
-                  {value.score?.toFixed(1) ?? "—"}
-                  {value.provisional && value.score !== null ? "*" : ""}
-                </td>
+                <td><MotionNumber>{value.score?.toFixed(1) ?? "—"}</MotionNumber></td>
                 <td>
                   <Coverage
                     roster={players.filter((p) => p.teamId === value.team.id)}
@@ -189,13 +167,9 @@ export function TeamRankings({
                 ))}
               </tr>
             ))}
-          </tbody>
+          </AnimatedRows>
         </table>
       </div>
-      <p className="panel-note">
-        * Provisional: unrated players use reference-average value. Coverage is
-        not a confidence probability.
-      </p>
     </Panel>
   );
 }
@@ -212,6 +186,7 @@ export function CategoryValue({ value }: { value: number | null }) {
 
 export function CategoryProfile({ roster }: { roster: Player[] }) {
   const value = rosterValue(roster);
+  const range = Math.max(1, ...CATEGORIES.map((category) => Math.abs(value.categories[category])));
   return (
     <div className="team-category-profile" aria-label="Category strengths">
       {CATEGORIES.map((category) => (
@@ -220,6 +195,7 @@ export function CategoryProfile({ roster }: { roster: Player[] }) {
           <CategoryValue
             value={value.rated ? value.categories[category] : null}
           />
+          <CategoryMeter value={value.rated ? value.categories[category] : null} range={range} />
         </div>
       ))}
     </div>
@@ -255,21 +231,15 @@ export function TeamProfile({
           <strong>{team.standing === null ? "—" : `#${team.standing}`}</strong>
         </div>
         <div>
-          <span>Power z{value.provisional ? " (provisional)" : ""}</span>
+          <span>Power{value.provisional ? " (est.)" : ""}</span>
           <strong>{value.score?.toFixed(1) ?? "—"}</strong>
         </div>
         <div>
-          <span>Coverage</span>
+          <span>Rated players</span>
           <Coverage roster={roster} />
         </div>
       </div>
       <CategoryProfile roster={roster} />
-      {value.missing.length > 0 && (
-        <p className="panel-note missing-players">
-          Reference-average estimates:{" "}
-          {value.missing.map((p) => p.name).join(", ")}.
-        </p>
-      )}
     </>
   );
 }

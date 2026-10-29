@@ -70,7 +70,7 @@ export function PlayerDialog({
               Games <strong>{player.gamesPlayed}</strong>
             </span>
             <span>
-              Total z-score <strong>{player.zTotal?.toFixed(2) ?? "—"}</strong>
+              Category total <strong>{player.zTotal?.toFixed(2) ?? "—"}</strong>
             </span>
           </div>
           {player.power === null && (
@@ -80,7 +80,7 @@ export function PlayerDialog({
           )}
           <div className="contribution-header">
             <h3>Category value</h3>
-            <span>Per game / z-score</span>
+            <span>Per game / Value</span>
           </div>
           <div className="contribution-list">
             {CATEGORIES.map((category) => {
@@ -113,10 +113,6 @@ export function PlayerDialog({
               );
             })}
           </div>
-          <p className="panel-note">
-            Positive adds value, including turnovers.
-            {player.gamesPlayed < 10 ? " Small sample." : ""}
-          </p>
           {data.news.some((item) => item.playerIds.includes(player.id)) && (
             <div className="dialog-news">
               <h3>News</h3>

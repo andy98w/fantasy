@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { Player, Team } from "@/lib/schema";
+import type { NbaTeam } from "@/lib/nba";
 import { initials } from "./format";
 function Avatar({
   src,
@@ -47,11 +48,14 @@ export function TeamAvatar({
     />
   );
 }
+export function NbaAvatar({ team }: { team: NbaTeam }) {
+  return <Avatar src={team.logo} name={team.abbrev} kind="team" />;
+}
 export function PlayerAvatar({
   player,
   large = false,
 }: {
-  player: Player;
+  player: Pick<Player, "id" | "name">;
   large?: boolean;
 }) {
   return (

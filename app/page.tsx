@@ -1,6 +1,7 @@
 import { loadLeague } from "@/lib/data";
 import Dashboard from "@/components/dashboard";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { loadToday } from "@/lib/nba-data";
 export const dynamic = "force-dynamic";
 export default async function Page() {
   const result = await loadLeague();
@@ -22,10 +23,11 @@ export default async function Page() {
         </a>
       </main>
     );
+  const today = result.snapshot.mode === "live" ? await loadToday() : undefined;
   return (
     <>
       {result.snapshot.mode === "live" && <AutoRefresh />}
-      <Dashboard data={result.snapshot} syncFailure={result.syncFailure} />
+      <Dashboard data={result.snapshot} syncFailure={result.syncFailure} today={today} />
     </>
   );
 }

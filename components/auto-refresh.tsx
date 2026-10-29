@@ -3,7 +3,7 @@
 import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-/** Refresh the saved snapshot, never ESPN directly. */
+/** Refresh the saved league snapshot and the server-cached public NBA scores. */
 export function AutoRefresh() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();

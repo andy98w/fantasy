@@ -1,11 +1,14 @@
 "use client";
+import { useEffect, useRef } from "react";
 import type { Snapshot } from "@/lib/schema";
 import { PixelIcon, type IconName } from "../ui/pixel-icon";
 export const navigation = [
   { value: "league", label: "League", icon: "home" },
   { value: "team", label: "Teams", icon: "roster" },
   { value: "players", label: "Players", icon: "players" },
-  { value: "trades", label: "Trade Calculator", icon: "trade" },
+  { value: "trades", label: "Trades", icon: "trade" },
+  { value: "rivalries", label: "Rivalries", icon: "matchup" },
+  { value: "records", label: "Records", icon: "standings" },
 ] as const satisfies readonly {
   value: string;
   label: string;
@@ -26,6 +29,10 @@ export function Navigation({
   espn: string;
   minutes: number | null;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current?.querySelector('a[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+  }, [view]);
   return (
     <header className="app-header">
       <div className="masthead">
@@ -60,7 +67,7 @@ export function Navigation({
         </div>
       </div>
       <div className="navigation-row">
-        <nav aria-label="Main navigation">
+        <nav ref={navRef} aria-label="Main navigation">
           {navigation.map((item) => (
             <a
               key={item.value}
@@ -87,6 +94,7 @@ export function Navigation({
             className={view === "connection" ? "selected" : ""}
           >
             <span
+              key={data.syncedAt}
               className={`sync-dot ${data.mode === "demo" || (minutes ?? 0) > 15 ? "stale" : ""}`}
             />
             {data.mode === "demo"

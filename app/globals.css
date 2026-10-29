@@ -1,6 +1,13 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
 @import "../components/ui/controls.css";
 @import "../components/league/trade.css";
+@import "../components/league/matchup-clash.css";
+@import "../components/ui/game-feel.css";
+@import "../components/league/today.css";
+@import "../components/league/trade-battles.css";
+@import "../components/league/weekly-highlights.css";
+@import "../components/league/season.css";
+@import "../components/league/power-movers.css";
 
 :root {
   color-scheme: dark;
@@ -383,12 +390,15 @@ h2 {
   right: -1px;
 }
 .contender {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 18px;
   min-width: 0;
 }
 .contender h3 {
+  text-shadow: 0 1px 3px var(--surface-deep), 1px 0 var(--surface-deep), -1px 0 var(--surface-deep);
   font: 500 24px/1.15 var(--pixel);
   max-width: 240px;
   overflow-wrap: anywhere;
@@ -413,6 +423,10 @@ h2 {
   color: var(--coral);
 }
 .matchup-score {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--surface-deep) 92%, transparent);
+  padding: 12px 6px;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -447,63 +461,63 @@ h2 {
   color: var(--gold);
   margin-top: 4px;
 }
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-  border-top: 1px solid var(--line);
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.matchup-categories {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
   background: var(--surface);
+  border-top: 1px solid var(--line);
 }
-.category-cell {
-  padding: 14px 14px 10px;
-  border-right: 1px solid var(--line-soft);
-}
-.category-cell:last-child {
-  border-right: 0;
-}
+.matchup-categories tbody tr + tr { border-top: 1px solid var(--line-soft); }
+.matchup-categories tbody tr:nth-child(even) { background: var(--surface-deep); }
+.matchup-categories tbody tr { position: relative; isolation: isolate; }
+.category-value, .category-label { position: relative; z-index: 1; }
 .category-label {
-  display: block;
-  color: var(--text);
-  font-weight: 500;
-  font-size: 11px;
-  margin-bottom: 10px;
+  display: inline-block;
+  min-width: 52px;
+  padding: 4px 8px;
+  background: var(--surface-deep);
 }
-.category-values {
-  display: flex;
-  justify-content: space-between;
-  gap: 5px;
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-}
-.category-values strong,
-.category-values span {
+.matchup-categories td {
+  width: 40%;
+  padding: 12px 32px;
   color: var(--muted);
+  font-size: 18px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.matchup-categories td:first-child { text-align: left; }
+.matchup-categories td:last-child { text-align: right; }
+.matchup-categories th[scope="row"] {
+  width: 20%;
+  padding: 10px 0;
+  color: var(--text);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+}
+.matchup-categories th small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
   font-weight: 400;
 }
-.category-values .home-value {
-  color: var(--teal);
-  font-weight: 600;
-}
-.category-values .away-value {
-  color: var(--coral);
-  font-weight: 600;
-}
-.category-meter {
-  height: 5px;
-  background: var(--coral);
-  position: relative;
-  margin: 10px 0 6px;
-}
-.category-meter span {
-  display: block;
-  height: 100%;
-  background: var(--teal);
-  border-right: 3px solid var(--surface);
-}
-.category-cell small {
-  color: var(--muted);
-  font-size: 9px;
-  display: block;
-  text-align: center;
+.matchup-categories .home-value { color: var(--teal); font-weight: 600; }
+.matchup-categories .away-value { color: var(--coral); font-weight: 600; }
+@media (max-width: 760px) {
+  .matchup-categories td { padding: 11px 18px; font-size: 16px; }
 }
 .avatar {
   display: inline-grid;
@@ -1150,12 +1164,6 @@ input::placeholder {
   .contender h3 {
     font-size: 22px;
   }
-  .category-cell {
-    padding: 13px 10px 9px;
-  }
-  .category-values {
-    font-size: 12px;
-  }
 }
 @media (max-width: 1050px) {
   .sync-control {
@@ -1171,22 +1179,15 @@ input::placeholder {
   .overview-grid {
     grid-template-columns: 1fr;
   }
-  .overview-grid > .panel:last-child .news-feed {
+  .league-sidebar .news-feed {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .overview-grid > .panel:last-child .news-feed > a {
+  .league-sidebar .news-feed > a {
     border-right: 1px solid var(--line-soft);
   }
   .matchup-picker {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .category-values {
-    flex-direction: column;
-    gap: 4px;
-  }
-  .category-cell small {
-    font-size: 8px;
   }
 }
 @media (max-width: 760px) {
@@ -1299,34 +1300,6 @@ input::placeholder {
     width: 16px;
     height: 16px;
   }
-  .category-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .category-cell {
-    padding: 10px 14px 8px;
-    border-bottom: 1px solid var(--line-soft);
-  }
-  .category-cell:nth-child(3n) {
-    border-right: 0;
-  }
-  .category-cell:nth-last-child(-n + 3) {
-    border-bottom: 0;
-  }
-  .category-label {
-    margin-bottom: 5px;
-    font-size: 10px;
-  }
-  .category-values {
-    flex-direction: row;
-    font-size: 13px;
-  }
-  .category-meter {
-    margin: 7px 0 0;
-    height: 4px;
-  }
-  .category-cell small {
-    display: none;
-  }
   .panel-heading {
     padding: 14px;
   }
@@ -1342,7 +1315,7 @@ input::placeholder {
   .players-table.compact td:first-child {
     padding-left: 12px;
   }
-  .overview-grid > .panel:last-child .news-feed {
+  .league-sidebar .news-feed {
     grid-template-columns: 1fr;
   }
   .filters {
@@ -1491,33 +1464,45 @@ input::placeholder {
   gap: 16px;
 }
 .matchup-card {
-  padding: 16px 18px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 206px;
+  padding: 18px;
   background: var(--surface);
   border: 2px solid var(--line);
   box-shadow: 3px 3px 0 var(--shadow);
   text-align: left;
 }
-.matchup-card:hover {
-  border-color: var(--gold);
-  background: var(--surface-raised);
-}
+.matchup-card:hover { border-color: var(--gold); }
 .matchup-card-team {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
+  width: 34%;
+  text-align: center;
 }
-.matchup-card-team + .matchup-card-team {
-  padding-top: 12px;
-  margin-top: 12px;
-  border-top: 1px solid var(--line-soft);
+.matchup-card-team .avatar { width: 40px; height: 40px; }
+.matchup-card-name { min-width: 0; width: 100%; font-size: 12px; }
+.matchup-card-name, .matchup-card-team > strong, .category-value {
+  text-shadow: 0 1px 3px var(--surface-deep), 1px 0 var(--surface-deep), -1px 0 var(--surface-deep);
 }
-.matchup-card-name {
-  min-width: 0;
+.matchup-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  min-height: 2.8em;
 }
 .matchup-card-name small {
   display: block;
@@ -1526,18 +1511,21 @@ input::placeholder {
   font-size: 10px;
 }
 .matchup-card-team > strong {
-  margin-left: auto;
-  padding-left: 6px;
-  font-size: 26px;
+  font-size: 34px;
+  line-height: 1;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .matchup-card-ties {
-  display: block;
-  text-align: right;
+  position: absolute;
+  z-index: 1;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  background: var(--surface-deep);
   color: var(--muted);
   font-size: 10px;
-  margin-top: 10px;
 }
 @media (max-width: 1050px) {
   .matchup-grid {
@@ -1551,9 +1539,5 @@ input::placeholder {
   }
   .matchup-card {
     padding: 13px 16px;
-  }
-  .matchup-card-team + .matchup-card-team {
-    padding-top: 9px;
-    margin-top: 9px;
   }
 }

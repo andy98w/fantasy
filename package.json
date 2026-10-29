@@ -8,7 +8,9 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "postbuild": "node scripts/clean-standalone.mjs"
+    "postbuild": "node scripts/clean-standalone.mjs",
+    "test:postgres": "tsx --test tests/integration/*.test.ts",
+    "test:production": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.4.1",

@@ -26,6 +26,8 @@ export const playerSchema = z.object({
   gamesPlayed: numeric,
   stats,
   power: numeric.nullable(),
+  powerChange7d: numeric.nullable().default(null),
+  powerTrendStatus: z.enum(["measured", "new", "unavailable"]).default("unavailable"),
   zTotal: numeric.nullable(),
   rank: numeric.nullable(),
   contributions: z.record(z.string(), numeric),
@@ -59,17 +61,34 @@ export const teamSchema = z.object({
   rosterSize: numeric,
   categoryProfile: z.record(z.string(), numeric),
 });
+const performerSchema = z.object({ playerId: z.number().int(), name: z.string(), stats });
+export type WeeklyPlayer = z.infer<typeof performerSchema>;
 const side = z.object({
   teamId: numeric,
   wins: numeric.nullable(),
   ties: numeric.nullable(),
   stats,
+  performers: z.array(performerSchema).default([]),
+  performanceComplete: z.boolean().default(false),
 });
+export const matchupSchema = z.object({ id: numeric, period: numeric, home: side, away: side, result: z.enum(["HOME", "AWAY", "TIE", "UNDECIDED"]).default("UNDECIDED") });
+export type Matchup = z.infer<typeof matchupSchema>;
+export const tradeSchema = z.object({
+  id: z.string().min(1).max(200),
+  completedAt: z.string().datetime({ offset: true }),
+  moves: z.array(z.object({
+    playerId: z.number().int().positive(),
+    fromTeamId: z.number().int().positive(),
+    toTeamId: z.number().int().positive(),
+  })).min(1),
+});
+export type Trade = z.infer<typeof tradeSchema>;
 export const snapshotSchema = z.object({
   schemaVersion: z.literal(1),
   mode: z.enum(["demo", "live"]),
   syncedAt: z.string().datetime({ offset: true }),
   newsSyncedAt: z.string().optional(),
+  powerBaselineAt: z.string().datetime({ offset: true }).nullable().default(null),
   league: z.object({
     id: numeric,
     season: numeric,
@@ -83,9 +102,9 @@ export const snapshotSchema = z.object({
   }),
   teams: z.array(teamSchema),
   players: z.array(playerSchema),
-  matchups: z.array(
-    z.object({ id: numeric, period: numeric, home: side, away: side }),
-  ),
+  matchups: z.array(matchupSchema),
+  matchupHistory: z.array(matchupSchema).default([]),
+  historySyncError: z.string().nullable().default(null),
   news: z.array(
     z.object({
       id: z.string(),
@@ -96,6 +115,8 @@ export const snapshotSchema = z.object({
       playerIds: z.array(numeric),
     }),
   ),
+  trades: z.array(tradeSchema).default([]),
+  tradeSyncError: z.string().nullable().default(null),
   model: z.object({
     version: z.string(),
     basis: z.string(),

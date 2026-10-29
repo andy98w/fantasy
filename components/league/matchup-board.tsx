@@ -1,16 +1,22 @@
-import { CATEGORIES, type Snapshot, type Team } from "@/lib/schema";
+import { type Snapshot, type Team } from "@/lib/schema";
 import { TeamAvatar } from "./avatars";
-import { stat } from "./format";
+import { CategoryComparison } from "./category-comparison";
 import { Button, Empty } from "../ui/primitives";
 import { PixelIcon } from "../ui/pixel-icon";
+import { MatchupClash } from "./matchup-clash";
+import { MatchupMVP } from "./weekly-highlights";
+import type { weeklyMVPs } from "@/lib/weekly";
+import { MotionNumber } from "../ui/motion";
 export function MatchupBoard({
   matchup,
   teams,
   onDetails,
+  ratings = [],
 }: {
   matchup?: Snapshot["matchups"][number];
   teams: Team[];
   onDetails?: () => void;
+  ratings?: ReturnType<typeof weeklyMVPs>;
 }) {
   const home = teams.find((t) => t.id === matchup?.home.teamId),
     away = teams.find((t) => t.id === matchup?.away.teamId);
@@ -24,7 +30,6 @@ export function MatchupBoard({
     <section className="scoreboard">
       <div className="scoreboard-heading">
         <h2>Week {matchup.period}</h2>
-        <span>9 categories</span>
         {onDetails && (
           <Button variant="quiet" onClick={onDetails}>
             All matchups →
@@ -32,11 +37,7 @@ export function MatchupBoard({
         )}
       </div>
       <div className="scoreboard-matchup">
-        <div className="court-lines" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </div>
+        <MatchupClash home={matchup.home.wins} away={matchup.away.wins} finished={matchup.result !== "UNDECIDED"} />
         <div className="contender home">
           <TeamAvatar team={home} large />
           <div>
@@ -49,12 +50,12 @@ export function MatchupBoard({
         </div>
         <div className="matchup-score">
           <div className="score-digits">
-            <strong className="home-score">{matchup.home.wins ?? "—"}</strong>
+            <strong className="home-score"><MotionNumber>{matchup.home.wins ?? "—"}</MotionNumber></strong>
             <span>:</span>
-            <strong className="away-score">{matchup.away.wins ?? "—"}</strong>
+            <strong className="away-score"><MotionNumber>{matchup.away.wins ?? "—"}</MotionNumber></strong>
           </div>
           <span className="score-label">
-            {matchup.home.ties ? `${matchup.home.ties} tied` : "Categories won"}
+            {matchup.result !== "UNDECIDED" ? "Final" : matchup.home.ties ? `${matchup.home.ties} tied` : "Categories won"}
           </span>
           <PixelIcon name="ball" size={20} />
         </div>
@@ -69,48 +70,8 @@ export function MatchupBoard({
           </div>
         </div>
       </div>
-      <div className="category-grid">
-        {CATEGORIES.map((category) => {
-          const a = matchup.home.stats[category],
-            b = matchup.away.stats[category];
-          const known = a != null && b != null,
-            tied = known && a === b,
-            win = known && (category === "TO" ? a < b : a > b);
-          const share = known && a + b > 0 ? (100 * a) / (a + b) : 50;
-          return (
-            <div
-              className="category-cell"
-              key={category}
-              title={category === "TO" ? "Fewer turnovers wins" : undefined}
-            >
-              <span className="category-label">
-                {category}
-                {category === "TO" ? " ↓" : ""}
-              </span>
-              <div className="category-values">
-                <strong className={known && (win || tied) ? "home-value" : ""}>
-                  {stat(a, category)}
-                </strong>
-                <span className={known && (!win || tied) ? "away-value" : ""}>
-                  {stat(b, category)}
-                </span>
-              </div>
-              <div className="category-meter" aria-hidden="true">
-                <span style={{ width: `${share}%` }} />
-              </div>
-              <small>
-                {!known
-                  ? "Pending"
-                  : tied
-                    ? "Tied"
-                    : win
-                      ? home.abbrev
-                      : away.abbrev}
-              </small>
-            </div>
-          );
-        })}
-      </div>
+      <CategoryComparison home={matchup.home} away={matchup.away} homeName={home.name} awayName={away.name} finished={matchup.result !== "UNDECIDED"} />
+      <MatchupMVP matchup={matchup} teams={teams} ratings={ratings} />
     </section>
   );
 }

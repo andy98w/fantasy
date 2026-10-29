@@ -1,0 +1,91 @@
+.matchup-clash {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: paint;
+}
+.clash-track { position: absolute; inset: 0 -32px; }
+.clash-territory { position: absolute; inset: 0; }
+.clash-away { background: color-mix(in srgb, var(--coral) 24%, var(--surface-deep)); }
+.clash-home {
+  background: color-mix(in srgb, var(--teal) 26%, var(--surface-deep));
+  transition: clip-path 900ms ease;
+}
+.clash-contact {
+  position: absolute;
+  top: 0;
+  left: var(--clash-split);
+  width: 64px;
+  height: 100%;
+  transform: translateX(-50%);
+  transition: left 900ms ease;
+}
+.clash-contact svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.clash-bolt-halo { stroke: var(--teal); stroke-width: 12; opacity: 0.25; filter: blur(5px); }
+.clash-bolt-teal { stroke: var(--teal); stroke-width: 4; transform: translateX(-2px); opacity: 0.8; }
+.clash-bolt-coral { stroke: var(--coral); stroke-width: 4; transform: translateX(2px); opacity: 0.8; }
+.clash-bolt { stroke: #f6ffff; stroke-width: 2; stroke-linejoin: miter; }
+.clash-branch { stroke: #d5fff7; stroke-width: 1; opacity: 0; }
+.clash-spark { position: absolute; width: 3px; height: 3px; opacity: 0; }
+.spark-one { top: 22%; left: 32px; background: var(--teal); --spark-x: -26px; --spark-y: -20px; }
+.spark-two { top: 65%; left: 30px; background: var(--coral); --spark-x: 30px; --spark-y: 18px; }
+.spark-three { top: 46%; left: 33px; background: var(--text); --spark-x: 18px; --spark-y: -22px; }
+.matchup-clash[data-active="true"] .clash-track {
+  animation: clash-struggle 3.2s ease-in-out infinite;
+  animation-delay: var(--clash-delay);
+}
+.matchup-clash[data-active="true"] .clash-spark {
+  animation: clash-spark 3.2s ease-out infinite;
+  animation-delay: var(--clash-delay);
+}
+.matchup-clash[data-active="true"] .spark-two { animation-delay: calc(var(--clash-delay) - 1.3s); }
+.matchup-clash[data-active="true"] .spark-three { animation-delay: calc(var(--clash-delay) - 2.6s); }
+.matchup-clash[data-active="true"] .clash-contact svg {
+  animation: clash-charge 3.2s ease-in-out infinite;
+  animation-delay: var(--clash-delay);
+}
+.matchup-clash[data-active="true"] .clash-branch {
+  animation: clash-arc 3.2s ease-out infinite;
+  animation-delay: var(--clash-delay);
+}
+.matchup-clash[data-active="true"] .branch-two { animation-delay: calc(var(--clash-delay) - 1.6s); }
+.matchup-clash[data-empty="true"] .clash-territory { background: var(--surface); }
+.matchup-clash[data-empty="true"] .clash-bolt { stroke: var(--line); }
+.matchup-clash[data-empty="true"] .clash-bolt-halo { opacity: 0; }
+.matchup-clash[data-empty="true"] .clash-bolt-teal,
+.matchup-clash[data-empty="true"] .clash-bolt-coral { opacity: 0; }
+.matchup-clash[data-compact="true"] .clash-bolt { stroke-width: 1.5; }
+.matchup-clash[data-compact="true"] { inset: 1px 0 0; }
+.matchup-clash[data-compact="true"] .clash-bolt-halo { stroke-width: 8; filter: blur(3px); }
+.matchup-clash[data-compact="true"] .clash-spark { width: 2px; height: 2px; }
+@keyframes clash-struggle {
+  0%, 100% { transform: translateX(0); }
+  18% { transform: translateX(calc(var(--clash-push) * -0.65)); }
+  32% { transform: translateX(var(--clash-push)); }
+  39% { transform: translateX(calc(var(--clash-push) * 0.35)); }
+  54%, 62% { transform: translateX(var(--clash-drive)); }
+  76% { transform: translateX(calc(var(--clash-push) * -1)); }
+  87% { transform: translateX(calc(var(--clash-drive) * 0.5)); }
+}
+@keyframes clash-charge {
+  0%, 100% { opacity: 0.75; }
+  28%, 64% { opacity: 1; }
+  42%, 82% { opacity: 0.85; }
+}
+@keyframes clash-arc {
+  0%, 45%, 80%, 100% { opacity: 0; stroke-dasharray: 0 100; }
+  53% { opacity: 0.9; stroke-dasharray: 60 100; }
+  70% { opacity: 0; stroke-dasharray: 85 100; }
+}
+@keyframes clash-spark {
+  0%, 46%, 100% { opacity: 0; transform: translate(0, 0) scale(1); }
+  51% { opacity: 1; transform: translate(0, 0) scale(1.2); }
+  78% { opacity: 0; transform: translate(var(--spark-x), var(--spark-y)) scale(0.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .matchup-clash *, .matchup-clash[data-active="true"] * { animation: none; transition: none; }
+}
+.matchup-clash[data-final="true"] .clash-contact { opacity: .5; }
+.matchup-clash[data-winner="home"] .clash-home,
+.matchup-clash[data-winner="away"] .clash-away { box-shadow: inset 0 3px 0 color-mix(in srgb, var(--gold) 55%, transparent); }

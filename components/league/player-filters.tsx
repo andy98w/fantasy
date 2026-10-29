@@ -1,6 +1,8 @@
+import type { Team } from "@/lib/schema";
 import { Button } from "../ui/primitives";
 import { PixelIcon } from "../ui/pixel-icon";
 export function PlayerFilters({
+  teams,
   query,
   onQuery,
   position,
@@ -10,6 +12,7 @@ export function PlayerFilters({
   count,
   onReset,
 }: {
+  teams: Team[];
   query: string;
   onQuery: (value: string) => void;
   position: string;
@@ -37,7 +40,14 @@ export function PlayerFilters({
       >
         <option value="all">All players</option>
         <option value="available">Available</option>
-        <option value="mine">My roster</option>
+        <option value="rostered">Rostered</option>
+        <optgroup label="Teams">
+          {teams.map((team) => (
+            <option key={team.id} value={`team:${team.id}`}>
+              {team.name}
+            </option>
+          ))}
+        </optgroup>
       </select>
       <select
         aria-label="Position"

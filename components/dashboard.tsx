@@ -6,7 +6,8 @@ import { MatchupBoard } from "./league/matchup-board";
 import { PlayerTable } from "./league/player-table";
 import { PlayerDialog } from "./league/player-dialog";
 import { PlayerFilters } from "./league/player-filters";
-import { TeamAvatar } from "./league/avatars";
+import { MatchupGrid } from "./league/matchup-grid";
+import { TeamDirectory } from "./league/team-directory";
 import {
   Standings,
   TeamRankings,
@@ -25,25 +26,19 @@ export default function Dashboard({
   data: Snapshot;
   syncFailure: string | null;
 }) {
-  const mine = data.teams.find((team) => team.id === data.league.myTeamId)!;
   const [view, setView] = useState<View>("overview");
-  const [teamId, setTeamId] = useState(mine.id);
+  const [teamId, setTeamId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState("all");
   const [availability, setAvailability] = useState("all");
   const [rankingScope, setRankingScope] = useState<"players" | "teams">(
     "players",
   );
-  const [newsScope, setNewsScope] = useState<"all" | "mine">("all");
+  const [newsScope, setNewsScope] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
   const [selected, setSelected] = useState<Player | null>(null);
   const [minutes, setMinutes] = useState<number | null>(null);
-  const myMatchup = data.matchups.find((matchup) =>
-    [matchup.home.teamId, matchup.away.teamId].includes(mine.id),
-  );
-  const [matchupId, setMatchupId] = useState(
-    myMatchup?.id ?? data.matchups[0]?.id,
-  );
+  const [matchupId, setMatchupId] = useState(data.matchups[0]?.id);
   useEffect(() => {
     const update = () =>
       setMinutes(
@@ -72,7 +67,7 @@ export default function Dashboard({
   }, []);
   const go = (value: View) => {
     setView(value);
-    if (value === "team") setTeamId(mine.id);
+    if (value === "team") setTeamId(null);
     window.location.hash = value;
     window.scrollTo({ top: 0, behavior: "instant" });
   };
@@ -85,12 +80,10 @@ export default function Dashboard({
       key,
       descending: current.key === key ? !current.descending : key !== "TO",
     }));
-  const team = data.teams.find((team) => team.id === teamId) ?? mine;
-  const roster = data.players.filter((player) => player.teamId === team.id);
-  const myRoster = data.players.filter((player) => player.teamId === mine.id);
-  const alerts = myRoster.filter((player) =>
-    ["OUT", "DAY_TO_DAY", "INJURY_RESERVE"].includes(player.status),
-  );
+  const team = data.teams.find((team) => team.id === teamId);
+  const roster = team
+    ? data.players.filter((player) => player.teamId === team.id)
+    : [];
   const visiblePlayers = useMemo(
     () =>
       sortPlayers(
@@ -99,20 +92,26 @@ export default function Dashboard({
             player.name.toLowerCase().includes(query.toLowerCase()) &&
             (position === "all" || player.eligibleSlots.includes(position)) &&
             (availability === "all" ||
-              (availability === "mine" && player.teamId === mine.id) ||
+              (availability === "rostered" && player.teamId !== null) ||
+              (availability.startsWith("team:") &&
+                player.teamId === Number(availability.slice(5))) ||
               (availability === "available" &&
                 ["FREEAGENT", "WAIVERS"].includes(player.availability))),
         ),
         sort,
       ),
-    [data.players, query, position, availability, mine.id, sort],
+    [data.players, query, position, availability, sort],
   );
   const news = data.news.filter(
     (item) =>
       newsScope === "all" ||
-      item.playerIds.some((id) => myRoster.some((player) => player.id === id)),
+      item.playerIds.some((id) =>
+        data.players.some(
+          (player) => player.id === id && player.teamId === Number(newsScope),
+        ),
+      ),
   );
-  const espn = `https://fantasy.espn.com/basketball/team?leagueId=${data.league.id}&teamId=${mine.id}&seasonId=${data.league.season}`;
+  const espn = `https://fantasy.espn.com/basketball/league?leagueId=${data.league.id}&seasonId=${data.league.season}`;
   const tableProps = {
     teams: data.teams,
     minimumGames: data.model.minimumGames,
@@ -127,6 +126,7 @@ export default function Dashboard({
   };
   const filters = (
     <PlayerFilters
+      teams={data.teams}
       query={query}
       onQuery={setQuery}
       position={position}
@@ -144,7 +144,6 @@ export default function Dashboard({
       </a>
       <Navigation
         data={data}
-        mine={mine}
         view={view}
         go={go}
         espn={espn}
@@ -192,50 +191,22 @@ export default function Dashboard({
         </div>
         {view === "overview" && (
           <>
-            <MatchupBoard
-              matchup={myMatchup}
+            <MatchupGrid
+              matchups={data.matchups}
               teams={data.teams}
-              onDetails={() => go("matchup")}
+              period={data.league.matchupPeriod}
+              onMatchup={(id) => {
+                setMatchupId(id);
+                go("matchup");
+              }}
             />
-            <div className="roster-summary">
-              <button className="identity" onClick={() => openTeam(mine.id)}>
-                <TeamAvatar team={mine} />
-                <strong>{mine.name}</strong>
-              </button>
-              <span>
-                Standing{" "}
-                <strong>
-                  {mine.standing ? `#${mine.standing}` : "—"}
-                  <small>/{data.teams.length}</small>
-                </strong>
-              </span>
-              <span>
-                Record{" "}
-                <strong>
-                  {mine.wins}–{mine.losses}–{mine.ties}
-                </strong>
-              </span>
-              <button
-                onClick={() => openTeam(mine.id)}
-                className={alerts.length ? "injury-link" : ""}
-              >
-                {`${alerts.length} ${alerts.length === 1 ? "injury" : "injuries"}`}
-              </button>
-              <Button variant="quiet" onClick={() => openTeam(mine.id)}>
-                Full roster →
-              </Button>
-            </div>
             <div className="overview-grid">
-              <Panel
-                title="My roster"
-                action={<span className="panel-meta">Per game</span>}
-              >
-                <PlayerTable
-                  players={sortPlayers(myRoster, sort)}
-                  {...tableProps}
-                  compact
-                />
-              </Panel>
+              <Standings
+                title="Standings"
+                teams={data.teams}
+                scoringType={data.league.scoringType}
+                onTeam={openTeam}
+              />
               <Panel
                 title="News"
                 action={
@@ -292,24 +263,39 @@ export default function Dashboard({
             <div className="view-toolbar">
               <select
                 aria-label="Select team"
-                value={teamId}
-                onChange={(event) => setTeamId(Number(event.target.value))}
+                value={teamId ?? ""}
+                onChange={(event) =>
+                  setTeamId(
+                    event.target.value ? Number(event.target.value) : null,
+                  )
+                }
               >
+                <option value="">All teams</option>
                 {data.teams.map((team) => (
                   <option key={team.id} value={team.id}>
                     {team.name}
                   </option>
                 ))}
               </select>
-              <span className="muted">{roster.length} players</span>
+              <span className="muted">
+                {team
+                  ? `${roster.length} players`
+                  : `${data.teams.length} teams`}
+              </span>
             </div>
-            <TeamProfile team={team} />
-            <Panel>
-              <PlayerTable
-                players={sortPlayers(roster, sort)}
-                {...tableProps}
-              />
-            </Panel>
+            {team ? (
+              <>
+                <TeamProfile team={team} />
+                <Panel>
+                  <PlayerTable
+                    players={sortPlayers(roster, sort)}
+                    {...tableProps}
+                  />
+                </Panel>
+              </>
+            ) : (
+              <TeamDirectory teams={data.teams} onTeam={openTeam} />
+            )}
           </>
         )}
         {view === "players" && (
@@ -324,7 +310,6 @@ export default function Dashboard({
         {view === "league" && (
           <Standings
             teams={data.teams}
-            mineId={mine.id}
             scoringType={data.league.scoringType}
             onTeam={openTeam}
           />
@@ -370,15 +355,18 @@ export default function Dashboard({
         {view === "news" && (
           <>
             <div className="view-toolbar">
-              <Tabs
-                label="News filter"
+              <select
+                aria-label="News team"
                 value={newsScope}
-                options={[
-                  { value: "all", label: "All news" },
-                  { value: "mine", label: "My players" },
-                ]}
-                onChange={setNewsScope}
-              />
+                onChange={(event) => setNewsScope(event.target.value)}
+              >
+                <option value="all">All news</option>
+                {data.teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
               <span className="muted">{news.length} headlines</span>
             </div>
             <Panel className="news-page">

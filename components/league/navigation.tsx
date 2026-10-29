@@ -1,12 +1,11 @@
 "use client";
-import type { Snapshot, Team } from "@/lib/schema";
-import { TeamAvatar } from "./avatars";
+import type { Snapshot } from "@/lib/schema";
 import { PixelIcon, type IconName } from "../ui/pixel-icon";
 import { Button } from "../ui/primitives";
 export const navigation = [
   { value: "overview", label: "Overview", icon: "home" },
   { value: "matchup", label: "Matchups", icon: "matchup" },
-  { value: "team", label: "Roster", icon: "roster" },
+  { value: "team", label: "Teams", icon: "roster" },
   { value: "players", label: "Players", icon: "players" },
   { value: "league", label: "Standings", icon: "standings" },
   { value: "rankings", label: "Rankings", icon: "rankings" },
@@ -19,14 +18,12 @@ export const navigation = [
 export type View = (typeof navigation)[number]["value"] | "connection";
 export function Navigation({
   data,
-  mine,
   view,
   go,
   espn,
   minutes,
 }: {
   data: Snapshot;
-  mine: Team;
   view: View;
   go: (view: View) => void;
   espn: string;
@@ -63,14 +60,6 @@ export function Navigation({
             ESPN
             <PixelIcon name="external" size={12} />
           </a>
-          <button
-            className="my-team-button"
-            onClick={() => go("team")}
-            aria-label={`Open ${mine.name} roster`}
-          >
-            <TeamAvatar team={mine} />
-            <span>{mine.name}</span>
-          </button>
         </div>
       </div>
       <div className="navigation-row">

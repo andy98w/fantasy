@@ -151,19 +151,6 @@ a {
   align-items: center;
   gap: 18px;
 }
-.my-team-button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  max-width: 250px;
-  text-align: left;
-}
-.my-team-button > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .navigation-row {
   max-width: 1504px;
   margin: auto;
@@ -565,45 +552,6 @@ h2 {
 .contender.away .avatar {
   border-color: var(--coral);
 }
-.roster-summary {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-  margin: 26px 0 18px;
-  padding: 13px 18px;
-  border: 1px solid var(--line);
-  background: var(--surface-deep);
-}
-.roster-summary > span {
-  color: var(--muted);
-  font-size: 11px;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.roster-summary > span > strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 500;
-}
-.roster-summary small {
-  color: var(--muted);
-  font-size: 11px;
-}
-.roster-summary > .identity {
-  margin-right: auto;
-}
-.roster-summary .button {
-  margin-left: auto;
-}
-.roster-summary > button:not(.identity):not(.button) {
-  color: var(--muted);
-  font-size: 11px;
-  padding: 0;
-}
-.roster-summary > button.injury-link {
-  color: var(--coral) !important;
-}
 .overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 310px;
@@ -926,19 +874,6 @@ select {
   text-align: left;
   width: 80px;
 }
-.standings-table .my-row td {
-  background: #2c3445;
-}
-.standings-table .my-row td:first-child {
-  border-left: 3px solid var(--gold);
-  padding-left: 17px;
-}
-.you-label {
-  font-size: 9px;
-  color: var(--gold);
-  padding: 2px 5px;
-  border: 1px solid #ffcd7540;
-}
 .heatmap-table {
   min-width: 1160px;
 }
@@ -1252,9 +1187,6 @@ select {
   .category-values {
     font-size: 12px;
   }
-  .roster-summary {
-    gap: 20px;
-  }
 }
 @media (max-width: 1050px) {
   .sync-control {
@@ -1279,10 +1211,6 @@ select {
   }
   .matchup-picker {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .roster-summary {
-    flex-wrap: wrap;
-    gap: 14px 24px;
   }
   .category-values {
     flex-direction: column;
@@ -1320,12 +1248,8 @@ select {
   .header-actions {
     gap: 0;
   }
-  .header-actions .espn-link,
-  .my-team-button > span:last-child {
+  .header-actions .espn-link {
     display: none;
-  }
-  .my-team-button {
-    padding: 0;
   }
   .navigation-row {
     padding: 0;
@@ -1436,28 +1360,6 @@ select {
   }
   .category-cell small {
     display: none;
-  }
-  .roster-summary {
-    padding: 12px;
-    gap: 14px;
-  }
-  .roster-summary > .identity {
-    flex-basis: calc(100% - 110px);
-  }
-  .roster-summary .button {
-    order: -1;
-  }
-  .roster-summary > .identity {
-    order: -2;
-  }
-  .roster-summary > span {
-    font-size: 10px;
-  }
-  .roster-summary > span > strong {
-    font-size: 13px;
-  }
-  .roster-summary > button.injury-link {
-    margin-left: auto;
   }
   .panel-heading {
     padding: 14px;
@@ -1595,7 +1497,137 @@ select {
 .power-badge,
 .team-profile > div > strong,
 .matchup-picker button strong,
-.player-facts strong,
-.roster-summary > span > strong {
+.player-facts strong {
   font-variant-numeric: lining-nums tabular-nums;
+}
+
+.league-matchups {
+  margin-bottom: 26px;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 14px;
+}
+.section-heading h2 {
+  color: var(--gold);
+}
+.section-heading > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.matchup-card {
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 2px solid var(--line);
+  box-shadow: 3px 3px 0 var(--shadow);
+  text-align: left;
+}
+.matchup-card:hover {
+  border-color: var(--gold);
+  background: var(--surface-raised);
+}
+.matchup-card-team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.matchup-card-team + .matchup-card-team {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.matchup-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.matchup-card-name small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: 10px;
+}
+.matchup-card-team > strong {
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.matchup-card-ties {
+  display: block;
+  text-align: right;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 10px;
+}
+.team-directory {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.team-card {
+  background: var(--surface);
+  border: 2px solid var(--line);
+  box-shadow: 3px 3px 0 var(--shadow);
+  padding: 24px 20px;
+  text-align: left;
+}
+.team-card:hover {
+  border-color: var(--gold);
+}
+.team-card h2 {
+  margin: 18px 0;
+  overflow-wrap: anywhere;
+  font-size: 24px;
+}
+.team-card > div {
+  display: flex;
+  gap: 24px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 15px;
+}
+.team-card > div > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.team-card strong {
+  display: block;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1050px) {
+  .matchup-grid,
+  .team-directory {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .matchup-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .matchup-card {
+    padding: 13px 16px;
+  }
+  .matchup-card-team + .matchup-card-team {
+    padding-top: 9px;
+    margin-top: 9px;
+  }
+  .team-directory {
+    grid-template-columns: 1fr;
+  }
 }

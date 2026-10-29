@@ -3,17 +3,17 @@ import { TeamAvatar } from "./avatars";
 import { Panel } from "../ui/primitives";
 export function Standings({
   teams,
-  mineId,
+  title,
   scoringType,
   onTeam,
 }: {
   teams: Team[];
-  mineId: number;
+  title?: string;
   scoringType: string;
   onTeam: (id: number) => void;
 }) {
   return (
-    <Panel>
+    <Panel title={title}>
       <div
         className="table-scroll"
         tabIndex={0}
@@ -36,10 +36,7 @@ export function Standings({
             {[...teams]
               .sort((a, b) => (a.standing ?? 999) - (b.standing ?? 999))
               .map((team) => (
-                <tr
-                  key={team.id}
-                  className={team.id === mineId ? "my-row" : ""}
-                >
+                <tr key={team.id}>
                   <td className="rank-cell">{team.standing ?? "—"}</td>
                   <td className="identity-col">
                     <button
@@ -48,9 +45,6 @@ export function Standings({
                     >
                       <TeamAvatar team={team} />
                       <strong>{team.name}</strong>
-                      {team.id === mineId && (
-                        <span className="you-label">You</span>
-                      )}
                     </button>
                   </td>
                   <td>{team.wins}</td>

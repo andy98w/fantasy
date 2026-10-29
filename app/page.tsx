@@ -13,9 +13,9 @@ export default async function Page() {
             Configure ESPN access in the server’s private environment file.
           </li>
           <li>Run the league sync and verify its imported counts.</li>
-          <li>Reload this page to see your league.</li>
+          <li>Reload this page to see the league.</li>
         </ol>
-        <a href="https://fantasy.espn.com/basketball/team?leagueId=1834203755&teamId=3&seasonId=2027">
+        <a href="https://fantasy.espn.com/basketball/league?leagueId=1834203755&seasonId=2027">
           Open ESPN
         </a>
       </main>

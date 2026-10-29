@@ -48,6 +48,8 @@ See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share
 
 ## Frontend
 
+This is a shared league dashboard with no viewer-specific team. The overview shows every current matchup, standings, and news. Teams opens a directory; roster and news filters can target any team. The legacy `myTeamId` import field is not used by the frontend.
+
 The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings, IBM Plex Sans with tabular numerals for scores and data, and a shared palette in `app/globals.css`. No component library or animation runtime is required.
 
 - `components/ui/`: shared buttons, panels, segmented controls, and pixel SVG icons.

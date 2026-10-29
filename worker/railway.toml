@@ -1,0 +1,7 @@
+# Set this as the sync service's config path. Keep service root at repository root.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "worker/Dockerfile"
+[deploy]
+cronSchedule = "*/5 * * * *"
+restartPolicyType = "NEVER"

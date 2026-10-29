@@ -40,6 +40,8 @@ After a successful sync:
 3. Open the dashboard; no website sign-in is required. Anyone with the hosted URL can view the imported league data.
 4. Compare all team rosters, the nine current matchup totals, and the W–L–T record against ESPN. Check player ownership and free-agent coverage.
 
+The dev server imports immediately and repeats five minutes after each attempt finishes. Open pages pick up the saved data automatically; there is no import button. Hosting uses the separate five-minute Railway cron worker instead. The last-updated timestamp always describes the last successful league import.
+
 The initial local import has passed access, coverage, and matchup arithmetic checks. Repeat this reconciliation after changes to the connector or league settings. Do not assume a successful HTTP request proves every field is interpreted correctly.
 
 If ESPN returns 401/403 again, update the cookies from your signed-in browser and retry. The existing dashboard remains on its last successful data with a warning. No automated ESPN login, password collection, browser-cookie extraction, or write operations are implemented.

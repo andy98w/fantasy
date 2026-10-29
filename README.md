@@ -31,6 +31,8 @@ Open `http://127.0.0.1:3000`. Demo mode needs no ESPN credentials. `lib/demo.jso
 
 Connect your private league using [the connection guide](docs/CONNECT_ESPN.md). Run `uv run python -m worker.sync --probe` to check access without saving league data, then `uv run python -m worker.sync` to import. This worker only issues GET requests to ESPN. PostgreSQL writes are internal storage operations, never league mutations.
 
+In live mode, `npm run dev` also starts the sync worker: it imports immediately, then waits five minutes after each completed attempt. Failed imports retain the last successful snapshot and retry. Stopping the dev server stops this worker. Demo mode never polls ESPN. Open live dashboards check the saved snapshot every minute and when a tab becomes visible or reconnects, preserving filters and open player details. Visitors never trigger ESPN imports.
+
 ## Verification
 
 ```sh

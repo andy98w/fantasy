@@ -36,7 +36,8 @@ export default function Dashboard({
   );
   const [newsScope, setNewsScope] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
-  const [selected, setSelected] = useState<Player | null>(null);
+  const [selectedId, setSelectedId] = useState<Player["id"] | null>(null);
+  const selected = data.players.find((player) => player.id === selectedId) ?? null;
   const [minutes, setMinutes] = useState<number | null>(null);
   const [matchupId, setMatchupId] = useState(data.matchups[0]?.id);
   useEffect(() => {
@@ -117,7 +118,7 @@ export default function Dashboard({
     minimumGames: data.model.minimumGames,
     sort,
     onSort,
-    onSelect: setSelected,
+    onSelect: (player: Player) => setSelectedId(player.id),
   };
   const resetFilters = () => {
     setQuery("");
@@ -163,7 +164,7 @@ export default function Dashboard({
         ) : (minutes ?? 0) > 15 ? (
           <div className="notice warning" role="status">
             Data is {minutes} minutes old.{" "}
-            <button onClick={() => go("connection")}>Import status</button>
+            <button onClick={() => go("connection")}>Sync status</button>
           </div>
         ) : null}
         <div className="page-heading">
@@ -178,7 +179,7 @@ export default function Dashboard({
           <button
             className="mobile-import"
             onClick={() => go("connection")}
-            aria-label="Import status"
+            aria-label="Sync status"
           >
             {data.mode === "demo"
               ? "Demo"
@@ -381,7 +382,7 @@ export default function Dashboard({
       <PlayerDialog
         player={selected}
         data={data}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedId(null)}
       />
     </div>
   );

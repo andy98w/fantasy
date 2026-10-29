@@ -1,7 +1,6 @@
 "use client";
 import type { Snapshot } from "@/lib/schema";
 import { PixelIcon, type IconName } from "../ui/pixel-icon";
-import { Button } from "../ui/primitives";
 export const navigation = [
   { value: "overview", label: "Overview", icon: "home" },
   { value: "matchup", label: "Matchups", icon: "matchup" },
@@ -79,8 +78,8 @@ export function Navigation({
         <div className="sync-control">
           <a
             href="#connection"
-            title="Import status"
-            aria-label={`Import status: ${data.mode === "demo" ? "demo" : minutes === null ? "imported" : `updated ${minutes} minutes ago`}`}
+            title="Sync status"
+            aria-label={`Sync status: ${data.mode === "demo" ? "demo" : minutes === null ? "imported" : `updated ${minutes} minutes ago`}`}
             onClick={() => go("connection")}
             className={view === "connection" ? "selected" : ""}
           >
@@ -93,16 +92,8 @@ export function Navigation({
                 ? "Imported"
                 : minutes === 0
                   ? "Updated now"
-                  : `${minutes}m ago`}
+                  : `Updated ${minutes}m ago`}
           </a>
-          <Button
-            variant="quiet"
-            aria-label="Reload latest imported data"
-            title="Reload latest imported data"
-            onClick={() => window.location.reload()}
-          >
-            <PixelIcon name="refresh" size={13} />
-          </Button>
         </div>
       </div>
     </header>

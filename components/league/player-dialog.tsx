@@ -16,10 +16,11 @@ export function PlayerDialog({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const open = player !== null;
   useEffect(() => {
-    if (player) ref.current?.showModal();
+    if (open) ref.current?.showModal();
     else ref.current?.close();
-  }, [player]);
+  }, [open]);
   return (
     <dialog
       ref={ref}

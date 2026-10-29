@@ -6,8 +6,7 @@ export default async function Page() {
   if (!result.snapshot)
     return (
       <main className="setup-screen">
-        <div className="brand-mark">9</div>
-        <h1>Your league starts here.</h1>
+        <h1>League unavailable</h1>
         <p>{result.error}</p>
         <ol>
           <li>

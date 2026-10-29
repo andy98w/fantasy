@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Ninecat — Your league, in focus",
+  title: "Ninecat · Fantasy basketball",
   description:
     "A read-only fantasy basketball dashboard with category matchups, player rankings and league news.",
   robots: { index: false, follow: false },

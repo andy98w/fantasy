@@ -46,6 +46,17 @@ Unit tests cover shooting volume, turnovers, zero attempts, missing values, fixe
 
 See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share a private PostgreSQL database. The dashboard is public: anyone with the URL can view the imported league data without signing in. ESPN cookies stay exclusively in the sync worker; database credentials and raw upstream payloads remain server-side.
 
+## Frontend
+
+The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings and scores, IBM Plex Sans for data, and a shared palette in `app/globals.css`. No component library or animation runtime is required.
+
+- `components/ui/`: shared buttons, panels, segmented controls, and pixel SVG icons.
+- `components/league/`: navigation, avatars, matchup board, player tables and details, standings, rankings, news, filters, and connection status.
+- `components/dashboard.tsx`: navigation and filter state, composing the view components.
+- `components/league/format.ts`: numeric formatting and deterministic player sorting.
+
+Ranking definitions live in expandable details; missing-data explanations stay on the relevant player. Wide tables scroll independently, and the mobile matchup uses a 3×3 category grid.
+
 ## Structure
 
 - `app/`, `components/`: responsive dashboard and server-rendered entry point.

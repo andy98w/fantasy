@@ -1,142 +1,22 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Player, Snapshot } from "@/lib/schema";
+import { Navigation, navigation, type View } from "./league/navigation";
+import { MatchupBoard } from "./league/matchup-board";
+import { PlayerTable } from "./league/player-table";
+import { PlayerDialog } from "./league/player-dialog";
+import { PlayerFilters } from "./league/player-filters";
+import { TeamAvatar } from "./league/avatars";
 import {
-  ArrowDown,
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CircleHelp,
-  Clock3,
-  ExternalLink,
-  LayoutDashboard,
-  ListFilter,
-  Newspaper,
-  RefreshCw,
-  Search,
-  Settings2,
-  ShieldCheck,
-  Swords,
-  Trophy,
-  Users,
-  X,
-} from "lucide-react";
-import {
-  CATEGORIES,
-  type Category,
-  type Player,
-  type Snapshot,
-  type Team,
-} from "@/lib/schema";
-
-type View =
-  | "overview"
-  | "matchup"
-  | "team"
-  | "players"
-  | "league"
-  | "rankings"
-  | "news"
-  | "connection";
-const nav = [
-  ["overview", "Overview", LayoutDashboard],
-  ["matchup", "Matchups", Swords],
-  ["team", "My team", Users],
-  ["players", "Players", ListFilter],
-  ["league", "League", Trophy],
-  ["rankings", "Power rankings", ArrowUpRight],
-  ["news", "News", Newspaper],
-] as const;
-const categoryLabels: Record<string, string> = {
-  PTS: "Points",
-  REB: "Rebounds",
-  AST: "Assists",
-  STL: "Steals",
-  BLK: "Blocks",
-  "3PM": "Threes",
-  "FG%": "Field goals",
-  "FT%": "Free throws",
-  TO: "Turnovers",
-};
-const initials = (name: string) =>
-  name
-    .split(" ")
-    .map((x) => x[0])
-    .slice(0, 2)
-    .join("");
-const stat = (v: number | null | undefined, cat: string) =>
-  v == null
-    ? "—"
-    : cat.includes("%")
-      ? `${(v * 100).toFixed(1)}%`
-      : Number.isInteger(v)
-        ? v.toString()
-        : v.toFixed(1);
-const statusText = (s: string) =>
-  s === "DAY_TO_DAY"
-    ? "Day to day"
-    : s === "OUT"
-      ? "Out"
-      : s === "ACTIVE"
-        ? "Healthy"
-        : s.replaceAll("_", " ").toLowerCase();
-function TeamBadge({ team, small = false }: { team: Team; small?: boolean }) {
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const showLogo = team.logoUrl && failedUrl !== team.logoUrl;
-  return (
-    <span className={`team-badge ${small ? "small" : ""} color-${team.id % 4}`}>
-      {showLogo ? (
-        <img
-          src={team.logoUrl!}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          onError={() => setFailedUrl(team.logoUrl)}
-        />
-      ) : (
-        team.abbrev || initials(team.name)
-      )}
-    </span>
-  );
-}
-function PlayerAvatar({ player }: { player: Player }) {
-  const [failedId, setFailedId] = useState<number | null>(null);
-  const showImage = player.id > 0 && failedId !== player.id;
-  return (
-    <span className={`player-avatar color-${Math.abs(player.id) % 4}`}>
-      {showImage ? (
-        <img
-          src={`https://a.espncdn.com/i/headshots/nba/players/full/${player.id}.png`}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          onError={() => setFailedId(player.id)}
-        />
-      ) : (
-        initials(player.name)
-      )}
-    </span>
-  );
-}
-function Power({ value, reason }: { value: number | null; reason?: string }) {
-  return (
-    <span
-      className={`power ${value === null ? "unrated" : value >= 75 ? "strong" : ""}`}
-      title={
-        value === null ? reason : `${value.toFixed(1)} / 100 · 9-cat percentile`
-      }
-      aria-label={
-        value === null
-          ? `Unrated: ${reason ?? "insufficient data"}`
-          : `Power ${value.toFixed(1)} out of 100`
-      }
-    >
-      {value === null ? "Unrated" : value.toFixed(0)}
-    </span>
-  );
-}
+  Standings,
+  TeamRankings,
+  TeamProfile,
+  RankingHelp,
+} from "./league/team-views";
+import { Connection } from "./league/connection";
+import { NewsFeed } from "./league/news-feed";
+import { sortPlayers, type Sort } from "./league/format";
+import { Button, Panel, Tabs } from "./ui/primitives";
 
 export default function Dashboard({
   data,
@@ -145,1280 +25,376 @@ export default function Dashboard({
   data: Snapshot;
   syncFailure: string | null;
 }) {
+  const mine = data.teams.find((team) => team.id === data.league.myTeamId)!;
   const [view, setView] = useState<View>("overview");
-  const [teamId, setTeamId] = useState(data.league.myTeamId);
+  const [teamId, setTeamId] = useState(mine.id);
   const [query, setQuery] = useState("");
-  const [availability, setAvailability] = useState("all");
   const [position, setPosition] = useState("all");
-  const [sort, setSort] = useState("power");
-  const [descending, setDescending] = useState(true);
-  const [selected, setSelected] = useState<Player | null>(null);
-  const [newsScope, setNewsScope] = useState("all");
-  const [matchupId, setMatchupId] = useState(
-    data.matchups.find((m) =>
-      [m.home.teamId, m.away.teamId].includes(data.league.myTeamId),
-    )?.id ?? data.matchups[0]?.id,
-  );
+  const [availability, setAvailability] = useState("all");
   const [rankingScope, setRankingScope] = useState<"players" | "teams">(
     "players",
   );
-  const [rankingQuery, setRankingQuery] = useState("");
-  const [showMethod, setShowMethod] = useState(false);
-  const [now, setNow] = useState<number | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const modalRef = useRef<HTMLDialogElement>(null);
+  const [newsScope, setNewsScope] = useState<"all" | "mine">("all");
+  const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
+  const [selected, setSelected] = useState<Player | null>(null);
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const myMatchup = data.matchups.find((matchup) =>
+    [matchup.home.teamId, matchup.away.teamId].includes(mine.id),
+  );
+  const [matchupId, setMatchupId] = useState(
+    myMatchup?.id ?? data.matchups[0]?.id,
+  );
   useEffect(() => {
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 60000);
+    const update = () =>
+      setMinutes(
+        Math.max(
+          0,
+          Math.floor((Date.now() - new Date(data.syncedAt).getTime()) / 60000),
+        ),
+      );
+    update();
+    const timer = setInterval(update, 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [data.syncedAt]);
   useEffect(() => {
     const update = () => {
-      const hash = window.location.hash.slice(1);
-      if ([...nav.map((n) => n[0]), "connection"].includes(hash as View))
-        setView(hash as View);
+      const value = window.location.hash.slice(1);
+      if (
+        [...navigation.map((item) => item.value), "connection"].includes(
+          value as View,
+        )
+      )
+        setView(value as View);
     };
     update();
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, []);
-  useEffect(() => {
-    if (selected) modalRef.current?.showModal();
-    else modalRef.current?.close();
-  }, [selected]);
-  const go = (v: View) => {
-    setView(v);
-    window.location.hash = v;
+  const go = (value: View) => {
+    setView(value);
+    if (value === "team") setTeamId(mine.id);
+    window.location.hash = value;
     window.scrollTo({ top: 0, behavior: "instant" });
   };
-  const mine = data.teams.find((t) => t.id === data.league.myTeamId)!;
-  const team = data.teams.find((t) => t.id === teamId) ?? mine;
-  const roster = data.players.filter((p) => p.teamId === team.id);
-  const myRoster = data.players.filter((p) => p.teamId === mine.id);
-  const available = data.players.filter((p) =>
-    ["FREEAGENT", "WAIVERS"].includes(p.availability),
-  ).length;
-  const fullyRatedTeams = data.teams.filter(
-    (t) => t.talentRank !== null,
-  ).length;
-  const rankedTeams = [...data.teams].sort(
-    (a, b) => (a.talentRank ?? 999) - (b.talentRank ?? 999),
-  );
-  const matchup = data.matchups.find((m) => m.id === matchupId);
-  const left = matchup?.home;
-  const right = matchup?.away;
-  const leftTeam = data.teams.find((t) => t.id === left?.teamId);
-  const rightTeam = data.teams.find((t) => t.id === right?.teamId);
-  const alerts = myRoster.filter((p) =>
-    ["OUT", "DAY_TO_DAY", "INJURY_RESERVE"].includes(p.status),
-  );
-  const minutes = now
-    ? Math.max(0, Math.floor((now - new Date(data.syncedAt).getTime()) / 60000))
-    : 0;
-  const stale = data.mode === "live" && minutes > 15;
-  const visiblePlayers = useMemo(() => {
-    const list = data.players.filter(
-      (p) =>
-        p.name.toLowerCase().includes(query.toLowerCase()) &&
-        (availability === "all" ||
-          (availability === "available" &&
-            ["FREEAGENT", "WAIVERS"].includes(p.availability)) ||
-          (availability === "mine" && p.teamId === mine.id)) &&
-        (position === "all" || p.eligibleSlots.includes(position)),
-    );
-    return list.sort((a, b) => {
-      const av = sort === "power" ? a.zTotal : a.stats[sort];
-      const bv = sort === "power" ? b.zTotal : b.stats[sort];
-      if (av == null) return bv == null ? 0 : 1;
-      if (bv == null) return -1;
-      return descending ? bv - av : av - bv;
-    });
-  }, [data.players, query, availability, position, sort, descending, mine.id]);
-  const news = data.news.filter(
-    (n) =>
-      newsScope === "all" ||
-      n.playerIds.some((id) => myRoster.some((p) => p.id === id)),
-  );
-  const espn = `https://fantasy.espn.com/basketball/team?leagueId=${data.league.id}&teamId=${data.league.myTeamId}&seasonId=${data.league.season}`;
-  const titles: Record<View, string> = {
-    overview: "Your league, in focus.",
-    matchup: "Every category counts.",
-    team: team.name,
-    players: "Find your next advantage.",
-    league: "The whole league.",
-    rankings: "Beyond the standings.",
-    news: "Around the league.",
-    connection: "Your connection.",
+  const openTeam = (id: number) => {
+    go("team");
+    setTeamId(id);
   };
-  function sortedPlayers(players: Player[]) {
-    return [...players].sort((a, b) => {
-      const av = sort === "power" ? a.zTotal : a.stats[sort];
-      const bv = sort === "power" ? b.zTotal : b.stats[sort];
-      if (av == null) return bv == null ? 0 : 1;
-      if (bv == null) return -1;
-      return descending ? bv - av : av - bv;
-    });
-  }
-  function sortBy(key: string) {
-    if (sort === key) setDescending(!descending);
-    else {
-      setSort(key);
-      setDescending(true);
-    }
-  }
-  function ratingReason(player: Player) {
-    if (player.gamesPlayed < data.model.minimumGames)
-      return `${player.gamesPlayed} of ${data.model.minimumGames} required games played`;
-    return "Not enough complete statistics to calculate a rating";
-  }
-  function playerTable(players: Player[], compact = false) {
-    return (
-      <div className="table-scroll">
-        <table className="players-table">
-          <thead>
-            <tr>
-              <th className="player-col">Player</th>
-              <th title="Rank among all rated players, independent of filters">
-                Rank
-              </th>
-              <th>
-                <button onClick={() => sortBy("power")}>
-                  Power{" "}
-                  {sort === "power" && (
-                    <ArrowDown
-                      size={12}
-                      style={{
-                        transform: descending ? "none" : "rotate(180deg)",
-                      }}
-                    />
-                  )}
-                </button>
-              </th>
-              {(compact ? ["PTS", "REB", "AST", "FG%"] : CATEGORIES).map(
-                (c) => (
-                  <th key={c}>
-                    <button onClick={() => sortBy(c)}>
-                      {c}
-                      {sort === c && <ArrowDown size={11} />}
-                    </button>
-                  </th>
-                ),
-              )}
-              <th>
-                {view === "players" || view === "rankings"
-                  ? "Roster"
-                  : "Status"}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((p) => (
-              <tr key={p.id}>
-                <td className="player-col">
-                  <button
-                    className="player-button"
-                    onClick={() => setSelected(p)}
-                  >
-                    <PlayerAvatar player={p} />
-                    <span>
-                      <strong>{p.name}</strong>
-                      <small>
-                        {p.nbaTeam} <span className="dot-separator" />{" "}
-                        {p.position}
-                        {p.slot === "BE" ? " · Bench" : ""}
-                      </small>
-                    </span>
-                  </button>
-                </td>
-                <td
-                  className="rank-num"
-                  title={
-                    p.rank === null
-                      ? ratingReason(p)
-                      : "Overall 9-cat player rank"
-                  }
-                >
-                  {p.rank === null ? "—" : `#${p.rank}`}
-                </td>
-                <td>
-                  <Power value={p.power} reason={ratingReason(p)} />
-                </td>
-                {(compact ? ["PTS", "REB", "AST", "FG%"] : CATEGORIES).map(
-                  (c) => (
-                    <td key={c}>{stat(p.stats[c], c)}</td>
-                  ),
-                )}
-                <td>
-                  {view === "players" || view === "rankings" ? (
-                    <span
-                      className={`availability ${p.teamId === null ? "free" : ""}`}
-                    >
-                      {p.teamId === null
-                        ? p.availability === "FREEAGENT"
-                          ? "Free agent"
-                          : p.availability === "WAIVERS"
-                            ? "Waivers"
-                            : "Unknown"
-                        : data.teams.find((t) => t.id === p.teamId)?.abbrev}
-                    </span>
-                  ) : (
-                    <span
-                      className={`status ${p.status === "ACTIVE" ? "healthy" : "injured"}`}
-                    >
-                      {p.status === "ACTIVE" && <span />}
-                      {statusText(p.status)}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!players.length && (
-          <div className="empty">
-            <Search size={26} />
-            <h3>No players match.</h3>
-            <p>Try another name or broaden your filters.</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-  function matchupBoard(full = false) {
-    if (!matchup || !left || !right || !leftTeam || !rightTeam)
-      return (
-        <div className="panel empty">
-          <Swords />
-          <h3>No matchup available.</h3>
-          <p>Your team may have a bye, or the matchup has not started.</p>
-        </div>
-      );
-    return (
-      <section className={`matchup-panel ${full ? "full" : ""}`}>
-        <div className="panel-top">
-          <span className="section-label">Week {matchup.period} matchup</span>
-          <span className="subtle">
-            {data.mode === "demo" ? "Sample matchup" : "ESPN category totals"}
-          </span>
-        </div>
-        <div className="matchup-teams">
-          <div className="contender">
-            <TeamBadge team={leftTeam} />
-            <div>
-              <h2>{leftTeam.name}</h2>
-              <span>
-                {leftTeam.id === mine.id
-                  ? "Your team"
-                  : `${leftTeam.wins}-${leftTeam.losses}-${leftTeam.ties}`}
-              </span>
-            </div>
-          </div>
-          <div className="score">
-            <span>{left.wins ?? "—"}</span>
-            <i>:</i>
-            <span>{right.wins ?? "—"}</span>
-          </div>
-          <div className="contender opponent">
-            <div>
-              <h2>{rightTeam.name}</h2>
-              <span>
-                {rightTeam.id === mine.id
-                  ? "Your team"
-                  : `${rightTeam.wins}-${rightTeam.losses}-${rightTeam.ties}`}
-              </span>
-            </div>
-            <TeamBadge team={rightTeam} />
-          </div>
-        </div>
-        <div className="category-grid">
-          {CATEGORIES.map((c) => {
-            const a = left.stats[c],
-              b = right.stats[c];
-            const known = a != null && b != null;
-            const won = known && (c === "TO" ? a < b : a > b);
-            const tied = known && a === b;
-            const share =
-              known && a + b > 0
-                ? Math.max(8, Math.min(92, (100 * a) / (a + b)))
-                : 50;
-            return (
-              <div
-                key={c}
-                className={`category ${known ? (tied ? "tied" : won ? "winning" : "losing") : ""}`}
-              >
-                <div className="category-name">
-                  {c}
-                  {known && won && <Check size={12} />}
-                </div>
-                <div className="category-values">
-                  <strong>{stat(a, c)}</strong>
-                  <span>{stat(b, c)}</span>
-                </div>
-                <div className="comparison-track">
-                  <span style={{ width: `${share}%` }} />
-                  <i />
-                </div>
-                {full && (
-                  <small>
-                    {categoryLabels[c]}
-                    {c === "TO" ? " · Fewer wins" : ""}
-                  </small>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="matchup-footer">
-          <span>
-            <span className="legend-dot blue" />
-            {leftTeam.abbrev} <span className="legend-dot orange" />
-            {rightTeam.abbrev}
-            <span className="lower-note">Lower turnovers win</span>
-          </span>
-          {!full && (
-            <button className="text-button" onClick={() => go("matchup")}>
-              Matchup details <ChevronRight size={15} />
-            </button>
-          )}
-        </div>
-      </section>
-    );
-  }
-  function newsList(limit = 100) {
-    if (!news.length)
-      return (
-        <div className="news-empty">
-          <Newspaper size={27} />
-          <h3>
-            {data.mode === "demo"
-              ? "News connects with your league."
-              : "No matching headlines yet."}
-          </h3>
-          <p>
-            {data.mode === "demo"
-              ? "ESPN and RotoWire headlines will appear here after your first import."
-              : "New headlines appear after the next successful news sync."}
-          </p>
-          {data.mode === "demo" && (
-            <button className="text-button" onClick={() => go("connection")}>
-              Connection status <ChevronRight size={15} />
-            </button>
-          )}
-        </div>
-      );
-    return (
-      <div className="news-list">
-        {news.slice(0, limit).map((n) => (
-          <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer">
-            <div className="news-source">
-              {n.source}
-              <span>
-                {n.publishedAt
-                  ? new Date(n.publishedAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      timeZone: "America/Los_Angeles",
-                    })
-                  : "Date unavailable"}
-              </span>
-            </div>
-            <h3>
-              {n.title}
-              <ArrowUpRight size={15} />
-            </h3>
-            {n.playerIds.length > 0 && (
-              <small>
-                {n.playerIds
-                  .map((id) => data.players.find((p) => p.id === id)?.name)
-                  .filter(Boolean)
-                  .join(", ")}
-              </small>
-            )}
-          </a>
-        ))}
-      </div>
-    );
-  }
+  const onSort = (key: string) =>
+    setSort((current) => ({
+      key,
+      descending: current.key === key ? !current.descending : key !== "TO",
+    }));
+  const team = data.teams.find((team) => team.id === teamId) ?? mine;
+  const roster = data.players.filter((player) => player.teamId === team.id);
+  const myRoster = data.players.filter((player) => player.teamId === mine.id);
+  const alerts = myRoster.filter((player) =>
+    ["OUT", "DAY_TO_DAY", "INJURY_RESERVE"].includes(player.status),
+  );
+  const visiblePlayers = useMemo(
+    () =>
+      sortPlayers(
+        data.players.filter(
+          (player) =>
+            player.name.toLowerCase().includes(query.toLowerCase()) &&
+            (position === "all" || player.eligibleSlots.includes(position)) &&
+            (availability === "all" ||
+              (availability === "mine" && player.teamId === mine.id) ||
+              (availability === "available" &&
+                ["FREEAGENT", "WAIVERS"].includes(player.availability))),
+        ),
+        sort,
+      ),
+    [data.players, query, position, availability, mine.id, sort],
+  );
+  const news = data.news.filter(
+    (item) =>
+      newsScope === "all" ||
+      item.playerIds.some((id) => myRoster.some((player) => player.id === id)),
+  );
+  const espn = `https://fantasy.espn.com/basketball/team?leagueId=${data.league.id}&teamId=${mine.id}&seasonId=${data.league.season}`;
+  const tableProps = {
+    teams: data.teams,
+    minimumGames: data.model.minimumGames,
+    sort,
+    onSort,
+    onSelect: setSelected,
+  };
+  const resetFilters = () => {
+    setQuery("");
+    setPosition("all");
+    setAvailability("all");
+  };
+  const filters = (
+    <PlayerFilters
+      query={query}
+      onQuery={setQuery}
+      position={position}
+      onPosition={setPosition}
+      availability={availability}
+      onAvailability={setAvailability}
+      count={visiblePlayers.length}
+      onReset={resetFilters}
+    />
+  );
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a className="brand" href="#overview" onClick={() => go("overview")}>
-          <span className="brand-mark">
-            9<span />
-          </span>
-          <span>
-            ninecat<span className="brand-period">.</span>
-          </span>
-        </a>
-        <div className="league-selector">
-          <span className="league-icon">
-            <Trophy size={18} />
-          </span>
-          <div>
-            <strong>{data.league.name}</strong>
-            <small>{data.teams.length} teams · 9 categories</small>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <Navigation
+        data={data}
+        mine={mine}
+        view={view}
+        go={go}
+        espn={espn}
+        minutes={minutes}
+      />
+      <main className="main-content" id="main-content">
+        {data.mode === "demo" ? (
+          <div className="notice">
+            Demo league · Fictional stats{" "}
+            <button onClick={() => go("connection")}>Connection</button>
           </div>
-        </div>
-        <nav aria-label="Main navigation">
-          {nav.map(([key, label, Icon]) => (
-            <a
-              key={key}
-              aria-label={label}
-              href={`#${key}`}
-              onClick={() => {
-                if (key === "team") setTeamId(mine.id);
-                go(key);
-              }}
-              className={view === key ? "active" : ""}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-              {key === "news" && data.news.length > 0 && (
-                <span className="nav-count">{data.news.length}</span>
-              )}
-            </a>
-          ))}
-          <a
-            className="mobile-connection"
-            aria-label="Connection"
-            href="#connection"
+        ) : syncFailure ? (
+          <div className="notice warning" role="status">
+            Sync failed. Showing the last import.{" "}
+            <button onClick={() => go("connection")}>Details</button>
+          </div>
+        ) : (minutes ?? 0) > 15 ? (
+          <div className="notice warning" role="status">
+            Data is {minutes} minutes old.{" "}
+            <button onClick={() => go("connection")}>Import status</button>
+          </div>
+        ) : null}
+        <div className="page-heading">
+          <h1>
+            {view === "connection"
+              ? "Connection"
+              : navigation.find((item) => item.value === view)?.label}
+          </h1>
+          {view === "players" || view === "rankings" ? (
+            <span className="heading-detail">Season per game</span>
+          ) : null}
+          <button
+            className="mobile-import"
             onClick={() => go("connection")}
+            aria-label="Import status"
           >
-            <Settings2 size={19} />
-            <span>Connection</span>
-          </a>
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="read-only">
-            <ShieldCheck size={17} />
-            <span>Read-only by design</span>
-          </div>
-          <a href="#connection" onClick={() => go("connection")}>
-            <Settings2 size={17} />
-            Connection
-          </a>
-          <a href={espn} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={17} />
-            Open ESPN
-          </a>
-          <div className="sidebar-team">
-            <TeamBadge team={mine} small />
-            <div>
-              <strong>{mine.name}</strong>
-              <small>Your team</small>
-            </div>
-          </div>
+            {data.mode === "demo"
+              ? "Demo"
+              : minutes === null
+                ? "Imported"
+                : minutes === 0
+                  ? "Updated now"
+                  : `${minutes}m ago`}
+          </button>
         </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <span>
-            Fantasy basketball <ChevronRight size={14} />{" "}
-            <strong>
-              {data.league.season - 1}–{String(data.league.season).slice(2)}
-            </strong>
-          </span>
-          <div className="top-actions">
-            <label className="global-search">
-              <Search size={16} />
-              <input
-                aria-label="Search players"
-                placeholder="Search players…"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  go("players");
-                }}
-              />
-            </label>
-            <span className="user-avatar" aria-label={mine.name}>
-              <TeamBadge team={mine} small />
-            </span>
-          </div>
-        </header>
-        <main className="main-content" id="main-content">
-          {data.mode === "demo" ? (
-            <div className="demo-banner">
-              <span>
-                <span className="status-dot" />
-                <strong>Demo league</strong> Fictional players and sample stats.
-                Your ESPN league is not connected yet.
-              </span>
-              <button onClick={() => go("connection")}>
-                Connect your league <ChevronRight size={14} />
-              </button>
-            </div>
-          ) : (
-            (syncFailure || stale) && (
-              <div className="warning-banner">
-                {syncFailure ??
-                  "Data is more than 15 minutes old. Showing the last successful import."}
-              </div>
-            )
-          )}
-          <div className="page-heading">
-            <div>
-              <p className="page-context">
-                {view === "overview"
-                  ? `Week ${data.league.matchupPeriod} · Head-to-head, 9-cat`
-                  : (nav.find((n) => n[0] === view)?.[1] ?? "League settings")}
-              </p>
-              <h1>{titles[view]}</h1>
-            </div>
-            <button
-              className="refresh-button"
-              onClick={() => {
-                setRefreshing(true);
-                window.location.reload();
-              }}
-              disabled={refreshing}
-            >
-              <RefreshCw size={14} />
-              {refreshing
-                ? "Loading…"
-                : data.mode === "demo"
-                  ? "Refresh view"
-                  : minutes > 0
-                    ? `Updated ${minutes}m ago`
-                    : "Just updated"}
-            </button>
-          </div>
-          {view === "overview" && (
-            <>
-              {matchupBoard()}
-              <div className="summary-strip">
-                <div>
-                  <span>League standing</span>
-                  <strong>
-                    {mine.standing
-                      ? `${mine.standing}${mine.standing === 1 ? "st" : mine.standing === 2 ? "nd" : mine.standing === 3 ? "rd" : "th"}`
-                      : "—"}{" "}
-                    <small>of {data.teams.length}</small>
-                  </strong>
-                  <button onClick={() => go("league")}>
-                    View standings <ChevronRight size={13} />
-                  </button>
-                </div>
-                <div>
-                  <span>Roster talent rank</span>
-                  <strong>
-                    {mine.talentRank ? `#${mine.talentRank}` : "—"}
-                    <small>of {fullyRatedTeams} fully rated teams</small>
-                  </strong>
-                  <button
-                    onClick={() => {
-                      setRankingScope("teams");
-                      go("rankings");
-                    }}
-                  >
-                    Explore rankings <ChevronRight size={13} />
-                  </button>
-                </div>
-                <div>
-                  <span>Roster watch</span>
-                  <strong>
-                    {alerts.length}
-                    <small>
-                      injury {alerts.length === 1 ? "flag" : "flags"}
-                    </small>
-                  </strong>
-                  <button
-                    onClick={() => {
-                      setTeamId(mine.id);
-                      go("team");
-                    }}
-                  >
-                    {alerts.length ? "Review your roster" : "See your team"}{" "}
-                    <ChevronRight size={13} />
-                  </button>
-                </div>
-                <div>
-                  <span>Available players</span>
-                  <strong>
-                    {available}
-                    <small>free agents & waivers</small>
-                  </strong>
-                  <button
-                    onClick={() => {
-                      setAvailability("available");
-                      go("players");
-                    }}
-                  >
-                    Explore players <ChevronRight size={13} />
-                  </button>
-                </div>
-              </div>
-              <div className="overview-columns">
-                <section className="panel roster-panel">
-                  <div className="panel-title">
-                    <div>
-                      <h2>Your roster</h2>
-                      <p>Season averages. Tap a player for the full picture.</p>
-                    </div>
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setTeamId(mine.id);
-                        go("team");
-                      }}
-                    >
-                      All players <ChevronRight size={15} />
-                    </button>
-                  </div>
-                  {playerTable(sortedPlayers(myRoster).slice(0, 7), true)}
-                </section>
-                <section className="panel">
-                  <div className="panel-title">
-                    <h2>League pulse</h2>
-                    <Newspaper size={18} />
-                  </div>
-                  {newsList(4)}
-                  <div className="panel-bottom">
-                    <button className="text-button" onClick={() => go("news")}>
-                      All news <ChevronRight size={15} />
-                    </button>
-                  </div>
-                </section>
-              </div>
-              <section className="panel league-peek">
-                <div className="panel-title">
-                  <div>
-                    <h2>The talent board</h2>
-                    <p>Roster value, independent of the standings.</p>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      setRankingScope("teams");
-                      go("rankings");
-                    }}
-                  >
-                    Full rankings <ChevronRight size={15} />
-                  </button>
-                </div>
-                <div className="peek-teams">
-                  {rankedTeams.slice(0, 4).map((t, i) => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        setTeamId(t.id);
-                        go("team");
-                      }}
-                    >
-                      <span className="peek-rank">{t.talentRank ?? "—"}</span>
-                      <TeamBadge team={t} small />
-                      <div>
-                        <strong>{t.name}</strong>
-                        <small>
-                          {t.rankedPlayers}/{t.rosterSize} players rated
-                        </small>
-                      </div>
-                      <span>{t.talent?.toFixed(1) ?? "—"}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            </>
-          )}
-          {view === "matchup" && (
-            <>
-              <div className="matchup-picker">
-                {data.matchups.map((m) => (
-                  <button
-                    className={m.id === matchupId ? "selected" : ""}
-                    key={m.id}
-                    onClick={() => setMatchupId(m.id)}
-                  >
-                    {data.teams.find((t) => t.id === m.home.teamId)?.abbrev}
-                    <span>
-                      {m.home.wins ?? "—"} : {m.away.wins ?? "—"}
-                    </span>
-                    {data.teams.find((t) => t.id === m.away.teamId)?.abbrev}
-                  </button>
-                ))}
-              </div>
-              {matchupBoard(true)}
-              <div className="explanation">
-                <Clock3 size={20} />
-                <div>
-                  <h3>Actual results, straight from ESPN.</h3>
-                  <p>
-                    Totals reflect ESPN’s scored lineups for this matchup.
-                    Roster changes and stat corrections appear after the next
-                    sync. Weekly forecasts are not included in this first
-                    release.
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-          {view === "team" && (
-            <>
-              <div className="team-toolbar">
-                <label>
-                  Team{" "}
-                  <select
-                    value={teamId}
-                    onChange={(e) => setTeamId(Number(e.target.value))}
-                  >
-                    {data.teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span>
-                  {roster.length} players · {team.wins}-{team.losses}-
-                  {team.ties}
-                </span>
-              </div>
-              <div className="profile-strip">
-                {CATEGORIES.map((c) => (
-                  <div key={c}>
-                    <span>{c}</span>
-                    <strong
-                      className={
-                        (team.categoryProfile[c] ?? 0) >= 0
-                          ? "positive"
-                          : "negative"
-                      }
-                    >
-                      {(team.categoryProfile[c] ?? 0) > 0 ? "+" : ""}
-                      {team.categoryProfile[c]?.toFixed(1) ?? "—"}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-              <p className="table-note">
-                Category contributions from {team.rankedPlayers}/
-                {team.rosterSize} rated players. Includes bench and injured
-                players; this is roster talent, not a weekly forecast.
-              </p>
-              <section className="panel">
-                {playerTable(sortedPlayers(roster))}
-              </section>
-            </>
-          )}
-          {view === "players" && (
-            <>
-              <div className="filters">
-                <label className="search-field">
-                  <Search size={17} />
-                  <input
-                    aria-label="Filter players by name"
-                    placeholder="Player name"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </label>
-                <select
-                  aria-label="Availability"
-                  value={availability}
-                  onChange={(e) => setAvailability(e.target.value)}
-                >
-                  <option value="all">All players</option>
-                  <option value="available">Available players</option>
-                  <option value="mine">My roster</option>
-                </select>
-                <select
-                  aria-label="Position"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                >
-                  <option value="all">All positions</option>
-                  {["PG", "SG", "SF", "PF", "C"].map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
-                <span>{visiblePlayers.length} players</span>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    setQuery("");
-                    setPosition("all");
-                    setAvailability("all");
-                  }}
-                >
-                  Reset
-                </button>
-              </div>
-              <section className="panel">{playerTable(visiblePlayers)}</section>
-              <p className="table-note">
-                Power is a percentile against the fixed {data.model.poolSize}
-                -player reference pool. Minimum {data.model.minimumGames} games.
-                Stats are season averages; missing stats remain blank.
-              </p>
-            </>
-          )}
-          {view === "league" && (
-            <section className="panel">
-              <div className="panel-title">
-                <div>
-                  <h2>Standings</h2>
-                  <p>
-                    {data.league.scoringType === "H2H_CATEGORY"
-                      ? "Each category counts toward the record."
-                      : "Weekly matchup results determine the record."}
-                  </p>
-                </div>
-                <span className="pill">ESPN standings</span>
-              </div>
-              <div className="table-scroll">
-                <table className="league-table">
-                  <thead>
-                    <tr>
-                      <th>Rank</th>
-                      <th>Team</th>
-                      <th>W</th>
-                      <th>L</th>
-                      <th>T</th>
-                      <th>Roster talent</th>
-                      <th>Players rated</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...data.teams]
-                      .sort((a, b) => (a.standing ?? 999) - (b.standing ?? 999))
-                      .map((t) => (
-                        <tr key={t.id}>
-                          <td>{t.standing ?? "—"}</td>
-                          <td>
-                            <button
-                              className="team-link"
-                              onClick={() => {
-                                setTeamId(t.id);
-                                go("team");
-                              }}
-                            >
-                              <TeamBadge team={t} small />
-                              <strong>{t.name}</strong>
-                              {t.id === mine.id && (
-                                <span className="you-tag">You</span>
-                              )}
-                            </button>
-                          </td>
-                          <td>{t.wins}</td>
-                          <td>{t.losses}</td>
-                          <td>{t.ties}</td>
-                          <td>{t.talentRank ? `#${t.talentRank}` : "—"}</td>
-                          <td>
-                            {t.rankedPlayers}/{t.rosterSize}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-          {view === "rankings" && (
-            <>
-              <div className="segmented" aria-label="Ranking type">
-                <button
-                  aria-pressed={rankingScope === "players"}
-                  className={rankingScope === "players" ? "selected" : ""}
-                  onClick={() => {
-                    setRankingScope("players");
-                    setSort("power");
-                    setDescending(true);
-                  }}
-                >
-                  Players
-                </button>
-                <button
-                  aria-pressed={rankingScope === "teams"}
-                  className={rankingScope === "teams" ? "selected" : ""}
-                  onClick={() => setRankingScope("teams")}
-                >
-                  Teams
-                </button>
-              </div>
-              {rankingScope === "players" ? (
-                <>
-                  <div className="ranking-intro">
-                    <div>
-                      <h2>Player power</h2>
-                      <p>
-                        {data.players.filter((p) => p.rank !== null).length}{" "}
-                        rated players · Season per game · All nine categories
-                      </p>
-                      <p>
-                        Rank compares all rated players. Power is a 0–100
-                        percentile against the fixed {data.model.poolSize}
-                        -player reference pool.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="filters">
-                    <label className="search-field">
-                      <Search size={16} />
-                      <input
-                        aria-label="Search player rankings"
-                        placeholder="Search player rankings…"
-                        value={rankingQuery}
-                        onChange={(e) => setRankingQuery(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <section className="panel">
-                    {playerTable(
-                      sortedPlayers(
-                        data.players.filter((p) =>
-                          p.name
-                            .toLowerCase()
-                            .includes(rankingQuery.toLowerCase()),
-                        ),
-                      ),
-                    )}
-                  </section>
-                  <p className="table-note">
-                    Players need {data.model.minimumGames} games and complete
-                    stats to receive a rating. Unrated players appear last.
-                    These early-season ratings describe performance so far; they
-                    are not rest-of-season projections. Select a player to see
-                    their category contributions.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="ranking-intro">
-                    <div>
-                      <h2>Roster talent</h2>
-                      <p className="coverage-note">
-                        {fullyRatedTeams} of {data.teams.length} teams have
-                        complete ratings. Unrated teams are not included in the
-                        rank.
-                      </p>
-                      <p>
-                        A transparent first look at team strength. Sum of each
-                        player’s nine-category value, including bench and
-                        injured players.
-                      </p>
-                    </div>
-                    <button
-                      className="secondary-button"
-                      onClick={() => setShowMethod(!showMethod)}
-                    >
-                      <CircleHelp size={16} />
-                      {showMethod ? "Hide methodology" : "How it works"}
-                    </button>
-                  </div>
-                  {showMethod && (
-                    <div className="methodology">
-                      <h3>Every score has a reason.</h3>
-                      <p>
-                        We standardize per-game counting stats against a fixed
-                        fantasy-relevant player pool. Turnovers are reversed.
-                        Shooting impact is makes minus baseline percentage ×
-                        attempts, so volume matters. The nine z-scores sum to
-                        player value; power displays its reference-pool
-                        percentile.
-                      </p>
-                      <p>
-                        Reference pool: {data.model.poolSize} players.{" "}
-                        {data.model.poolRule}. At least{" "}
-                        {data.model.minimumGames} games required. A team with
-                        incomplete player ratings receives no talent rank. This
-                        model is descriptive, not a forecast or win probability.
-                      </p>
-                    </div>
-                  )}
-                  <section className="panel">
-                    <div className="table-scroll">
-                      <table className="heatmap">
-                        <thead>
-                          <tr>
-                            <th>Rank</th>
-                            <th>Team</th>
-                            <th>Talent</th>
-                            {CATEGORIES.map((c) => (
-                              <th key={c}>{c}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rankedTeams.map((t) => (
-                            <tr key={t.id}>
-                              <td className="rank-num">
-                                {t.talentRank ?? "—"}
-                              </td>
-                              <td>
-                                <button
-                                  className="team-link"
-                                  onClick={() => {
-                                    setTeamId(t.id);
-                                    go("team");
-                                  }}
-                                >
-                                  <TeamBadge team={t} small />
-                                  <strong>{t.name}</strong>
-                                </button>
-                              </td>
-                              <td>
-                                <strong>{t.talent?.toFixed(1) ?? "—"}</strong>
-                              </td>
-                              {CATEGORIES.map((c) => {
-                                const v = t.categoryProfile[c] ?? 0;
-                                return (
-                                  <td key={c}>
-                                    <span
-                                      className={`heat ${v >= 0 ? "positive" : "negative"}`}
-                                      style={{
-                                        background:
-                                          v >= 0
-                                            ? `rgba(38,114,91,${Math.min(0.28, 0.04 + Math.abs(v) * 0.025)})`
-                                            : `rgba(197,104,61,${Math.min(0.24, 0.04 + Math.abs(v) * 0.025)})`,
-                                      }}
-                                    >
-                                      {v > 0 ? "+" : ""}
-                                      {v.toFixed(1)}
-                                    </span>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                  <p className="table-note">
-                    Category totals use only rated players. Positive values
-                    indicate above-baseline contributions; negative values
-                    indicate below-baseline contributions. Weekly team power is
-                    the next model milestone.
-                  </p>
-                </>
-              )}
-            </>
-          )}
-          {view === "news" && (
-            <>
-              <div className="segmented">
-                <button
-                  className={newsScope === "all" ? "selected" : ""}
-                  onClick={() => setNewsScope("all")}
-                >
-                  All league news
-                </button>
-                <button
-                  className={newsScope === "mine" ? "selected" : ""}
-                  onClick={() => setNewsScope("mine")}
-                >
-                  My players
-                </button>
-              </div>
-              <section className="panel news-page">{newsList()}</section>
-              <p className="table-note">
-                Headlines link to their original publisher. Feeds may omit
-                stories; player matching uses full names where source IDs are
-                unavailable.
-              </p>
-            </>
-          )}
-          {view === "connection" && (
-            <div className="connection-grid">
-              <section className="panel connection-card">
-                <ShieldCheck size={32} />
-                <h2>
-                  {data.mode === "demo"
-                    ? "Ready for your league."
-                    : "Your ESPN league is connected."}
-                </h2>
-                <p>
-                  {data.mode === "demo"
-                    ? "You’re exploring a fictional league. Connect ESPN to replace this sample with your teams, players and matchups."
-                    : "ESPN remains the source of truth. This dashboard only reads league data."}
-                </p>
-                <dl>
-                  <div>
-                    <dt>League ID</dt>
-                    <dd>{data.league.id}</dd>
-                  </div>
-                  <div>
-                    <dt>Season</dt>
-                    <dd>{data.league.season}</dd>
-                  </div>
-                  <div>
-                    <dt>Mode</dt>
-                    <dd>
-                      {data.mode === "demo" ? "Demo data" : "Live import"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Last league import</dt>
-                    <dd>
-                      {data.mode === "demo"
-                        ? "Not connected"
-                        : new Date(data.syncedAt).toLocaleString("en-US", {
-                            timeZone: "America/Los_Angeles",
-                          }) + " PT"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Player coverage</dt>
-                    <dd>
-                      {data.coverage.playerCount}{" "}
-                      {data.mode === "demo" ? "sample" : "imported"} players
-                    </dd>
-                  </div>
-                </dl>
-                <a
-                  className="primary-button"
-                  href={espn}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open your ESPN league <ExternalLink size={15} />
-                </a>
-              </section>
-              <section className="panel connection-card">
-                <h2>Public dashboard. Private credentials.</h2>
-                <p>
-                  Anyone can view this dashboard without signing in. ESPN access
-                  is configured by the site owner on the server. Your ESPN
-                  password is never requested by this dashboard, and account
-                  cookies never reach the browser.
-                </p>
-                <h3>For the site owner</h3>
-                <p>
-                  Follow the repository’s connection guide to configure session
-                  cookies, run an import, and switch from demo to live data.
-                </p>
-                <a
-                  className="text-button"
-                  href="https://github.com/andy98w/fantasy/blob/main/docs/CONNECT_ESPN.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Connection guide <ArrowUpRight size={16} />
-                </a>
-                <h3>Data quality notes</h3>
-                <ul>
-                  {data.warnings.map((w) => (
-                    <li key={w}>{w}</li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-          )}
-          <footer className="page-footer">
-            <span>
-              ninecat. <span>Your league, a clearer view.</span>
-            </span>
-            <span>
-              {data.mode === "demo"
-                ? "Demo data · Not connected to ESPN"
-                : "Read-only · Data from ESPN"}
-              <span className="footer-dot" /> {data.model.version}
-            </span>
-          </footer>
-        </main>
-      </div>
-      <dialog
-        ref={modalRef}
-        className="player-dialog"
-        aria-label="Player details"
-        onCancel={() => setSelected(null)}
-        onClick={(e) => {
-          if (e.target === modalRef.current) setSelected(null);
-        }}
-      >
-        {selected && (
+        {view === "overview" && (
           <>
-            <button
-              className="dialog-close"
-              aria-label="Close player details"
-              onClick={() => setSelected(null)}
+            <MatchupBoard
+              matchup={myMatchup}
+              teams={data.teams}
+              onDetails={() => go("matchup")}
+            />
+            <div className="roster-summary">
+              <button className="identity" onClick={() => openTeam(mine.id)}>
+                <TeamAvatar team={mine} />
+                <strong>{mine.name}</strong>
+              </button>
+              <span>
+                Standing{" "}
+                <strong>
+                  {mine.standing ? `#${mine.standing}` : "—"}
+                  <small>/{data.teams.length}</small>
+                </strong>
+              </span>
+              <span>
+                Record{" "}
+                <strong>
+                  {mine.wins}–{mine.losses}–{mine.ties}
+                </strong>
+              </span>
+              <button
+                onClick={() => openTeam(mine.id)}
+                className={alerts.length ? "injury-link" : ""}
+              >
+                {`${alerts.length} ${alerts.length === 1 ? "injury" : "injuries"}`}
+              </button>
+              <Button variant="quiet" onClick={() => openTeam(mine.id)}>
+                Full roster →
+              </Button>
+            </div>
+            <div className="overview-grid">
+              <Panel
+                title="My roster"
+                action={<span className="panel-meta">Per game</span>}
+              >
+                <PlayerTable
+                  players={sortPlayers(myRoster, sort)}
+                  {...tableProps}
+                  compact
+                />
+              </Panel>
+              <Panel
+                title="News"
+                action={
+                  <Button variant="quiet" onClick={() => go("news")}>
+                    All news →
+                  </Button>
+                }
+              >
+                <NewsFeed items={data.news} limit={5} />
+              </Panel>
+            </div>
+          </>
+        )}
+        {view === "matchup" && (
+          <>
+            <div
+              className="matchup-picker"
+              role="group"
+              aria-label="Select matchup"
             >
-              <X size={20} />
-            </button>
-            <div className="player-dialog-header">
-              <PlayerAvatar player={selected} />
-              <div>
-                <p>
-                  {selected.nbaTeam} · {selected.position}
-                </p>
-                <h2>{selected.name}</h2>
-                <span
-                  className={`status ${selected.status === "ACTIVE" ? "healthy" : "injured"}`}
-                >
-                  {statusText(selected.status)}
-                </span>
-              </div>
-              <Power value={selected.power} reason={ratingReason(selected)} />
-            </div>
-            <div className="player-meta">
-              <span>
-                <strong>{selected.gamesPlayed}</strong> games played
-              </span>
-              <span>
-                <strong>{selected.rank ? `#${selected.rank}` : "—"}</strong>{" "}
-                player rank
-              </span>
-              <span>
-                <strong>{selected.zTotal?.toFixed(2) ?? "—"}</strong> total
-                value
-              </span>
-            </div>
-            <h3>Where the value comes from</h3>
-            <p className="subtle">
-              Category z-scores. Positive is better, including turnovers.
-            </p>
-            <div className="contribution-list">
-              {CATEGORIES.map((c) => {
-                const z = selected.contributions[c];
+              {data.matchups.map((matchup) => {
+                const home = data.teams.find(
+                    (t) => t.id === matchup.home.teamId,
+                  )!,
+                  away = data.teams.find((t) => t.id === matchup.away.teamId)!;
                 return (
-                  <div key={c}>
-                    <span>{c}</span>
-                    <span>{stat(selected.stats[c], c)}</span>
-                    <div className="contribution-track">
-                      <i />
-                      <span
-                        className={z >= 0 ? "positive-bar" : "negative-bar"}
-                        style={{
-                          left:
-                            z >= 0
-                              ? "50%"
-                              : `${50 - Math.min(50, Math.abs(z ?? 0) * 12)}%`,
-                          width: `${Math.min(50, Math.abs(z ?? 0) * 12)}%`,
-                        }}
-                      />
-                    </div>
+                  <button
+                    key={matchup.id}
+                    aria-pressed={matchup.id === matchupId}
+                    onClick={() => setMatchupId(matchup.id)}
+                  >
+                    <span>{home.abbrev}</span>
                     <strong>
-                      {z == null ? "—" : `${z > 0 ? "+" : ""}${z.toFixed(2)}`}
+                      {matchup.home.wins ?? "—"} : {matchup.away.wins ?? "—"}
                     </strong>
-                  </div>
+                    <span>{away.abbrev}</span>
+                  </button>
                 );
               })}
             </div>
-            <p className="table-note">
-              {selected.gamesPlayed < 10
-                ? "Small sample: interpret early-season rankings cautiously. "
-                : ""}
-              {selected.power === null
-                ? ratingReason(selected) + "."
-                : "Power is a percentile, not a forecast."}
+            <MatchupBoard
+              matchup={data.matchups.find(
+                (matchup) => matchup.id === matchupId,
+              )}
+              teams={data.teams}
+            />
+            <p className="footnote">
+              ESPN scored lineups. Fewer turnovers wins.
             </p>
-            {data.news
-              .filter((n) => n.playerIds.includes(selected.id))
-              .slice(0, 3)
-              .map((n) => (
-                <a
-                  className="player-news"
-                  key={n.id}
-                  href={n.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {n.title}
-                  <ArrowUpRight size={14} />
-                </a>
-              ))}
           </>
         )}
-      </dialog>
+        {view === "team" && (
+          <>
+            <div className="view-toolbar">
+              <select
+                aria-label="Select team"
+                value={teamId}
+                onChange={(event) => setTeamId(Number(event.target.value))}
+              >
+                {data.teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              <span className="muted">{roster.length} players</span>
+            </div>
+            <TeamProfile team={team} />
+            <Panel>
+              <PlayerTable
+                players={sortPlayers(roster, sort)}
+                {...tableProps}
+              />
+            </Panel>
+          </>
+        )}
+        {view === "players" && (
+          <>
+            {filters}
+            <Panel>
+              <PlayerTable players={visiblePlayers} {...tableProps} ownership />
+            </Panel>
+            <RankingHelp model={data.model} />
+          </>
+        )}
+        {view === "league" && (
+          <Standings
+            teams={data.teams}
+            mineId={mine.id}
+            scoringType={data.league.scoringType}
+            onTeam={openTeam}
+          />
+        )}
+        {view === "rankings" && (
+          <>
+            <div className="view-toolbar">
+              <Tabs
+                label="Ranking type"
+                value={rankingScope}
+                options={[
+                  { value: "players", label: "Players" },
+                  { value: "teams", label: "Teams" },
+                ]}
+                onChange={(value) => {
+                  setRankingScope(value);
+                  setSort({ key: "power", descending: true });
+                }}
+              />
+              <span className="muted">
+                {rankingScope === "players"
+                  ? `${data.players.filter((p) => p.rank !== null).length} rated / ${data.model.minimumGames} games minimum`
+                  : "Roster talent"}
+              </span>
+            </div>
+            {rankingScope === "players" ? (
+              <>
+                {filters}
+                <Panel>
+                  <PlayerTable
+                    players={visiblePlayers}
+                    {...tableProps}
+                    ownership
+                  />
+                </Panel>
+              </>
+            ) : (
+              <TeamRankings teams={data.teams} onTeam={openTeam} />
+            )}
+            <RankingHelp model={data.model} />
+          </>
+        )}
+        {view === "news" && (
+          <>
+            <div className="view-toolbar">
+              <Tabs
+                label="News filter"
+                value={newsScope}
+                options={[
+                  { value: "all", label: "All news" },
+                  { value: "mine", label: "My players" },
+                ]}
+                onChange={setNewsScope}
+              />
+              <span className="muted">{news.length} headlines</span>
+            </div>
+            <Panel className="news-page">
+              <NewsFeed items={news} />
+            </Panel>
+          </>
+        )}
+        {view === "connection" && (
+          <Connection data={data} syncFailure={syncFailure} />
+        )}
+      </main>
+      <PlayerDialog
+        player={selected}
+        data={data}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }

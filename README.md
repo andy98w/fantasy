@@ -1,4 +1,4 @@
-# ninecat.
+# Fantasy
 
 A read-only ESPN fantasy basketball dashboard for head-to-head nine-category leagues. Next.js + TypeScript on the web, Python ingestion and ranking jobs, PostgreSQL in production.
 

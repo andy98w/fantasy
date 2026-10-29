@@ -20,7 +20,7 @@ class ESPNClient:
         self.league = f'{self.base}/segments/0/leagues/{league_id}'
         cookies = {'espn_s2': s2, 'SWID': swid} if s2 and swid else {}
         self.client = httpx.Client(cookies=cookies, timeout=25, transport=transport,
-                                  headers={'User-Agent': 'Ninecat/0.1 (personal league reader)'})
+                                  headers={'User-Agent': 'Fantasy/0.1 (personal league reader)'})
 
     def __enter__(self): return self
     def __exit__(self, *_): self.client.close()

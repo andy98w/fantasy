@@ -110,7 +110,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ninecat-sync"
+name = "fantasy-sync"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

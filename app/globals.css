@@ -123,15 +123,6 @@ a {
   color: var(--gold);
   display: flex;
 }
-.brand-nine {
-  font-size: 12px;
-  align-self: flex-start;
-  color: var(--gold);
-  border: 2px solid var(--gold);
-  padding: 2px 4px;
-  margin: 1px 0 0 -5px;
-  letter-spacing: 0;
-}
 .league-name {
   border-left: 2px solid var(--line);
   padding-left: 28px;
@@ -1209,9 +1200,6 @@ input::placeholder {
   .brand-ball svg {
     width: 23px;
     height: 23px;
-  }
-  .brand-nine {
-    display: none;
   }
   .league-name {
     padding-left: 18px;

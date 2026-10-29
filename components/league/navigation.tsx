@@ -35,12 +35,12 @@ export function Navigation({
           className="brand"
           href="#overview"
           onClick={() => go("overview")}
-          aria-label="Ninecat overview"
+          aria-label="Fantasy overview"
         >
           <span className="brand-ball">
             <PixelIcon name="ball" size={28} />
           </span>
-          ninecat<span className="brand-nine">9</span>
+          Fantasy
         </a>
         <div className="league-name">
           <strong>{data.league.name.trim()}</strong>

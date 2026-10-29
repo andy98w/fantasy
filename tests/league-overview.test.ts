@@ -26,5 +26,15 @@ test("shared overview ignores configured owner team and includes every matchup",
     /My roster|My players|my-team-button|my-row|you-label/,
   );
   assert.doesNotMatch(html, /teamId=/);
+  const mainNav = html.match(
+    /<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/,
+  )![1];
+  assert.equal((mainNav.match(/<a /g) ?? []).length, 4);
+  assert.match(mainNav, /Trade Calculator/);
+  assert.doesNotMatch(mainNav, /Standings|Rankings|News|Overview/);
+  const standings = html.match(
+    /<table class="data-table standings-table">([\s\S]*?)<\/table>/,
+  )![1];
+  assert.doesNotMatch(standings, /Talent|Rated/);
   assert.match(html, /basketball\/league\?/);
 });

@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
 @import "../components/ui/controls.css";
+@import "../components/league/trade.css";
 
 :root {
   color-scheme: dark;
@@ -827,7 +828,7 @@ input::placeholder {
   margin-top: 10px;
 }
 .standings-table {
-  min-width: 710px;
+  min-width: 480px;
 }
 .standings-table .identity-col {
   width: 50%;
@@ -1538,47 +1539,8 @@ input::placeholder {
   font-size: 10px;
   margin-top: 10px;
 }
-.team-directory {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
-}
-.team-card {
-  background: var(--surface);
-  border: 2px solid var(--line);
-  box-shadow: 3px 3px 0 var(--shadow);
-  padding: 24px 20px;
-  text-align: left;
-}
-.team-card:hover {
-  border-color: var(--gold);
-}
-.team-card h2 {
-  margin: 18px 0;
-  overflow-wrap: anywhere;
-  font-size: 24px;
-}
-.team-card > div {
-  display: flex;
-  gap: 24px;
-  border-top: 1px solid var(--line-soft);
-  padding-top: 15px;
-}
-.team-card > div > span {
-  color: var(--muted);
-  font-size: 11px;
-}
-.team-card strong {
-  display: block;
-  color: var(--text);
-  font-weight: 500;
-  font-size: 14px;
-  margin-top: 5px;
-  font-variant-numeric: tabular-nums;
-}
 @media (max-width: 1050px) {
-  .matchup-grid,
-  .team-directory {
+  .matchup-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1593,8 +1555,5 @@ input::placeholder {
   .matchup-card-team + .matchup-card-team {
     padding-top: 9px;
     margin-top: 9px;
-  }
-  .team-directory {
-    grid-template-columns: 1fr;
   }
 }

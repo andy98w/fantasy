@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import type { Player, Snapshot } from "@/lib/schema";
+import { relevantNews } from "@/lib/analysis";
 import { Navigation, navigation, type View } from "./league/navigation";
 import { MatchupBoard } from "./league/matchup-board";
+import { MatchupGrid } from "./league/matchup-grid";
 import { PlayerTable } from "./league/player-table";
 import { PlayerDialog } from "./league/player-dialog";
 import { PlayerFilters } from "./league/player-filters";
-import { MatchupGrid } from "./league/matchup-grid";
-import { TeamDirectory } from "./league/team-directory";
 import { TeamSelect } from "./league/team-select";
 import {
   Standings,
@@ -15,13 +15,13 @@ import {
   TeamProfile,
   RankingHelp,
 } from "./league/team-views";
+import { TradeCalculator } from "./league/trade-calculator";
 import { Connection } from "./league/connection";
 import { NewsFeed } from "./league/news-feed";
 import { sortPlayers, type Sort } from "./league/format";
 import {
   Button,
   Panel,
-  Tabs,
   Toolbar,
   ResultCount,
   PageHeading,
@@ -35,15 +35,11 @@ export default function Dashboard({
   data: Snapshot;
   syncFailure: string | null;
 }) {
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>("league");
   const [teamId, setTeamId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState("all");
   const [availability, setAvailability] = useState("all");
-  const [rankingScope, setRankingScope] = useState<"players" | "teams">(
-    "players",
-  );
-  const [newsScope, setNewsScope] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
   const [selectedId, setSelectedId] = useState<Player["id"] | null>(null);
   const selected =
@@ -64,11 +60,20 @@ export default function Dashboard({
   }, [data.syncedAt]);
   useEffect(() => {
     const update = () => {
-      const value = window.location.hash.slice(1);
+      const hash = window.location.hash.slice(1);
+      const aliases: Record<string, View> = {
+        overview: "league",
+        rankings: "players",
+        news: "league",
+        teams: "team",
+      };
+      const value = aliases[hash] ?? hash;
       if (
-        [...navigation.map((item) => item.value), "connection"].includes(
-          value as View,
-        )
+        [
+          ...navigation.map((item) => item.value),
+          "connection",
+          "matchup",
+        ].includes(value as View)
       )
         setView(value as View);
     };
@@ -113,15 +118,11 @@ export default function Dashboard({
       ),
     [data.players, query, position, availability, sort],
   );
-  const news = data.news.filter(
-    (item) =>
-      newsScope === "all" ||
-      item.playerIds.some((id) =>
-        data.players.some(
-          (player) => player.id === id && player.teamId === Number(newsScope),
-        ),
-      ),
+  const news = useMemo(
+    () => relevantNews(data.news, data.players),
+    [data.news, data.players],
   );
+  const teamNews = team ? relevantNews(data.news, data.players, team.id) : [];
   const espn = `https://fantasy.espn.com/basketball/league?leagueId=${data.league.id}&seasonId=${data.league.season}`;
   const tableProps = {
     teams: data.teams,
@@ -130,24 +131,6 @@ export default function Dashboard({
     onSort,
     onSelect: (player: Player) => setSelectedId(player.id),
   };
-  const resetFilters = () => {
-    setQuery("");
-    setPosition("all");
-    setAvailability("all");
-  };
-  const filters = (
-    <PlayerFilters
-      teams={data.teams}
-      query={query}
-      onQuery={setQuery}
-      position={position}
-      onPosition={setPosition}
-      availability={availability}
-      onAvailability={setAvailability}
-      count={visiblePlayers.length}
-      onReset={resetFilters}
-    />
-  );
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -198,13 +181,11 @@ export default function Dashboard({
           title={
             view === "connection"
               ? "Connection"
-              : navigation.find((item) => item.value === view)!.label
+              : view === "matchup"
+                ? "Matchup"
+                : navigation.find((item) => item.value === view)!.label
           }
-          detail={
-            view === "players" || view === "rankings"
-              ? "Season per game"
-              : undefined
-          }
+          detail={view === "players" ? "Season per game" : undefined}
           action={
             <button
               className="mobile-import"
@@ -221,7 +202,10 @@ export default function Dashboard({
             </button>
           }
         />
-        {view === "overview" && (
+        {(["players", "team", "trades"] as View[]).includes(view) && (
+          <RankingHelp model={data.model} />
+        )}
+        {view === "league" && (
           <>
             <MatchupGrid
               matchups={data.matchups}
@@ -239,50 +223,24 @@ export default function Dashboard({
                 scoringType={data.league.scoringType}
                 onTeam={openTeam}
               />
-              <Panel
-                title="News"
-                action={
-                  <Button variant="quiet" onClick={() => go("news")}>
-                    All news →
-                  </Button>
-                }
-              >
-                <NewsFeed items={data.news} limit={5} />
+              <Panel title="Roster news">
+                <NewsFeed items={news} limit={6} />
               </Panel>
             </div>
           </>
         )}
         {view === "matchup" && (
           <>
-            <div
-              className="matchup-picker"
-              role="group"
-              aria-label="Select matchup"
-            >
-              {data.matchups.map((matchup) => {
-                const home = data.teams.find(
-                    (t) => t.id === matchup.home.teamId,
-                  )!,
-                  away = data.teams.find((t) => t.id === matchup.away.teamId)!;
-                return (
-                  <button
-                    key={matchup.id}
-                    aria-pressed={matchup.id === matchupId}
-                    onClick={() => setMatchupId(matchup.id)}
-                  >
-                    <span>{home.abbrev}</span>
-                    <strong>
-                      {matchup.home.wins ?? "—"} : {matchup.away.wins ?? "—"}
-                    </strong>
-                    <span>{away.abbrev}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <Toolbar>
+              <Button variant="quiet" onClick={() => go("league")}>
+                ← League
+              </Button>
+            </Toolbar>
             <MatchupBoard
-              matchup={data.matchups.find(
-                (matchup) => matchup.id === matchupId,
-              )}
+              matchup={
+                data.matchups.find((matchup) => matchup.id === matchupId) ??
+                data.matchups[0]
+              }
               teams={data.teams}
             />
             <p className="footnote">
@@ -308,90 +266,53 @@ export default function Dashboard({
             </Toolbar>
             {team ? (
               <>
-                <TeamProfile team={team} />
+                <TeamProfile team={team} teams={data.teams} roster={roster} />
                 <Panel>
                   <PlayerTable
                     players={sortPlayers(roster, sort)}
                     {...tableProps}
                   />
                 </Panel>
+                <div className="team-news">
+                  <Panel title="Team news">
+                    <NewsFeed items={teamNews} limit={6} />
+                  </Panel>
+                </div>
               </>
             ) : (
-              <TeamDirectory teams={data.teams} onTeam={openTeam} />
+              <TeamRankings
+                teams={data.teams}
+                players={data.players}
+                onTeam={openTeam}
+              />
             )}
           </>
         )}
         {view === "players" && (
           <>
-            {filters}
+            <PlayerFilters
+              teams={data.teams}
+              query={query}
+              onQuery={setQuery}
+              position={position}
+              onPosition={setPosition}
+              availability={availability}
+              onAvailability={setAvailability}
+              count={visiblePlayers.length}
+              onReset={() => {
+                setQuery("");
+                setPosition("all");
+                setAvailability("all");
+              }}
+            />
             <Panel>
               <PlayerTable players={visiblePlayers} {...tableProps} ownership />
             </Panel>
-            <RankingHelp model={data.model} />
           </>
         )}
-        {view === "league" && (
-          <Standings
-            teams={data.teams}
-            scoringType={data.league.scoringType}
-            onTeam={openTeam}
-          />
-        )}
-        {view === "rankings" && (
-          <>
-            <Toolbar>
-              <Tabs
-                label="Ranking type"
-                value={rankingScope}
-                options={[
-                  { value: "players", label: "Players" },
-                  { value: "teams", label: "Teams" },
-                ]}
-                onChange={(value) => {
-                  setRankingScope(value);
-                  setSort({ key: "power", descending: true });
-                }}
-              />
-              <span className="muted">
-                {rankingScope === "players"
-                  ? `${data.players.filter((p) => p.rank !== null).length} rated / ${data.model.minimumGames} games minimum`
-                  : "Roster talent"}
-              </span>
-            </Toolbar>
-            {rankingScope === "players" ? (
-              <>
-                {filters}
-                <Panel>
-                  <PlayerTable
-                    players={visiblePlayers}
-                    {...tableProps}
-                    ownership
-                  />
-                </Panel>
-              </>
-            ) : (
-              <TeamRankings teams={data.teams} onTeam={openTeam} />
-            )}
-            <RankingHelp model={data.model} />
-          </>
-        )}
-        {view === "news" && (
-          <>
-            <Toolbar>
-              <TeamSelect
-                teams={data.teams}
-                label="News team"
-                allLabel="All news"
-                value={newsScope}
-                onChange={setNewsScope}
-              />
-              <ResultCount count={news.length} singular="headline" />
-            </Toolbar>
-            <Panel className="news-page">
-              <NewsFeed items={news} />
-            </Panel>
-          </>
-        )}
+        <div hidden={view !== "trades"}>
+          <TradeCalculator data={data} />
+        </div>
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />
         )}

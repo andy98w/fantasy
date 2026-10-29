@@ -40,3 +40,8 @@ export const dateLabel = (date: string) =>
     day: "numeric",
     timeZone: "America/Los_Angeles",
   });
+
+export function signedZ(value: number) {
+  const rounded = Math.abs(value) < 0.05 ? 0 : value;
+  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
+}

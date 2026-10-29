@@ -108,7 +108,7 @@
         "MIN": 32.4
       },
       "power": 39.2,
-      "zTotal": -1.323,
+      "zTotal": -1.322,
       "contributions": {
         "PTS": -0.384,
         "REB": -0.672,
@@ -153,7 +153,7 @@
         "MIN": 24.5
       },
       "power": 26.7,
-      "zTotal": -2.349,
+      "zTotal": -2.348,
       "contributions": {
         "PTS": -0.421,
         "REB": 0.982,
@@ -198,7 +198,7 @@
         "MIN": 21.8
       },
       "power": 30.9,
-      "zTotal": -2.033,
+      "zTotal": -2.032,
       "contributions": {
         "PTS": 0.691,
         "REB": -0.199,
@@ -288,7 +288,7 @@
         "MIN": 28.9
       },
       "power": 77.4,
-      "zTotal": 2.358,
+      "zTotal": 2.359,
       "contributions": {
         "PTS": 0.58,
         "REB": 0.476,
@@ -333,7 +333,7 @@
         "MIN": 20.7
       },
       "power": 68.4,
-      "zTotal": 1.503,
+      "zTotal": 1.502,
       "contributions": {
         "PTS": -0.05,
         "REB": -1.077,
@@ -378,7 +378,7 @@
         "MIN": 35.8
       },
       "power": 63.5,
-      "zTotal": 1.202,
+      "zTotal": 1.203,
       "contributions": {
         "PTS": -0.366,
         "REB": -0.3,
@@ -558,7 +558,7 @@
         "MIN": 22.3
       },
       "power": 43.4,
-      "zTotal": -0.959,
+      "zTotal": -0.96,
       "contributions": {
         "PTS": 1.34,
         "REB": -0.773,
@@ -603,7 +603,7 @@
         "MIN": 34.2
       },
       "power": 53.1,
-      "zTotal": -0.346,
+      "zTotal": -0.347,
       "contributions": {
         "PTS": -0.662,
         "REB": -1.245,
@@ -648,7 +648,7 @@
         "MIN": 21.3
       },
       "power": 24.7,
-      "zTotal": -2.408,
+      "zTotal": -2.407,
       "contributions": {
         "PTS": -0.44,
         "REB": -1.144,
@@ -783,7 +783,7 @@
         "MIN": 26.0
       },
       "power": 34.4,
-      "zTotal": -1.795,
+      "zTotal": -1.794,
       "contributions": {
         "PTS": -0.18,
         "REB": 0.037,
@@ -828,7 +828,7 @@
         "MIN": 26.5
       },
       "power": 85.8,
-      "zTotal": 3.928,
+      "zTotal": 3.926,
       "contributions": {
         "PTS": 1.247,
         "REB": 1.488,
@@ -1098,7 +1098,7 @@
         "MIN": 33.4
       },
       "power": 92.0,
-      "zTotal": 4.917,
+      "zTotal": 4.915,
       "contributions": {
         "PTS": 2.119,
         "REB": -0.402,
@@ -1143,7 +1143,7 @@
         "MIN": 22.7
       },
       "power": 37.2,
-      "zTotal": -1.413,
+      "zTotal": -1.414,
       "contributions": {
         "PTS": -0.811,
         "REB": 0.442,
@@ -1233,7 +1233,7 @@
         "MIN": 28.2
       },
       "power": 35.1,
-      "zTotal": -1.742,
+      "zTotal": -1.741,
       "contributions": {
         "PTS": -0.088,
         "REB": 0.375,
@@ -1323,7 +1323,7 @@
         "MIN": 25.1
       },
       "power": 83.0,
-      "zTotal": 3.494,
+      "zTotal": 3.492,
       "contributions": {
         "PTS": 1.859,
         "REB": 0.24,
@@ -1368,7 +1368,7 @@
         "MIN": 30.8
       },
       "power": 15.6,
-      "zTotal": -3.149,
+      "zTotal": -3.15,
       "contributions": {
         "PTS": -0.551,
         "REB": -1.448,
@@ -1412,7 +1412,7 @@
         "TO": 1.7,
         "MIN": 29.6
       },
-      "power": 41.3,
+      "power": 41.7,
       "zTotal": -1.107,
       "contributions": {
         "PTS": 0.84,
@@ -1425,7 +1425,7 @@
         "FT%": -1.633,
         "TO": 0.762
       },
-      "rank": 85
+      "rank": 84
     },
     {
       "id": -32,
@@ -1458,7 +1458,7 @@
         "MIN": 34.4
       },
       "power": 4.5,
-      "zTotal": -5.133,
+      "zTotal": -5.132,
       "contributions": {
         "PTS": 0.079,
         "REB": 0.78,
@@ -1593,7 +1593,7 @@
         "MIN": 29.3
       },
       "power": 58.7,
-      "zTotal": 0.675,
+      "zTotal": 0.676,
       "contributions": {
         "PTS": 0.988,
         "REB": 0.78,
@@ -1638,7 +1638,7 @@
         "MIN": 20.7
       },
       "power": 1.7,
-      "zTotal": -6.006,
+      "zTotal": -6.005,
       "contributions": {
         "PTS": -0.94,
         "REB": -1.347,
@@ -1728,7 +1728,7 @@
         "MIN": 28.3
       },
       "power": 12.2,
-      "zTotal": -3.55,
+      "zTotal": -3.549,
       "contributions": {
         "PTS": -0.069,
         "REB": -0.874,
@@ -1773,7 +1773,7 @@
         "MIN": 23.3
       },
       "power": 2.4,
-      "zTotal": -5.683,
+      "zTotal": -5.682,
       "contributions": {
         "PTS": -0.662,
         "REB": -0.807,
@@ -1953,7 +1953,7 @@
         "MIN": 28.5
       },
       "power": 46.9,
-      "zTotal": -0.759,
+      "zTotal": -0.76,
       "contributions": {
         "PTS": 0.598,
         "REB": 1.792,
@@ -1998,7 +1998,7 @@
         "MIN": 26.5
       },
       "power": 38.5,
-      "zTotal": -1.332,
+      "zTotal": -1.331,
       "contributions": {
         "PTS": 0.821,
         "REB": -0.739,
@@ -2133,7 +2133,7 @@
         "MIN": 27.6
       },
       "power": 89.2,
-      "zTotal": 4.4,
+      "zTotal": 4.401,
       "contributions": {
         "PTS": -0.18,
         "REB": 0.746,
@@ -2223,7 +2223,7 @@
         "MIN": 31.2
       },
       "power": 25.3,
-      "zTotal": -2.395,
+      "zTotal": -2.396,
       "contributions": {
         "PTS": -1.423,
         "REB": 0.138,
@@ -2313,7 +2313,7 @@
         "MIN": 31.1
       },
       "power": 29.5,
-      "zTotal": -2.117,
+      "zTotal": -2.116,
       "contributions": {
         "PTS": -0.996,
         "REB": 1.117,
@@ -2403,7 +2403,7 @@
         "MIN": 21.3
       },
       "power": 50.3,
-      "zTotal": -0.445,
+      "zTotal": -0.443,
       "contributions": {
         "PTS": -1.348,
         "REB": -1.347,
@@ -2448,7 +2448,7 @@
         "MIN": 21.5
       },
       "power": 3.8,
-      "zTotal": -5.377,
+      "zTotal": -5.376,
       "contributions": {
         "PTS": 0.636,
         "REB": -1.313,
@@ -2493,7 +2493,7 @@
         "MIN": 26.5
       },
       "power": 67.0,
-      "zTotal": 1.291,
+      "zTotal": 1.292,
       "contributions": {
         "PTS": 0.432,
         "REB": 0.915,
@@ -2538,7 +2538,7 @@
         "MIN": 22.1
       },
       "power": 32.3,
-      "zTotal": -1.935,
+      "zTotal": -1.934,
       "contributions": {
         "PTS": -0.217,
         "REB": 1.86,
@@ -2582,8 +2582,8 @@
         "TO": 1.8,
         "MIN": 34.9
       },
-      "power": 74.0,
-      "zTotal": 2.04,
+      "power": 73.6,
+      "zTotal": 2.039,
       "contributions": {
         "PTS": 0.357,
         "REB": 1.252,
@@ -2628,7 +2628,7 @@
         "MIN": 24.1
       },
       "power": 45.5,
-      "zTotal": -0.796,
+      "zTotal": -0.795,
       "contributions": {
         "PTS": -1.886,
         "REB": -0.739,
@@ -2673,7 +2673,7 @@
         "MIN": 34.3
       },
       "power": 13.5,
-      "zTotal": -3.478,
+      "zTotal": -3.479,
       "contributions": {
         "PTS": -0.885,
         "REB": -0.942,
@@ -2718,7 +2718,7 @@
         "MIN": 24.5
       },
       "power": 48.3,
-      "zTotal": -0.699,
+      "zTotal": -0.697,
       "contributions": {
         "PTS": -0.718,
         "REB": 0.915,
@@ -2898,7 +2898,7 @@
         "MIN": 23.0
       },
       "power": 19.1,
-      "zTotal": -2.875,
+      "zTotal": -2.876,
       "contributions": {
         "PTS": 0.728,
         "REB": -0.807,
@@ -3123,7 +3123,7 @@
         "MIN": 30.3
       },
       "power": 65.6,
-      "zTotal": 1.273,
+      "zTotal": 1.274,
       "contributions": {
         "PTS": -0.273,
         "REB": -0.537,
@@ -3168,7 +3168,7 @@
         "MIN": 35.0
       },
       "power": 16.3,
-      "zTotal": -3.144,
+      "zTotal": -3.145,
       "contributions": {
         "PTS": 0.172,
         "REB": -1.347,
@@ -3258,7 +3258,7 @@
         "MIN": 21.3
       },
       "power": 5.9,
-      "zTotal": -4.814,
+      "zTotal": -4.813,
       "contributions": {
         "PTS": -1.237,
         "REB": -0.773,
@@ -3303,7 +3303,7 @@
         "MIN": 31.7
       },
       "power": 7.3,
-      "zTotal": -4.336,
+      "zTotal": -4.335,
       "contributions": {
         "PTS": -0.978,
         "REB": -0.874,
@@ -3348,7 +3348,7 @@
         "MIN": 26.2
       },
       "power": 44.8,
-      "zTotal": -0.9,
+      "zTotal": -0.902,
       "contributions": {
         "PTS": 1.303,
         "REB": -1.414,
@@ -3438,7 +3438,7 @@
         "MIN": 28.7
       },
       "power": 36.5,
-      "zTotal": -1.474,
+      "zTotal": -1.473,
       "contributions": {
         "PTS": -1.497,
         "REB": 1.691,
@@ -3483,7 +3483,7 @@
         "MIN": 30.8
       },
       "power": 10.1,
-      "zTotal": -3.736,
+      "zTotal": -3.737,
       "contributions": {
         "PTS": -1.386,
         "REB": -0.807,
@@ -3618,7 +3618,7 @@
         "MIN": 21.8
       },
       "power": 67.7,
-      "zTotal": 1.483,
+      "zTotal": 1.484,
       "contributions": {
         "PTS": 0.469,
         "REB": -1.482,
@@ -3708,7 +3708,7 @@
         "MIN": 21.7
       },
       "power": 54.5,
-      "zTotal": -0.259,
+      "zTotal": -0.258,
       "contributions": {
         "PTS": -0.644,
         "REB": 0.948,
@@ -3798,7 +3798,7 @@
         "MIN": 23.3
       },
       "power": 55.9,
-      "zTotal": 0.289,
+      "zTotal": 0.288,
       "contributions": {
         "PTS": 0.561,
         "REB": -1.313,
@@ -3843,7 +3843,7 @@
         "MIN": 31.8
       },
       "power": 11.5,
-      "zTotal": -3.562,
+      "zTotal": -3.561,
       "contributions": {
         "PTS": -1.052,
         "REB": -1.448,
@@ -3933,7 +3933,7 @@
         "MIN": 27.9
       },
       "power": 49.7,
-      "zTotal": -0.649,
+      "zTotal": -0.648,
       "contributions": {
         "PTS": -0.458,
         "REB": 0.51,
@@ -3978,7 +3978,7 @@
         "MIN": 27.3
       },
       "power": 80.9,
-      "zTotal": 3.019,
+      "zTotal": 3.018,
       "contributions": {
         "PTS": 2.471,
         "REB": -0.368,
@@ -4158,7 +4158,7 @@
         "MIN": 23.2
       },
       "power": 97.6,
-      "zTotal": 6.677,
+      "zTotal": 6.678,
       "contributions": {
         "PTS": 1.21,
         "REB": 0.408,
@@ -4203,7 +4203,7 @@
         "MIN": 32.8
       },
       "power": 51.0,
-      "zTotal": -0.415,
+      "zTotal": -0.416,
       "contributions": {
         "PTS": 0.506,
         "REB": 0.712,
@@ -4293,7 +4293,7 @@
         "MIN": 33.3
       },
       "power": 10.8,
-      "zTotal": -3.703,
+      "zTotal": -3.702,
       "contributions": {
         "PTS": -1.033,
         "REB": -1.144,
@@ -4338,7 +4338,7 @@
         "MIN": 34.5
       },
       "power": 91.3,
-      "zTotal": 4.792,
+      "zTotal": 4.794,
       "contributions": {
         "PTS": 2.249,
         "REB": 1.455,
@@ -4383,7 +4383,7 @@
         "MIN": 33.8
       },
       "power": 62.8,
-      "zTotal": 1.116,
+      "zTotal": 1.115,
       "contributions": {
         "PTS": -0.644,
         "REB": -1.077,
@@ -4428,7 +4428,7 @@
         "MIN": 26.7
       },
       "power": 79.5,
-      "zTotal": 2.698,
+      "zTotal": 2.699,
       "contributions": {
         "PTS": 0.543,
         "REB": 0.273,
@@ -4518,7 +4518,7 @@
         "MIN": 23.7
       },
       "power": 76.0,
-      "zTotal": 2.245,
+      "zTotal": 2.246,
       "contributions": {
         "PTS": -0.996,
         "REB": 0.003,
@@ -4563,7 +4563,7 @@
         "MIN": 33.7
       },
       "power": 99.7,
-      "zTotal": 11.223,
+      "zTotal": 11.224,
       "contributions": {
         "PTS": 1.934,
         "REB": 0.476,
@@ -4608,7 +4608,7 @@
         "MIN": 21.4
       },
       "power": 71.2,
-      "zTotal": 1.924,
+      "zTotal": 1.923,
       "contributions": {
         "PTS": 0.598,
         "REB": 0.577,
@@ -4698,7 +4698,7 @@
         "MIN": 23.6
       },
       "power": 24.0,
-      "zTotal": -2.431,
+      "zTotal": -2.43,
       "contributions": {
         "PTS": -0.254,
         "REB": 0.577,
@@ -4743,7 +4743,7 @@
         "MIN": 24.4
       },
       "power": 96.9,
-      "zTotal": 6.425,
+      "zTotal": 6.426,
       "contributions": {
         "PTS": 1.285,
         "REB": 0.813,
@@ -4923,7 +4923,7 @@
         "MIN": 30.1
       },
       "power": 93.4,
-      "zTotal": 5.438,
+      "zTotal": 5.437,
       "contributions": {
         "PTS": 0.357,
         "REB": -0.604,
@@ -4968,7 +4968,7 @@
         "MIN": 24.6
       },
       "power": 56.6,
-      "zTotal": 0.471,
+      "zTotal": 0.472,
       "contributions": {
         "PTS": -0.069,
         "REB": -0.469,
@@ -5013,7 +5013,7 @@
         "MIN": 20.5
       },
       "power": 53.8,
-      "zTotal": -0.314,
+      "zTotal": -0.315,
       "contributions": {
         "PTS": 0.172,
         "REB": -0.672,
@@ -5148,7 +5148,7 @@
         "MIN": 30.4
       },
       "power": 51.7,
-      "zTotal": -0.397,
+      "zTotal": -0.396,
       "contributions": {
         "PTS": -0.31,
         "REB": -0.132,
@@ -5238,7 +5238,7 @@
         "MIN": 30.3
       },
       "power": 64.9,
-      "zTotal": 1.242,
+      "zTotal": 1.243,
       "contributions": {
         "PTS": -0.421,
         "REB": 1.455,
@@ -5372,7 +5372,7 @@
         "TO": 3.4,
         "MIN": 35.7
       },
-      "power": 73.3,
+      "power": 73.6,
       "zTotal": 2.039,
       "contributions": {
         "PTS": -0.403,
@@ -5385,7 +5385,7 @@
         "FT%": 0.936,
         "TO": -1.446
       },
-      "rank": 39
+      "rank": 38
     },
     {
       "id": -120,
@@ -5463,7 +5463,7 @@
         "MIN": 28.4
       },
       "power": 49.0,
-      "zTotal": -0.675,
+      "zTotal": -0.674,
       "contributions": {
         "PTS": -0.533,
         "REB": -0.334,
@@ -5508,7 +5508,7 @@
         "MIN": 31.1
       },
       "power": 81.6,
-      "zTotal": 3.064,
+      "zTotal": 3.065,
       "contributions": {
         "PTS": 0.821,
         "REB": 1.083,
@@ -5643,7 +5643,7 @@
         "MIN": 20.9
       },
       "power": 76.7,
-      "zTotal": 2.306,
+      "zTotal": 2.305,
       "contributions": {
         "PTS": -0.755,
         "REB": -0.672,
@@ -5688,7 +5688,7 @@
         "MIN": 27.0
       },
       "power": 71.9,
-      "zTotal": 1.946,
+      "zTotal": 1.947,
       "contributions": {
         "PTS": 0.432,
         "REB": 1.151,
@@ -5778,7 +5778,7 @@
         "MIN": 29.8
       },
       "power": 82.3,
-      "zTotal": 3.251,
+      "zTotal": 3.25,
       "contributions": {
         "PTS": -0.31,
         "REB": -0.334,
@@ -5823,7 +5823,7 @@
         "MIN": 30.7
       },
       "power": 18.4,
-      "zTotal": -2.878,
+      "zTotal": -2.879,
       "contributions": {
         "PTS": -1.534,
         "REB": 0.273,
@@ -5868,7 +5868,7 @@
         "MIN": 34.2
       },
       "power": 47.6,
-      "zTotal": -0.727,
+      "zTotal": -0.726,
       "contributions": {
         "PTS": 1.266,
         "REB": -1.178,
@@ -5913,7 +5913,7 @@
         "MIN": 25.5
       },
       "power": 9.4,
-      "zTotal": -3.92,
+      "zTotal": -3.921,
       "contributions": {
         "PTS": -1.182,
         "REB": -0.199,
@@ -6048,7 +6048,7 @@
         "MIN": 30.7
       },
       "power": 46.2,
-      "zTotal": -0.767,
+      "zTotal": -0.765,
       "contributions": {
         "PTS": 0.71,
         "REB": 0.341,
@@ -6093,7 +6093,7 @@
         "MIN": 22.6
       },
       "power": 28.1,
-      "zTotal": -2.222,
+      "zTotal": -2.221,
       "contributions": {
         "PTS": -0.57,
         "REB": -0.942,
@@ -6138,7 +6138,7 @@
         "MIN": 24.3
       },
       "power": 87.8,
-      "zTotal": 3.994,
+      "zTotal": 3.995,
       "contributions": {
         "PTS": -0.254,
         "REB": 1.421,
@@ -6317,7 +6317,7 @@
         "TO": 3.3,
         "MIN": 26.7
       },
-      "power": 42.0,
+      "power": 41.7,
       "zTotal": -1.107,
       "contributions": {
         "PTS": -1.089,
@@ -6363,7 +6363,7 @@
         "MIN": 29.4
       },
       "power": 33.7,
-      "zTotal": -1.884,
+      "zTotal": -1.885,
       "contributions": {
         "PTS": -1.182,
         "REB": 0.24,
@@ -6453,7 +6453,7 @@
         "MIN": 22.8
       },
       "power": 28.8,
-      "zTotal": -2.162,
+      "zTotal": -2.161,
       "contributions": {
         "PTS": 1.099,
         "REB": -0.57,
@@ -6498,7 +6498,7 @@
         "MIN": 32.9
       },
       "power": 78.8,
-      "zTotal": 2.535,
+      "zTotal": 2.536,
       "contributions": {
         "PTS": 1.674,
         "REB": 0.51,
@@ -6526,15 +6526,15 @@
       "rosterSize": 10,
       "talent": -5.26,
       "categoryProfile": {
-        "PTS": -0.84,
+        "PTS": -0.839,
         "REB": -1.89,
-        "AST": -0.6,
-        "STL": -2.36,
-        "BLK": -1.35,
-        "3PM": -5.8,
-        "FG%": -0.38,
-        "FT%": 3.85,
-        "TO": 4.12
+        "AST": -0.605,
+        "STL": -2.358,
+        "BLK": -1.348,
+        "3PM": -5.801,
+        "FG%": -0.383,
+        "FT%": 3.847,
+        "TO": 4.117
       },
       "talentRank": 7
     },
@@ -6551,14 +6551,14 @@
       "talent": -4.32,
       "categoryProfile": {
         "PTS": 1.46,
-        "REB": -0.3,
-        "AST": -0.49,
-        "STL": 0.4,
-        "BLK": -4.18,
-        "3PM": 1.13,
-        "FG%": 3.87,
-        "FT%": -3.83,
-        "TO": -2.38
+        "REB": -0.304,
+        "AST": -0.491,
+        "STL": 0.396,
+        "BLK": -4.176,
+        "3PM": 1.129,
+        "FG%": 3.874,
+        "FT%": -3.827,
+        "TO": -2.381
       },
       "talentRank": 6
     },
@@ -6572,17 +6572,17 @@
       "standing": 3,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": -9.22,
+      "talent": -9.228,
       "categoryProfile": {
-        "PTS": -1.6,
-        "REB": -0.3,
-        "AST": 0.78,
-        "STL": -2.13,
-        "BLK": -1.17,
-        "3PM": -4.35,
-        "FG%": 0.3,
-        "FT%": -0.19,
-        "TO": -0.56
+        "PTS": -1.599,
+        "REB": -0.304,
+        "AST": 0.784,
+        "STL": -2.129,
+        "BLK": -1.171,
+        "3PM": -4.347,
+        "FG%": 0.296,
+        "FT%": -0.194,
+        "TO": -0.564
       },
       "talentRank": 11
     },
@@ -6596,17 +6596,17 @@
       "standing": 4,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": -15.16,
+      "talent": -15.159,
       "categoryProfile": {
         "PTS": -3.86,
         "REB": 2.26,
-        "AST": 3.75,
-        "STL": 0.17,
-        "BLK": -2.94,
-        "3PM": -0.07,
-        "FG%": -2.71,
+        "AST": 3.747,
+        "STL": 0.167,
+        "BLK": -2.939,
+        "3PM": -0.068,
+        "FG%": -2.708,
         "FT%": -6.39,
-        "TO": -5.37
+        "TO": -5.368
       },
       "talentRank": 12
     },
@@ -6620,17 +6620,17 @@
       "standing": 5,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": -6.5,
+      "talent": -6.502,
       "categoryProfile": {
-        "PTS": 3.44,
-        "REB": -0.47,
-        "AST": -5.82,
-        "STL": 3.15,
-        "BLK": -0.11,
-        "3PM": -3.06,
-        "FG%": -0.99,
-        "FT%": 0.12,
-        "TO": -2.77
+        "PTS": 3.443,
+        "REB": -0.473,
+        "AST": -5.817,
+        "STL": 3.151,
+        "BLK": -0.111,
+        "3PM": -3.062,
+        "FG%": -0.987,
+        "FT%": 0.125,
+        "TO": -2.771
       },
       "talentRank": 8
     },
@@ -6644,16 +6644,16 @@
       "standing": 6,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": -7.49,
+      "talent": -7.483,
       "categoryProfile": {
-        "PTS": -4.8,
-        "REB": 3.31,
-        "AST": 4.87,
-        "STL": -0.75,
-        "BLK": 0.24,
-        "3PM": -4.0,
-        "FG%": -5.32,
-        "FT%": -0.21,
+        "PTS": -4.805,
+        "REB": 3.308,
+        "AST": 4.873,
+        "STL": -0.752,
+        "BLK": 0.243,
+        "3PM": -4.003,
+        "FG%": -5.316,
+        "FT%": -0.211,
         "TO": -0.82
       },
       "talentRank": 9
@@ -6668,17 +6668,17 @@
       "standing": 7,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": 0.73,
+      "talent": 0.726,
       "categoryProfile": {
         "PTS": 0.33,
-        "REB": -2.67,
-        "AST": -1.66,
-        "STL": -0.52,
-        "BLK": -1.7,
-        "3PM": 1.47,
-        "FG%": -1.13,
-        "FT%": 1.45,
-        "TO": 5.15
+        "REB": -2.667,
+        "AST": -1.655,
+        "STL": -0.522,
+        "BLK": -1.702,
+        "3PM": 1.471,
+        "FG%": -1.131,
+        "FT%": 1.448,
+        "TO": 5.154
       },
       "talentRank": 4
     },
@@ -6692,17 +6692,17 @@
       "standing": 8,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": -7.69,
+      "talent": -7.692,
       "categoryProfile": {
         "PTS": 0.18,
-        "REB": -2.36,
-        "AST": -6.79,
-        "STL": -5.34,
-        "BLK": 3.25,
-        "3PM": 3.18,
-        "FG%": -1.29,
-        "FT%": 1.4,
-        "TO": 0.09
+        "REB": -2.363,
+        "AST": -6.793,
+        "STL": -5.343,
+        "BLK": 3.245,
+        "3PM": 3.181,
+        "FG%": -1.289,
+        "FT%": 1.401,
+        "TO": 0.089
       },
       "talentRank": 10
     },
@@ -6716,17 +6716,17 @@
       "standing": 9,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": -2.76,
+      "talent": -2.763,
       "categoryProfile": {
-        "PTS": 0.09,
-        "REB": -3.14,
-        "AST": -0.87,
+        "PTS": 0.088,
+        "REB": -3.139,
+        "AST": -0.866,
         "STL": -1.67,
-        "BLK": 2.72,
-        "3PM": 4.21,
-        "FG%": -0.99,
-        "FT%": -6.84,
-        "TO": 3.73
+        "BLK": 2.718,
+        "3PM": 4.209,
+        "FG%": -0.987,
+        "FT%": -6.841,
+        "TO": 3.725
       },
       "talentRank": 5
     },
@@ -6740,16 +6740,16 @@
       "standing": 10,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": 15.96,
+      "talent": 15.959,
       "categoryProfile": {
-        "PTS": 2.43,
-        "REB": -2.94,
-        "AST": 2.47,
-        "STL": 0.85,
-        "BLK": 0.77,
-        "3PM": 6.78,
-        "FG%": 5.0,
-        "FT%": 1.16,
+        "PTS": 2.426,
+        "REB": -2.937,
+        "AST": 2.473,
+        "STL": 0.854,
+        "BLK": 0.773,
+        "3PM": 6.775,
+        "FG%": 4.997,
+        "FT%": 1.158,
         "TO": -0.56
       },
       "talentRank": 2
@@ -6766,15 +6766,15 @@
       "rosterSize": 10,
       "talent": 24.47,
       "categoryProfile": {
-        "PTS": 5.22,
-        "REB": 1.42,
-        "AST": 5.88,
-        "STL": 1.54,
-        "BLK": 3.42,
-        "3PM": 2.33,
+        "PTS": 5.225,
+        "REB": 1.417,
+        "AST": 5.884,
+        "STL": 1.543,
+        "BLK": 3.424,
+        "3PM": 2.328,
         "FG%": 0.13,
-        "FT%": 0.66,
-        "TO": 3.86
+        "FT%": 0.662,
+        "TO": 3.857
       },
       "talentRank": 1
     },
@@ -6788,16 +6788,16 @@
       "standing": 12,
       "rankedPlayers": 10,
       "rosterSize": 10,
-      "talent": 2.96,
+      "talent": 2.958,
       "categoryProfile": {
-        "PTS": -1.73,
-        "REB": 0.2,
+        "PTS": -1.728,
+        "REB": 0.201,
         "AST": -3.68,
-        "STL": 0.17,
-        "BLK": 8.55,
-        "3PM": -3.83,
-        "FG%": 0.2,
-        "FT%": 5.59,
+        "STL": 0.167,
+        "BLK": 8.549,
+        "3PM": -3.833,
+        "FG%": 0.204,
+        "FT%": 5.588,
         "TO": -2.51
       },
       "talentRank": 3
@@ -7023,7 +7023,7 @@
   ],
   "news": [],
   "model": {
-    "version": "zscore-v1",
+    "version": "zscore-v2",
     "basis": "Season per game",
     "poolSize": 144,
     "minimumGames": 3,

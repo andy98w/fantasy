@@ -33,10 +33,30 @@ def test_fixed_reference_pool_does_not_depend_on_display_order():
     assert ma['poolIds']==mb['poolIds']
     assert {p['id']:p['power'] for p in a}=={p['id']:p['power'] for p in b}
 
-def test_partial_roster_has_no_comparable_team_talent():
+def test_partial_roster_has_provisional_total_and_explicit_coverage():
     players=[player(1),player(2,PTS=20),player(3)]
     players[2]['gamesPlayed']=0
     rank_players(players,3)
     teams=[{'id':1}]; rank_teams(teams,players)
-    assert teams[0]['talent'] is None
+    assert teams[0]['talent'] == round(sum(p['zTotal'] for p in players if p['zTotal'] is not None), 3)
+    assert players[2]['zTotal'] is None
     assert teams[0]['rankedPlayers']==2
+
+
+def test_equal_player_values_share_competition_ranks():
+    players=[player(1,PTS=25),player(2,PTS=25),player(3,PTS=10)]
+    rank_players(players,3)
+    assert [p['rank'] for p in players] == [1,1,3]
+    assert players[0]['power'] == players[1]['power']
+
+
+def test_team_ties_and_no_measured_players():
+    players=[player(1),player(2),player(3,PTS=10)]
+    players[0]['teamId']=1
+    players[1]['teamId']=2
+    players[2]['teamId']=3
+    rank_players(players,3)
+    teams=[{'id':1},{'id':2},{'id':3},{'id':4}]
+    rank_teams(teams,players)
+    assert [t['talentRank'] for t in teams] == [1,1,3,None]
+    assert teams[3]['talent'] is None

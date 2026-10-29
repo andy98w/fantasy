@@ -2,19 +2,17 @@
 import type { Snapshot } from "@/lib/schema";
 import { PixelIcon, type IconName } from "../ui/pixel-icon";
 export const navigation = [
-  { value: "overview", label: "Overview", icon: "home" },
-  { value: "matchup", label: "Matchups", icon: "matchup" },
+  { value: "league", label: "League", icon: "home" },
   { value: "team", label: "Teams", icon: "roster" },
   { value: "players", label: "Players", icon: "players" },
-  { value: "league", label: "Standings", icon: "standings" },
-  { value: "rankings", label: "Rankings", icon: "rankings" },
-  { value: "news", label: "News", icon: "news" },
+  { value: "trades", label: "Trade Calculator", icon: "trade" },
 ] as const satisfies readonly {
   value: string;
   label: string;
   icon: IconName;
 }[];
-export type View = (typeof navigation)[number]["value"] | "connection";
+export type View =
+  (typeof navigation)[number]["value"] | "connection" | "matchup";
 export function Navigation({
   data,
   view,
@@ -33,9 +31,9 @@ export function Navigation({
       <div className="masthead">
         <a
           className="brand"
-          href="#overview"
-          onClick={() => go("overview")}
-          aria-label="Fantasy overview"
+          href="#league"
+          onClick={() => go("league")}
+          aria-label="Fantasy league"
         >
           <span className="brand-ball">
             <PixelIcon name="ball" size={28} />
@@ -68,7 +66,12 @@ export function Navigation({
               key={item.value}
               href={`#${item.value}`}
               onClick={() => go(item.value)}
-              aria-current={view === item.value ? "page" : undefined}
+              aria-current={
+                view === item.value ||
+                (view === "matchup" && item.value === "league")
+                  ? "page"
+                  : undefined
+              }
             >
               <PixelIcon name={item.icon} size={16} />
               <span>{item.label}</span>

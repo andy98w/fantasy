@@ -13,8 +13,10 @@ export type IconName =
   | "close"
   | "chevron"
   | "check"
+  | "trade"
   | "ball";
 const shapes: Record<IconName, string> = {
+  trade: "M2 4h14V0h4v4h4v4h-4v4h-4V8H2z M22 16H8v-4H4v4H0v4h4v4h4v-4h14z",
   chevron: "M2 6h4v4h4v4h4v-4h4V6h4v4h-4v4h-4v4h-4v-4H6v-4H2z",
   check: "M2 10h4v4h4v4H6v-4H2z M10 14h4v-4h4V6h4v4h-4v4h-4v4h-4z",
   home: "M10 2h4v2h2v2h2v2h2v2h2v4h-4v8h-6v-6H8v6H2v-8H0v-4h2V8h2V6h2V4h4z",

@@ -1,0 +1,256 @@
+.ranking-help.power-help {
+  margin: -10px 0 22px;
+  max-width: 850px;
+}
+.power-help summary {
+  font-size: 12px;
+}
+.coverage-label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.coverage-label.provisional {
+  color: var(--gold);
+}
+.team-category-profile {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 8px;
+  margin: 0 0 20px;
+}
+.team-category-profile > div {
+  display: grid;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 10px 6px;
+  gap: 7px;
+}
+.team-category-profile > div > span:first-child {
+  font-size: 11px;
+  color: var(--muted);
+}
+.missing-players {
+  padding: 0 0 20px;
+}
+.team-news {
+  margin-top: 24px;
+}
+.standings-table {
+  min-width: 480px;
+}
+.trade-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.trade-results {
+  margin-top: 28px;
+  align-items: start;
+}
+.trade-roster-controls {
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.trade-roster-controls .team-select {
+  flex: 1;
+  width: 100%;
+  min-width: 180px;
+}
+.trade-roster-controls .search-field {
+  flex: 1;
+  min-width: 180px;
+}
+.trade-roster-list {
+  max-height: 320px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--line) var(--surface-deep);
+}
+.trade-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+}
+.trade-player:hover {
+  background: var(--surface-raised);
+}
+.trade-player.selected {
+  background: #ffcd7512;
+  box-shadow: inset 3px 0 var(--gold);
+}
+.trade-player input {
+  accent-color: var(--gold);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.trade-player-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+.trade-player-name strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.trade-player-name small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.trade-player > span:last-child {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.trade-outgoing {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 2px solid var(--line);
+  font-size: 12px;
+}
+.trade-outgoing strong {
+  color: var(--gold);
+}
+.trade-impact-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.trade-impact-heading h2 {
+  overflow-wrap: anywhere;
+}
+.trade-impact-body {
+  padding: 16px;
+}
+.trade-exchange {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  min-height: 48px;
+}
+.trade-exchange span {
+  color: var(--muted);
+  display: inline-block;
+  min-width: 58px;
+}
+.trade-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 20px 0;
+}
+.trade-metrics > div {
+  display: grid;
+  gap: 4px;
+}
+.trade-metrics span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.trade-metrics strong {
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.trade-verdict {
+  font-size: 13px;
+  margin-top: 14px;
+}
+.data-table.trade-impact-table {
+  min-width: 460px;
+  width: 100%;
+}
+.data-table.trade-impact-table th,
+.data-table.trade-impact-table td {
+  padding: 8px 10px;
+}
+.data-table.trade-impact-table th:first-child,
+.data-table.trade-impact-table td:first-child {
+  text-align: left;
+  padding-left: 16px;
+}
+.data-table.trade-impact-table .weight-select {
+  width: 122px;
+  min-height: 36px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.data-table.trade-impact-table .punted-category > td:first-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.data-table.trade-impact-table .heat-cell {
+  padding: 5px;
+}
+@media (max-width: 900px) {
+  .trade-grid {
+    grid-template-columns: 1fr;
+  }
+  .team-category-profile {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .data-table.trade-impact-table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .data-table.trade-impact-table th,
+  .data-table.trade-impact-table td {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  .data-table.trade-impact-table th:first-child,
+  .data-table.trade-impact-table td:first-child {
+    padding-left: 8px;
+    width: 13%;
+  }
+  .data-table.trade-impact-table th:nth-child(2),
+  .data-table.trade-impact-table th:nth-child(3) {
+    width: 15%;
+  }
+  .data-table.trade-impact-table th:nth-child(4) {
+    width: 17%;
+  }
+  .data-table.trade-impact-table th:last-child {
+    width: 40%;
+  }
+  .data-table.trade-impact-table .weight-select {
+    width: 100%;
+    padding: 6px;
+    gap: 4px;
+  }
+  .data-table.trade-impact-table .heat-cell {
+    min-width: 0;
+    padding: 4px;
+  }
+  .trade-roster-controls .search-field {
+    width: 100%;
+  }
+  .trade-player {
+    padding: 10px 12px;
+    gap: 9px;
+  }
+  .trade-results {
+    gap: 20px;
+  }
+  .team-profile > div {
+    min-width: 0;
+  }
+}

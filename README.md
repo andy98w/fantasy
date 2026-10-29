@@ -8,7 +8,8 @@ A read-only ESPN fantasy basketball dashboard for head-to-head nine-category lea
 - Per-game 9-cat z-scores with volume-weighted shooting impact and reversed turnovers.
 - Searchable player power leaderboard, visible overall player ranks, and ESPN headshots with initials as a fallback.
 - Fantasy team logos from ESPN, including custom uploads, with abbreviation fallbacks. Private uploads are fetched by the worker and cached as bounded raster images in the snapshot; ESPN cookies stay server-side.
-- Roster talent rankings with category heatmaps. These are **not weekly projections**.
+- Team power estimates with coverage, shared tied ranks, and category heatmaps. Incomplete rosters use explicit reference-average assumptions. These are **not weekly projections**.
+- Read-only trade calculator: two teams, multi-player exchanges, before/after categories, roster counts, coverage, and independent punts/priorities. Draft selections survive navigation within the app.
 - Read-only ESPN adapter with timeouts, bounded retries, pagination checks, roster reconciliation, and raw snapshots.
 - RSS headline collection from ESPN and RotoWire, deduplication, and conservative player matching.
 - Last-good-snapshot behavior, visible stale data, and public access without a website sign-in.
@@ -50,7 +51,7 @@ See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share
 
 ## Frontend
 
-This is a shared league dashboard with no viewer-specific team. The overview shows every current matchup, standings, and news. Teams opens a directory; roster and news filters can target any team. The legacy `myTeamId` import field is not used by the frontend.
+This is a shared league dashboard with four tabs: League, Teams, Players, and Trade Calculator. League combines current matchups, record standings, and roster-relevant news. Open matchup details from its cards. Teams combines the power heatmap with roster pages and team news; Players includes the player leaderboard. Record ranks share ties by win percentage; ESPN seeds remain separately labeled in team profiles. The legacy `myTeamId` import field is not used by the frontend.
 
 The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings, IBM Plex Sans with tabular numerals for scores and data, and a shared palette in `app/globals.css`. Dropdowns use Radix Select for keyboard, focus, and popup behavior, with our own pixel styling. There is no animation runtime.
 
@@ -59,14 +60,14 @@ The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headin
 - `components/dashboard.tsx`: navigation and filter state, composing the view components.
 - `components/league/format.ts`: numeric formatting and deterministic player sorting.
 
-Use `Select` for new dropdowns and `TeamSelect` for team filters (including team logos). `PlayerFilters` is shared by Players and Rankings. Teams and News use the same team selector and toolbar. Keep new control styles in the shared components instead of adding page-specific native inputs.
+Use `Select` for new dropdowns and `TeamSelect` for team filters (including team logos). Player filtering lives in `PlayerFilters`; the team and trade views reuse the same dropdowns, avatars, and controls. Keep new control styles in the shared components instead of adding page-specific native inputs.
 
-Ranking definitions live in expandable details; missing-data explanations stay on the relevant player. Wide tables scroll independently, and the mobile matchup uses a 3×3 category grid.
+One shared, expandable power explanation appears on the active power/trade view; missing-data explanations stay on the relevant player. Wide tables scroll independently, and the mobile matchup uses a 3×3 category grid.
 
 ## Structure
 
 - `app/`, `components/`: responsive dashboard and server-rendered entry point.
-- `lib/`: validated public snapshot contract, server-only storage reader.
+- `lib/`: validated public snapshot contract, server-only storage reader, and pure team/trade/news analysis.
 - `worker/`: ESPN reads, normalization, rankings, news, transactional sync.
 - `db/schema.sql`: append-only snapshots and sync history. Raw payloads remain server-side.
 - `docs/`: setup, methodology, implementation milestones.

@@ -2,7 +2,8 @@
 
 ## Built in the first slice
 
-- Next.js dashboard: overview, matchup selection, team roster selection, player search and sorting, standings, roster talent heatmap, player details, news filtering, connection status.
+- Four-tab dashboard: League, Teams, Players, and Trade Calculator. League combines matchups, tied record standings, and roster-relevant news; team pages combine power heatmaps, rosters, and news.
+- Read-only multi-player trade comparisons with before/after category values, roster counts, coverage, independent category priorities, and provisional missing-player assumptions.
 - ESPN read adapter: authentication, complete player pagination, explicit scoring/matchup periods, strict nine-category checks, ownership reconciliation.
 - Python normalization, descriptive player rankings, safe news ingestion, local snapshot persistence, PostgreSQL transaction path.
 - Public dashboard access, server-only ESPN credentials, schema validation, stale-data presentation.

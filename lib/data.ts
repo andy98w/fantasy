@@ -1,6 +1,4 @@
 import "server-only";
-import { headers } from "next/headers";
-import { authorized } from "./auth";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
@@ -13,22 +11,6 @@ export type DataResult = {
   syncFailure: string | null;
 };
 export async function loadLeague(): Promise<DataResult> {
-  // Check at the data boundary as well as the request proxy.
-  const password = process.env.LEAGUE_ACCESS_PASSWORD;
-  const requiresAuth =
-    process.env.NODE_ENV === "production" ||
-    process.env.DATA_MODE === "live" ||
-    !!password;
-  if (
-    requiresAuth &&
-    (!password || !authorized((await headers()).get("authorization"), password))
-  ) {
-    return {
-      snapshot: null,
-      error: "League access is required.",
-      syncFailure: null,
-    };
-  }
   if ((process.env.DATA_MODE ?? "demo") === "demo") {
     return {
       snapshot: snapshotSchema.parse(demo),

@@ -18,7 +18,6 @@ ESPN_TEAM_ID=3
 ESPN_S2='your session cookie'
 ESPN_SWID='{your SWID}'
 DATA_MODE=demo
-LEAGUE_ACCESS_PASSWORD='choose a separate password for this dashboard'
 ```
 
 Do not send cookie values in chat, screenshots, issue reports, or commits. They are account credentials and may permit more than reading ESPN. This application only uses GET requests and keeps cookies inside the sync worker. `.env`, runtime data, and private snapshots are ignored by Git and excluded from container build contexts.
@@ -37,10 +36,9 @@ Without `DATABASE_URL`, the worker writes private files to `data/`, atomically p
 After a successful sync:
 
 1. Change `DATA_MODE=live` in `.env`.
-2. Set a nonempty `LEAGUE_ACCESS_PASSWORD` (separate from any ESPN password).
-3. Restart `npm run dev`.
-4. Sign in using username **league** and your dashboard password.
-5. Compare all team rosters, the nine current matchup totals, and the W–L–T record against ESPN. Check player ownership and free-agent coverage.
+2. Restart `npm run dev`.
+3. Open the dashboard; no website sign-in is required. Anyone with the hosted URL can view the imported league data.
+4. Compare all team rosters, the nine current matchup totals, and the W–L–T record against ESPN. Check player ownership and free-agent coverage.
 
 The initial local import has passed access, coverage, and matchup arithmetic checks. Repeat this reconciliation after changes to the connector or league settings. Do not assume a successful HTTP request proves every field is interpreted correctly.
 

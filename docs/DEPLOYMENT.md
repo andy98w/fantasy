@@ -7,7 +7,7 @@ Deployment configuration is included; no hosted environment has been provisioned
 3. Add a second service from the same repo, root `/`, config path `worker/railway.toml`. It builds `worker/Dockerfile`, runs a one-shot sync every five minutes, and exits. Never configure the worker as an HTTP service.
 4. Set `DATABASE_URL` on both services using Railway's private database connection reference. Set `ESPN_LEAGUE_ID`, `ESPN_SEASON`, and `ESPN_TEAM_ID` on both.
 5. Set `ESPN_S2` and `ESPN_SWID` **only on the worker**. Do not put these in frontend variables, Docker build args, or GitHub repository variables.
-6. On the web service, set `DATA_MODE=live` and a strong `LEAGUE_ACCESS_PASSWORD`. Access is denied if the password is missing. Username is `league`. Use the HTTPS domain provided by Railway.
+6. On the web service, set `DATA_MODE=live` and use the HTTPS domain provided by Railway. The dashboard is public and requires no visitor account or password. ESPN authentication happens only in the worker.
 7. Run the worker once. Confirm the expected team/player counts, then open the web domain and reconcile the matchup with ESPN.
 8. Enable database backups and provider alerts for failed jobs; review usage after the first week.
 

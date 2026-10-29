@@ -9,7 +9,7 @@ A read-only ESPN fantasy basketball dashboard for head-to-head nine-category lea
 - Roster talent rankings with category heatmaps. These are **not weekly projections**.
 - Read-only ESPN adapter with timeouts, bounded retries, pagination checks, roster reconciliation, and raw snapshots.
 - RSS headline collection from ESPN and RotoWire, deduplication, and conservative player matching.
-- Last-good-snapshot behavior, visible stale data, and fail-closed password protection for live data.
+- Last-good-snapshot behavior, visible stale data, and public access without a website sign-in.
 - Explicit fictional demo mode for development. No sample data silently replaces failed live imports.
 
 ## Run locally
@@ -38,16 +38,16 @@ npm run build
 uv run pytest -q
 ```
 
-Unit tests cover shooting volume, turnovers, zero attempts, missing values, fixed reference pools, incomplete rosters, ESPN auth errors, repeated pagination, normalization, atomic writes, access checks, and snapshot validation. The initial authenticated import was verified locally: player and roster coverage passed, and all current matchup category win/tie totals and pooled shooting percentages reconciled with ESPN payloads. Independent screen-by-screen ESPN comparison and PostgreSQL/hosted integration verification remain before production launch.
+Unit tests cover shooting volume, turnovers, zero attempts, missing values, fixed reference pools, incomplete rosters, ESPN auth errors, repeated pagination, normalization, atomic writes and snapshot validation. The initial authenticated import was verified locally: player and roster coverage passed, and all current matchup category win/tie totals and pooled shooting percentages reconciled with ESPN payloads. Independent screen-by-screen ESPN comparison and PostgreSQL/hosted integration verification remain before production launch.
 
 ## Hosting
 
-See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share a private PostgreSQL database. The initial access gate uses one shared league password over HTTPS; individual member accounts are a later milestone. Production refuses access if the password is missing.
+See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share a private PostgreSQL database. The dashboard is public: anyone with the URL can view the imported league data without signing in. ESPN cookies stay exclusively in the sync worker; database credentials and raw upstream payloads remain server-side.
 
 ## Structure
 
 - `app/`, `components/`: responsive dashboard and server-rendered entry point.
-- `lib/`: validated public snapshot contract, server-only storage reader, access checks.
+- `lib/`: validated public snapshot contract, server-only storage reader.
 - `worker/`: ESPN reads, normalization, rankings, news, transactional sync.
 - `db/schema.sql`: append-only snapshots and sync history. Raw payloads remain server-side.
 - `docs/`: setup, methodology, implementation milestones.

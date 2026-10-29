@@ -1128,9 +1128,9 @@ export default function Dashboard({
                 </a>
               </section>
               <section className="panel connection-card">
-                <h2>Private by default.</h2>
+                <h2>Public dashboard. Private credentials.</h2>
                 <p>
-                  ESPN access is configured by the site owner on the server.
+                  Anyone can view this dashboard without signing in. ESPN access is configured by the site owner on the server.
                   Your ESPN password is never requested by this dashboard, and
                   account cookies never reach the browser.
                 </p>

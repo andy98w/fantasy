@@ -52,12 +52,14 @@ See [Railway deployment](docs/DEPLOYMENT.md). The web and scheduled worker share
 
 This is a shared league dashboard with no viewer-specific team. The overview shows every current matchup, standings, and news. Teams opens a directory; roster and news filters can target any team. The legacy `myTeamId` import field is not used by the frontend.
 
-The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings, IBM Plex Sans with tabular numerals for scores and data, and a shared palette in `app/globals.css`. No component library or animation runtime is required.
+The interface uses a pixel basketball scoreboard theme: Pixelify Sans for headings, IBM Plex Sans with tabular numerals for scores and data, and a shared palette in `app/globals.css`. Dropdowns use Radix Select for keyboard, focus, and popup behavior, with our own pixel styling. There is no animation runtime.
 
-- `components/ui/`: shared buttons, panels, segmented controls, and pixel SVG icons.
+- `components/ui/`: shared buttons, panels, segmented controls, dropdowns, search fields, toolbars, result counts, page headings, notices, and pixel SVG icons. `controls.css` owns the common field/menu styling.
 - `components/league/`: navigation, avatars, matchup board, player tables and details, standings, rankings, news, filters, and connection status.
 - `components/dashboard.tsx`: navigation and filter state, composing the view components.
 - `components/league/format.ts`: numeric formatting and deterministic player sorting.
+
+Use `Select` for new dropdowns and `TeamSelect` for team filters (including team logos). `PlayerFilters` is shared by Players and Rankings. Teams and News use the same team selector and toolbar. Keep new control styles in the shared components instead of adding page-specific native inputs.
 
 Ranking definitions live in expandable details; missing-data explanations stay on the relevant player. Wide tables scroll independently, and the mobile matchup uses a 3×3 category grid.
 

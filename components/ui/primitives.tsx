@@ -8,7 +8,11 @@ export function Button({
   variant?: "default" | "quiet" | "accent";
 }) {
   return (
-    <button className={`button button-${variant} ${className}`} {...props}>
+    <button
+      type="button"
+      className={`button button-${variant} ${className}`}
+      {...props}
+    >
       {children}
     </button>
   );
@@ -51,6 +55,7 @@ export function Tabs<T extends string>({
     <div className="tabs" role="group" aria-label={label}>
       {options.map((option) => (
         <button
+          type="button"
           key={option.value}
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
@@ -63,4 +68,65 @@ export function Tabs<T extends string>({
 }
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty-state">{children}</div>;
+}
+
+export function Toolbar({
+  children,
+  filters = false,
+}: {
+  children: ReactNode;
+  filters?: boolean;
+}) {
+  return <div className={filters ? "filters" : "view-toolbar"}>{children}</div>;
+}
+
+export function ResultCount({
+  count,
+  singular,
+  plural = `${singular}s`,
+}: {
+  count: number;
+  singular: string;
+  plural?: string;
+}) {
+  return (
+    <span className="result-count">
+      {count} {count === 1 ? singular : plural}
+    </span>
+  );
+}
+
+export function PageHeading({
+  title,
+  detail,
+  action,
+}: {
+  title: string;
+  detail?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      <h1>{title}</h1>
+      {detail && <span className="heading-detail">{detail}</span>}
+      {action}
+    </div>
+  );
+}
+
+export function Notice({
+  children,
+  warning = false,
+  action,
+}: {
+  children: ReactNode;
+  warning?: boolean;
+  action?: ReactNode;
+}) {
+  return (
+    <div className={`notice${warning ? " warning" : ""}`} role="status">
+      {children}
+      {action}
+    </div>
+  );
 }

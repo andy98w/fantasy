@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
+@import "../components/ui/controls.css";
 
 :root {
   color-scheme: dark;
@@ -302,6 +303,7 @@ h2 {
 }
 .notice {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
@@ -313,6 +315,7 @@ h2 {
   font-size: 12px;
 }
 .notice button {
+  color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
   white-space: nowrap;
@@ -800,41 +803,15 @@ h2 {
   gap: 12px;
   margin-bottom: 18px;
 }
-.search-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 13px;
-  border: 1px solid var(--line);
-  background: var(--surface-deep);
-  color: var(--muted);
-  min-width: 230px;
-}
-.search-field:focus-within {
-  border-color: var(--gold);
-}
-.search-field input {
-  border: 0;
-  background: transparent;
-  outline: none;
-  font-size: 12px;
-  width: 100%;
-  min-width: 0;
-}
 input::placeholder {
   color: var(--muted);
   opacity: 1;
 }
-select {
-  background: var(--surface-deep);
-  border: 1px solid var(--line);
-  padding: 10px 32px 10px 12px;
-  font-size: 12px;
-  max-width: 100%;
-}
-.filter-count {
+.result-count {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
+}
+.filters > .result-count {
   margin-left: auto;
 }
 .ranking-help {
@@ -1386,10 +1363,12 @@ select {
     width: 100%;
     min-width: 0;
   }
-  .filters select {
+  .filters .select-trigger {
     flex: 1;
+    width: 0;
+    min-width: 130px;
   }
-  .filter-count {
+  .filters > .result-count {
     width: 100%;
     margin-left: 0;
   }

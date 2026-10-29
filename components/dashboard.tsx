@@ -8,6 +8,7 @@ import { PlayerDialog } from "./league/player-dialog";
 import { PlayerFilters } from "./league/player-filters";
 import { MatchupGrid } from "./league/matchup-grid";
 import { TeamDirectory } from "./league/team-directory";
+import { TeamSelect } from "./league/team-select";
 import {
   Standings,
   TeamRankings,
@@ -17,7 +18,15 @@ import {
 import { Connection } from "./league/connection";
 import { NewsFeed } from "./league/news-feed";
 import { sortPlayers, type Sort } from "./league/format";
-import { Button, Panel, Tabs } from "./ui/primitives";
+import {
+  Button,
+  Panel,
+  Tabs,
+  Toolbar,
+  ResultCount,
+  PageHeading,
+  Notice,
+} from "./ui/primitives";
 
 export default function Dashboard({
   data,
@@ -37,7 +46,8 @@ export default function Dashboard({
   const [newsScope, setNewsScope] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
   const [selectedId, setSelectedId] = useState<Player["id"] | null>(null);
-  const selected = data.players.find((player) => player.id === selectedId) ?? null;
+  const selected =
+    data.players.find((player) => player.id === selectedId) ?? null;
   const [minutes, setMinutes] = useState<number | null>(null);
   const [matchupId, setMatchupId] = useState(data.matchups[0]?.id);
   useEffect(() => {
@@ -152,44 +162,65 @@ export default function Dashboard({
       />
       <main className="main-content" id="main-content">
         {data.mode === "demo" ? (
-          <div className="notice">
-            Demo league · Fictional stats{" "}
-            <button onClick={() => go("connection")}>Connection</button>
-          </div>
-        ) : syncFailure ? (
-          <div className="notice warning" role="status">
-            Sync failed. Showing the last import.{" "}
-            <button onClick={() => go("connection")}>Details</button>
-          </div>
-        ) : (minutes ?? 0) > 15 ? (
-          <div className="notice warning" role="status">
-            Data is {minutes} minutes old.{" "}
-            <button onClick={() => go("connection")}>Sync status</button>
-          </div>
-        ) : null}
-        <div className="page-heading">
-          <h1>
-            {view === "connection"
-              ? "Connection"
-              : navigation.find((item) => item.value === view)?.label}
-          </h1>
-          {view === "players" || view === "rankings" ? (
-            <span className="heading-detail">Season per game</span>
-          ) : null}
-          <button
-            className="mobile-import"
-            onClick={() => go("connection")}
-            aria-label="Sync status"
+          <Notice
+            action={
+              <Button variant="quiet" onClick={() => go("connection")}>
+                Connection
+              </Button>
+            }
           >
-            {data.mode === "demo"
-              ? "Demo"
-              : minutes === null
-                ? "Imported"
-                : minutes === 0
-                  ? "Updated now"
-                  : `${minutes}m ago`}
-          </button>
-        </div>
+            Demo league · Fictional stats
+          </Notice>
+        ) : syncFailure ? (
+          <Notice
+            warning
+            action={
+              <Button variant="quiet" onClick={() => go("connection")}>
+                Details
+              </Button>
+            }
+          >
+            Sync failed. Showing the last import.
+          </Notice>
+        ) : (minutes ?? 0) > 15 ? (
+          <Notice
+            warning
+            action={
+              <Button variant="quiet" onClick={() => go("connection")}>
+                Sync status
+              </Button>
+            }
+          >
+            Data is {minutes} minutes old.
+          </Notice>
+        ) : null}
+        <PageHeading
+          title={
+            view === "connection"
+              ? "Connection"
+              : navigation.find((item) => item.value === view)!.label
+          }
+          detail={
+            view === "players" || view === "rankings"
+              ? "Season per game"
+              : undefined
+          }
+          action={
+            <button
+              className="mobile-import"
+              onClick={() => go("connection")}
+              aria-label="Sync status"
+            >
+              {data.mode === "demo"
+                ? "Demo"
+                : minutes === null
+                  ? "Imported"
+                  : minutes === 0
+                    ? "Updated now"
+                    : `${minutes}m ago`}
+            </button>
+          }
+        />
         {view === "overview" && (
           <>
             <MatchupGrid
@@ -261,29 +292,20 @@ export default function Dashboard({
         )}
         {view === "team" && (
           <>
-            <div className="view-toolbar">
-              <select
-                aria-label="Select team"
-                value={teamId ?? ""}
-                onChange={(event) =>
-                  setTeamId(
-                    event.target.value ? Number(event.target.value) : null,
-                  )
+            <Toolbar>
+              <TeamSelect
+                teams={data.teams}
+                label="Select team"
+                value={teamId === null ? "all" : String(teamId)}
+                onChange={(value) =>
+                  setTeamId(value === "all" ? null : Number(value))
                 }
-              >
-                <option value="">All teams</option>
-                {data.teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-              <span className="muted">
-                {team
-                  ? `${roster.length} players`
-                  : `${data.teams.length} teams`}
-              </span>
-            </div>
+              />
+              <ResultCount
+                count={team ? roster.length : data.teams.length}
+                singular={team ? "player" : "team"}
+              />
+            </Toolbar>
             {team ? (
               <>
                 <TeamProfile team={team} />
@@ -317,7 +339,7 @@ export default function Dashboard({
         )}
         {view === "rankings" && (
           <>
-            <div className="view-toolbar">
+            <Toolbar>
               <Tabs
                 label="Ranking type"
                 value={rankingScope}
@@ -335,7 +357,7 @@ export default function Dashboard({
                   ? `${data.players.filter((p) => p.rank !== null).length} rated / ${data.model.minimumGames} games minimum`
                   : "Roster talent"}
               </span>
-            </div>
+            </Toolbar>
             {rankingScope === "players" ? (
               <>
                 {filters}
@@ -355,21 +377,16 @@ export default function Dashboard({
         )}
         {view === "news" && (
           <>
-            <div className="view-toolbar">
-              <select
-                aria-label="News team"
+            <Toolbar>
+              <TeamSelect
+                teams={data.teams}
+                label="News team"
+                allLabel="All news"
                 value={newsScope}
-                onChange={(event) => setNewsScope(event.target.value)}
-              >
-                <option value="all">All news</option>
-                {data.teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-              <span className="muted">{news.length} headlines</span>
-            </div>
+                onChange={setNewsScope}
+              />
+              <ResultCount count={news.length} singular="headline" />
+            </Toolbar>
             <Panel className="news-page">
               <NewsFeed items={news} />
             </Panel>

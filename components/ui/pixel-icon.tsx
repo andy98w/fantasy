@@ -11,8 +11,12 @@ export type IconName =
   | "external"
   | "refresh"
   | "close"
+  | "chevron"
+  | "check"
   | "ball";
 const shapes: Record<IconName, string> = {
+  chevron: "M2 6h4v4h4v4h4v-4h4V6h4v4h-4v4h-4v4h-4v-4H6v-4H2z",
+  check: "M2 10h4v4h4v4H6v-4H2z M10 14h4v-4h4V6h4v4h-4v4h-4v4h-4z",
   home: "M10 2h4v2h2v2h2v2h2v2h2v4h-4v8h-6v-6H8v6H2v-8H0v-4h2V8h2V6h2V4h4z",
   matchup:
     "M2 2h4v4h4v4h4v4h4v4h4v4h-6v-4h-4v-4H8v-4H4V6H2z M18 2h4v4h-4v4h-4V6h4z M2 18h4v-4h4v4H6v4H2z",

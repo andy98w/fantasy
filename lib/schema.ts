@@ -34,6 +34,21 @@ export const teamSchema = z.object({
   id: numeric,
   name: z.string(),
   abbrev: z.string(),
+  logoUrl: z
+    .union([
+      z.url().refine((value) => {
+        const url = new URL(value);
+        return url.protocol === "https:" && !url.username && !url.password;
+      }),
+      z
+        .string()
+        .max(350000)
+        .regex(
+          /^data:image\/(?:jpeg|png|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+        ),
+    ])
+    .nullable()
+    .default(null),
   wins: numeric,
   losses: numeric,
   ties: numeric,

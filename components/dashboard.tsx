@@ -81,9 +81,22 @@ const statusText = (s: string) =>
         ? "Healthy"
         : s.replaceAll("_", " ").toLowerCase();
 function TeamBadge({ team, small = false }: { team: Team; small?: boolean }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showLogo = team.logoUrl && failedUrl !== team.logoUrl;
   return (
     <span className={`team-badge ${small ? "small" : ""} color-${team.id % 4}`}>
-      {team.abbrev || initials(team.name)}
+      {showLogo ? (
+        <img
+          src={team.logoUrl!}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(team.logoUrl)}
+        />
+      ) : (
+        team.abbrev || initials(team.name)
+      )}
     </span>
   );
 }
@@ -618,7 +631,9 @@ export default function Dashboard({
                 }}
               />
             </label>
-            <span className="user-avatar">{mine.abbrev}</span>
+            <span className="user-avatar" aria-label={mine.name}>
+              <TeamBadge team={mine} small />
+            </span>
           </div>
         </header>
         <main className="main-content" id="main-content">

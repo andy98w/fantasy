@@ -37,3 +37,15 @@ def test_ownership_mismatch_rejected():
 def test_unrecognized_ninth_category_rejected():
     raw=fixture();raw['league']['settings']['scoringSettings']['scoringItems'][-1]['statId']=38
     with pytest.raises(SyncError,match='standard 9-cat'):normalize(raw,123,2027,3)
+
+@pytest.mark.parametrize('logo, expected', [
+    ('https://g.espncdn.com/team.svg', 'https://g.espncdn.com/team.svg'),
+    ('https://mystique-api.fantasy.espn.com/apis/v1/domains/lm/images/example', 'https://mystique-api.fantasy.espn.com/apis/v1/domains/lm/images/example'),
+    (None, None), ('javascript:alert(1)', None), ('https://user:secret@example.com/logo.png', None),
+])
+def test_team_logos_pass_through_without_unsafe_urls(logo, expected):
+    raw = fixture()
+    raw['league']['teams'][0]['logo'] = logo
+    data = normalize(raw, 123, 2027, 3)
+    assert data['teams'][0]['logoUrl'] == expected
+    assert data['teams'][1]['logoUrl'] is None

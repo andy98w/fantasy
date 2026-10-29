@@ -15,6 +15,7 @@ from psycopg.types.json import Jsonb
 from .espn import ESPNClient, SyncError
 from .normalize import normalize
 from .news import collect_news
+from .logos import cache_team_logos
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -72,6 +73,7 @@ def run(args):
                 with ESPNClient(league_id,season,os.environ.get('ESPN_S2',''),os.environ.get('ESPN_SWID','')) as client:
                     raw=client.fetch()
                 snapshot=normalize(raw,league_id,season,team_id)
+                snapshot['warnings'] += cache_team_logos(snapshot['teams'], os.environ.get('ESPN_S2',''), os.environ.get('ESPN_SWID',''))
             snapshot['news'],news_warnings=collect_news(snapshot['players'],(previous or {}).get('news'))
             snapshot['warnings']=[w for w in snapshot.get('warnings',[]) if 'news unavailable' not in w]+news_warnings
             snapshot['newsSyncedAt']=datetime.now(timezone.utc).isoformat()

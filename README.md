@@ -7,6 +7,7 @@ A read-only ESPN fantasy basketball dashboard for head-to-head nine-category lea
 - Category matchup board, team rosters, standings, full player search, and category-value player details.
 - Per-game 9-cat z-scores with volume-weighted shooting impact and reversed turnovers.
 - Searchable player power leaderboard, visible overall player ranks, and ESPN headshots with initials as a fallback.
+- Fantasy team logos from ESPN, including custom uploads, with abbreviation fallbacks. Private uploads are fetched by the worker and cached as bounded raster images in the snapshot; ESPN cookies stay server-side.
 - Roster talent rankings with category heatmaps. These are **not weekly projections**.
 - Read-only ESPN adapter with timeouts, bounded retries, pagination checks, roster reconciliation, and raw snapshots.
 - RSS headline collection from ESPN and RotoWire, deduplication, and conservative player matching.

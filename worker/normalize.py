@@ -1,11 +1,20 @@
 from __future__ import annotations
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from .espn import SyncError
 from .rankings import rank_players, rank_teams, CATS
 
 STAT_IDS={'0':'PTS','1':'BLK','2':'STL','3':'AST','6':'REB','11':'TO','13':'FGM','14':'FGA','15':'FTM','16':'FTA','17':'3PM','19':'FG%','20':'FT%','40':'MIN','42':'GP'}
 SLOTS={0:'PG',1:'SG',2:'SF',3:'PF',4:'C',5:'G',6:'F',7:'SG/SF',8:'G/F',9:'PF/C',10:'F/C',11:'UTIL',12:'BE',13:'IR',15:'Rookie'}
 NBA=['FA','ATL','BOS','NOP','CHI','CLE','DAL','DEN','DET','GSW','HOU','IND','LAC','LAL','MIA','MIL','MIN','BKN','NYK','ORL','PHI','PHX','POR','SAC','SAS','OKC','UTA','WAS','TOR','MEM','CHA']
+
+def team_logo(value):
+    if not isinstance(value, str): return None
+    try:
+        parsed = urlsplit(value)
+        return value if parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password else None
+    except ValueError:
+        return None
 
 def normalize(raw, league_id, season, team_id):
     league=raw['league']
@@ -23,7 +32,7 @@ def normalize(raw, league_id, season, team_id):
     for t in league['teams']:
         record=t.get('record',{}).get('overall',{})
         teams.append({'id':t['id'],'name':t.get('name') or f"{t.get('location','')} {t.get('nickname','')}".strip() or f"Team {t['id']}",
-            'abbrev':t.get('abbrev',''), 'wins':record.get('wins',0),'losses':record.get('losses',0),
+            'abbrev':t.get('abbrev',''), 'logoUrl':team_logo(t.get('logo')), 'wins':record.get('wins',0),'losses':record.get('losses',0),
             'ties':record.get('ties',0),'standing':t.get('playoffSeed') or t.get('rankCalculatedFinal') or None})
         for entry in t.get('roster',{}).get('entries',[]):
             p=entry.get('playerPoolEntry',{}).get('player',{})

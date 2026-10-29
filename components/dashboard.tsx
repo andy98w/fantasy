@@ -88,16 +88,39 @@ function TeamBadge({ team, small = false }: { team: Team; small?: boolean }) {
   );
 }
 function PlayerAvatar({ player }: { player: Player }) {
+  const [failedId, setFailedId] = useState<number | null>(null);
+  const showImage = player.id > 0 && failedId !== player.id;
   return (
     <span className={`player-avatar color-${Math.abs(player.id) % 4}`}>
-      {initials(player.name)}
+      {showImage ? (
+        <img
+          src={`https://a.espncdn.com/i/headshots/nba/players/full/${player.id}.png`}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedId(player.id)}
+        />
+      ) : (
+        initials(player.name)
+      )}
     </span>
   );
 }
-function Power({ value }: { value: number | null }) {
+function Power({ value, reason }: { value: number | null; reason?: string }) {
   return (
-    <span className={`power ${value !== null && value >= 75 ? "strong" : ""}`}>
-      {value === null ? "—" : value.toFixed(0)}
+    <span
+      className={`power ${value === null ? "unrated" : value >= 75 ? "strong" : ""}`}
+      title={
+        value === null ? reason : `${value.toFixed(1)} / 100 · 9-cat percentile`
+      }
+      aria-label={
+        value === null
+          ? `Unrated: ${reason ?? "insufficient data"}`
+          : `Power ${value.toFixed(1)} out of 100`
+      }
+    >
+      {value === null ? "Unrated" : value.toFixed(0)}
     </span>
   );
 }
@@ -123,6 +146,10 @@ export default function Dashboard({
       [m.home.teamId, m.away.teamId].includes(data.league.myTeamId),
     )?.id ?? data.matchups[0]?.id,
   );
+  const [rankingScope, setRankingScope] = useState<"players" | "teams">(
+    "players",
+  );
+  const [rankingQuery, setRankingQuery] = useState("");
   const [showMethod, setShowMethod] = useState(false);
   const [now, setNow] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -226,6 +253,11 @@ export default function Dashboard({
       setDescending(true);
     }
   }
+  function ratingReason(player: Player) {
+    if (player.gamesPlayed < data.model.minimumGames)
+      return `${player.gamesPlayed} of ${data.model.minimumGames} required games played`;
+    return "Not enough complete statistics to calculate a rating";
+  }
   function playerTable(players: Player[], compact = false) {
     return (
       <div className="table-scroll">
@@ -233,6 +265,9 @@ export default function Dashboard({
           <thead>
             <tr>
               <th className="player-col">Player</th>
+              <th title="Rank among all rated players, independent of filters">
+                Rank
+              </th>
               <th>
                 <button onClick={() => sortBy("power")}>
                   Power{" "}
@@ -256,7 +291,11 @@ export default function Dashboard({
                   </th>
                 ),
               )}
-              <th>{view === "players" ? "Roster" : "Status"}</th>
+              <th>
+                {view === "players" || view === "rankings"
+                  ? "Roster"
+                  : "Status"}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -278,8 +317,18 @@ export default function Dashboard({
                     </span>
                   </button>
                 </td>
+                <td
+                  className="rank-num"
+                  title={
+                    p.rank === null
+                      ? ratingReason(p)
+                      : "Overall 9-cat player rank"
+                  }
+                >
+                  {p.rank === null ? "—" : `#${p.rank}`}
+                </td>
                 <td>
-                  <Power value={p.power} />
+                  <Power value={p.power} reason={ratingReason(p)} />
                 </td>
                 {(compact ? ["PTS", "REB", "AST", "FG%"] : CATEGORIES).map(
                   (c) => (
@@ -287,7 +336,7 @@ export default function Dashboard({
                   ),
                 )}
                 <td>
-                  {view === "players" ? (
+                  {view === "players" || view === "rankings" ? (
                     <span
                       className={`availability ${p.teamId === null ? "free" : ""}`}
                     >
@@ -641,7 +690,12 @@ export default function Dashboard({
                     {mine.talentRank ? `#${mine.talentRank}` : "—"}
                     <small>of {fullyRatedTeams} fully rated teams</small>
                   </strong>
-                  <button onClick={() => go("rankings")}>
+                  <button
+                    onClick={() => {
+                      setRankingScope("teams");
+                      go("rankings");
+                    }}
+                  >
                     Explore rankings <ChevronRight size={13} />
                   </button>
                 </div>
@@ -719,7 +773,10 @@ export default function Dashboard({
                   </div>
                   <button
                     className="text-button"
-                    onClick={() => go("rankings")}
+                    onClick={() => {
+                      setRankingScope("teams");
+                      go("rankings");
+                    }}
                   >
                     Full rankings <ChevronRight size={15} />
                   </button>
@@ -942,109 +999,183 @@ export default function Dashboard({
           )}
           {view === "rankings" && (
             <>
-              <div className="ranking-intro">
-                <div>
-                  <h2>Roster talent</h2>
-                  <p className="coverage-note">
-                    {fullyRatedTeams} of {data.teams.length} teams have complete
-                    ratings. Unrated teams are not included in the rank.
-                  </p>
-                  <p>
-                    A transparent first look at team strength. Sum of each
-                    player’s nine-category value, including bench and injured
-                    players.
-                  </p>
-                </div>
+              <div className="segmented" aria-label="Ranking type">
                 <button
-                  className="secondary-button"
-                  onClick={() => setShowMethod(!showMethod)}
+                  aria-pressed={rankingScope === "players"}
+                  className={rankingScope === "players" ? "selected" : ""}
+                  onClick={() => {
+                    setRankingScope("players");
+                    setSort("power");
+                    setDescending(true);
+                  }}
                 >
-                  <CircleHelp size={16} />
-                  {showMethod ? "Hide methodology" : "How it works"}
+                  Players
+                </button>
+                <button
+                  aria-pressed={rankingScope === "teams"}
+                  className={rankingScope === "teams" ? "selected" : ""}
+                  onClick={() => setRankingScope("teams")}
+                >
+                  Teams
                 </button>
               </div>
-              {showMethod && (
-                <div className="methodology">
-                  <h3>Every score has a reason.</h3>
-                  <p>
-                    We standardize per-game counting stats against a fixed
-                    fantasy-relevant player pool. Turnovers are reversed.
-                    Shooting impact is makes minus baseline percentage ×
-                    attempts, so volume matters. The nine z-scores sum to player
-                    value; power displays its reference-pool percentile.
+              {rankingScope === "players" ? (
+                <>
+                  <div className="ranking-intro">
+                    <div>
+                      <h2>Player power</h2>
+                      <p>
+                        {data.players.filter((p) => p.rank !== null).length}{" "}
+                        rated players · Season per game · All nine categories
+                      </p>
+                      <p>
+                        Rank compares all rated players. Power is a 0–100
+                        percentile against the fixed {data.model.poolSize}
+                        -player reference pool.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="filters">
+                    <label className="search-field">
+                      <Search size={16} />
+                      <input
+                        aria-label="Search player rankings"
+                        placeholder="Search player rankings…"
+                        value={rankingQuery}
+                        onChange={(e) => setRankingQuery(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <section className="panel">
+                    {playerTable(
+                      sortedPlayers(
+                        data.players.filter((p) =>
+                          p.name
+                            .toLowerCase()
+                            .includes(rankingQuery.toLowerCase()),
+                        ),
+                      ),
+                    )}
+                  </section>
+                  <p className="table-note">
+                    Players need {data.model.minimumGames} games and complete
+                    stats to receive a rating. Unrated players appear last.
+                    These early-season ratings describe performance so far; they
+                    are not rest-of-season projections. Select a player to see
+                    their category contributions.
                   </p>
-                  <p>
-                    Reference pool: {data.model.poolSize} players.{" "}
-                    {data.model.poolRule}. At least {data.model.minimumGames}{" "}
-                    games required. A team with incomplete player ratings
-                    receives no talent rank. This model is descriptive, not a
-                    forecast or win probability.
-                  </p>
-                </div>
-              )}
-              <section className="panel">
-                <div className="table-scroll">
-                  <table className="heatmap">
-                    <thead>
-                      <tr>
-                        <th>Rank</th>
-                        <th>Team</th>
-                        <th>Talent</th>
-                        {CATEGORIES.map((c) => (
-                          <th key={c}>{c}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankedTeams.map((t) => (
-                        <tr key={t.id}>
-                          <td className="rank-num">{t.talentRank ?? "—"}</td>
-                          <td>
-                            <button
-                              className="team-link"
-                              onClick={() => {
-                                setTeamId(t.id);
-                                go("team");
-                              }}
-                            >
-                              <TeamBadge team={t} small />
-                              <strong>{t.name}</strong>
-                            </button>
-                          </td>
-                          <td>
-                            <strong>{t.talent?.toFixed(1) ?? "—"}</strong>
-                          </td>
-                          {CATEGORIES.map((c) => {
-                            const v = t.categoryProfile[c] ?? 0;
-                            return (
-                              <td key={c}>
-                                <span
-                                  className={`heat ${v >= 0 ? "positive" : "negative"}`}
-                                  style={{
-                                    background:
-                                      v >= 0
-                                        ? `rgba(38,114,91,${Math.min(0.28, 0.04 + Math.abs(v) * 0.025)})`
-                                        : `rgba(197,104,61,${Math.min(0.24, 0.04 + Math.abs(v) * 0.025)})`,
+                </>
+              ) : (
+                <>
+                  <div className="ranking-intro">
+                    <div>
+                      <h2>Roster talent</h2>
+                      <p className="coverage-note">
+                        {fullyRatedTeams} of {data.teams.length} teams have
+                        complete ratings. Unrated teams are not included in the
+                        rank.
+                      </p>
+                      <p>
+                        A transparent first look at team strength. Sum of each
+                        player’s nine-category value, including bench and
+                        injured players.
+                      </p>
+                    </div>
+                    <button
+                      className="secondary-button"
+                      onClick={() => setShowMethod(!showMethod)}
+                    >
+                      <CircleHelp size={16} />
+                      {showMethod ? "Hide methodology" : "How it works"}
+                    </button>
+                  </div>
+                  {showMethod && (
+                    <div className="methodology">
+                      <h3>Every score has a reason.</h3>
+                      <p>
+                        We standardize per-game counting stats against a fixed
+                        fantasy-relevant player pool. Turnovers are reversed.
+                        Shooting impact is makes minus baseline percentage ×
+                        attempts, so volume matters. The nine z-scores sum to
+                        player value; power displays its reference-pool
+                        percentile.
+                      </p>
+                      <p>
+                        Reference pool: {data.model.poolSize} players.{" "}
+                        {data.model.poolRule}. At least{" "}
+                        {data.model.minimumGames} games required. A team with
+                        incomplete player ratings receives no talent rank. This
+                        model is descriptive, not a forecast or win probability.
+                      </p>
+                    </div>
+                  )}
+                  <section className="panel">
+                    <div className="table-scroll">
+                      <table className="heatmap">
+                        <thead>
+                          <tr>
+                            <th>Rank</th>
+                            <th>Team</th>
+                            <th>Talent</th>
+                            {CATEGORIES.map((c) => (
+                              <th key={c}>{c}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rankedTeams.map((t) => (
+                            <tr key={t.id}>
+                              <td className="rank-num">
+                                {t.talentRank ?? "—"}
+                              </td>
+                              <td>
+                                <button
+                                  className="team-link"
+                                  onClick={() => {
+                                    setTeamId(t.id);
+                                    go("team");
                                   }}
                                 >
-                                  {v > 0 ? "+" : ""}
-                                  {v.toFixed(1)}
-                                </span>
+                                  <TeamBadge team={t} small />
+                                  <strong>{t.name}</strong>
+                                </button>
                               </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              <p className="table-note">
-                Category totals use only rated players. Positive values indicate
-                above-baseline contributions; negative values indicate
-                below-baseline contributions. Weekly team power is the next
-                model milestone.
-              </p>
+                              <td>
+                                <strong>{t.talent?.toFixed(1) ?? "—"}</strong>
+                              </td>
+                              {CATEGORIES.map((c) => {
+                                const v = t.categoryProfile[c] ?? 0;
+                                return (
+                                  <td key={c}>
+                                    <span
+                                      className={`heat ${v >= 0 ? "positive" : "negative"}`}
+                                      style={{
+                                        background:
+                                          v >= 0
+                                            ? `rgba(38,114,91,${Math.min(0.28, 0.04 + Math.abs(v) * 0.025)})`
+                                            : `rgba(197,104,61,${Math.min(0.24, 0.04 + Math.abs(v) * 0.025)})`,
+                                      }}
+                                    >
+                                      {v > 0 ? "+" : ""}
+                                      {v.toFixed(1)}
+                                    </span>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                  <p className="table-note">
+                    Category totals use only rated players. Positive values
+                    indicate above-baseline contributions; negative values
+                    indicate below-baseline contributions. Weekly team power is
+                    the next model milestone.
+                  </p>
+                </>
+              )}
             </>
           )}
           {view === "news" && (
@@ -1130,9 +1261,10 @@ export default function Dashboard({
               <section className="panel connection-card">
                 <h2>Public dashboard. Private credentials.</h2>
                 <p>
-                  Anyone can view this dashboard without signing in. ESPN access is configured by the site owner on the server.
-                  Your ESPN password is never requested by this dashboard, and
-                  account cookies never reach the browser.
+                  Anyone can view this dashboard without signing in. ESPN access
+                  is configured by the site owner on the server. Your ESPN
+                  password is never requested by this dashboard, and account
+                  cookies never reach the browser.
                 </p>
                 <h3>For the site owner</h3>
                 <p>
@@ -1200,7 +1332,7 @@ export default function Dashboard({
                   {statusText(selected.status)}
                 </span>
               </div>
-              <Power value={selected.power} />
+              <Power value={selected.power} reason={ratingReason(selected)} />
             </div>
             <div className="player-meta">
               <span>
@@ -1251,7 +1383,7 @@ export default function Dashboard({
                 ? "Small sample: interpret early-season rankings cautiously. "
                 : ""}
               {selected.power === null
-                ? "Not enough complete data to rank this player."
+                ? ratingReason(selected) + "."
                 : "Power is a percentile, not a forecast."}
             </p>
             {data.news

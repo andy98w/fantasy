@@ -731,6 +731,7 @@ th.player-col {
   margin-top: 5px;
 }
 .player-avatar {
+  overflow: hidden;
   width: 32px;
   height: 35px;
   border-radius: 9px;
@@ -2006,4 +2007,22 @@ th.player-col {
   .sidebar nav .mobile-connection {
     display: flex;
   }
+}
+
+.player-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.power.unrated {
+  width: auto;
+  padding: 0 7px;
+  font-size: 9px;
+  color: var(--muted);
+}
+.player-dialog-header .power.unrated {
+  width: auto;
+  font-size: 11px;
 }

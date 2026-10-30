@@ -8,6 +8,7 @@ import { PixelIcon } from "../ui/pixel-icon";
 import { TeamAvatar } from "./avatars";
 import { LeagueAwards } from "./weekly-highlights";
 import { Rivalries } from "./rivalries";
+import { TransactionLedger } from "./transaction-ledger";
 import { Standings } from "./team-views";
 
 function RecordCard({ record, data, season }: { record: LeagueRecord; data: Snapshot; season: boolean }) {
@@ -40,13 +41,13 @@ function RecordCard({ record, data, season }: { record: LeagueRecord; data: Snap
 export function Records({ data, onTeam = () => {} }: { data: Snapshot; onTeam?: (id: number) => void }) {
   const matches = useMemo(() => seasonMatchups(data), [data]);
   const finals = matches.filter(m => m.result !== "UNDECIDED");
-  const [tab, setTab] = useState<"week" | "season" | "standings" | "duel" | "whatif">("standings");
+  const [tab, setTab] = useState<"week" | "season" | "standings" | "duel" | "ledger">("standings");
   const selected = tab === "season" ? finals : matches.filter(m => m.period === data.league.matchupPeriod);
   const records = leagueRecords(selected);
   return <div className="records-room">
-    <div className="rivalry-toolbar"><Tabs label="Record book" value={tab} onChange={setTab} options={[{value:"standings",label:"Standings"},{value:"week",label:"This week"},{value:"season",label:"Season records"},{value:"duel",label:"Head-to-head"},{value:"whatif",label:"What if"}]} /><span className="records-period">{tab === "week" ? `Week ${data.league.matchupPeriod}${selected.some(m => m.result === "UNDECIDED") ? " · In progress" : " · Final"}` : `${data.league.season - 1}–${String(data.league.season).slice(2)}`}</span></div>
-    {data.historySyncError && tab !== "duel" && tab !== "whatif" && <p className="history-warning" role="status">{data.historySyncError} Showing saved records.</p>}
-    {tab === "duel" || tab === "whatif" ? <Rivalries data={data} mode={tab} /> : tab === "standings" ? <Standings title="Standings" teams={data.teams} onTeam={onTeam} /> : tab === "week" ? <LeagueAwards matchups={data.matchups} teams={data.teams} onTeam={onTeam} /> : records.length ? <div className="record-cabinet" key={tab}>{records.map(record => <RecordCard record={record} data={data} season={tab === "season"} key={record.id} />)}</div>
+    <div className="rivalry-toolbar"><Tabs label="Record book" value={tab} onChange={setTab} options={[{value:"standings",label:"Standings"},{value:"week",label:"This week"},{value:"season",label:"Season records"},{value:"duel",label:"Head-to-head"},{value:"ledger",label:"Ledger"}]} /><span className="records-period">{tab === "week" ? `Week ${data.league.matchupPeriod}${selected.some(m => m.result === "UNDECIDED") ? " · In progress" : " · Final"}` : `${data.league.season - 1}–${String(data.league.season).slice(2)}`}</span></div>
+    {data.historySyncError && tab !== "duel" && tab !== "ledger" && <p className="history-warning" role="status">{data.historySyncError} Showing saved records.</p>}
+    {tab === "ledger" ? <TransactionLedger data={data} /> : tab === "duel" ? <Rivalries data={data} mode="duel" /> : tab === "standings" ? <Standings title="Standings" teams={data.teams} onTeam={onTeam} /> : tab === "week" ? <LeagueAwards matchups={data.matchups} teams={data.teams} onTeam={onTeam} /> : records.length ? <div className="record-cabinet" key={tab}>{records.map(record => <RecordCard record={record} data={data} season={tab === "season"} key={record.id} />)}</div>
       : <div className="record-vacant"><PixelIcon name="standings" size={64} /><h2>{tab === "season" ? "The record book is waiting." : "No scores yet."}</h2><Empty>{tab === "season" ? "Season records unlock after the first completed matchup." : "Weekly leaders appear when games begin."}</Empty></div>}
   </div>;
 }

@@ -17,6 +17,7 @@ from .normalize import normalize
 from .news import collect_news
 from .logos import cache_team_logos
 from .trades import fetch_trades
+from .activity import load_activity
 from .history import fetch_history, previous_history
 from .power_history import add_power_history
 from .retention import retention_days, prune_snapshots
@@ -93,12 +94,17 @@ def run(args):
                         old=previous if previous and previous.get('league',{}).get('id')==league_id and previous.get('league',{}).get('season')==season else {}
                         trades=old.get('trades',[])
                         trade_error='Trade history could not refresh.'
+                    transactions, activity_error = load_activity(client, previous, league_id, season)
                 snapshot=normalize(raw,league_id,season,team_id)
                 add_power_history(snapshot, previous)
                 snapshot['matchupHistory']=history
                 snapshot['historySyncError']=history_error
                 snapshot['trades']=trades
                 snapshot['tradeSyncError']=trade_error
+                snapshot['transactions']=transactions
+                snapshot['activitySyncError']=activity_error
+                same_league = previous and previous.get('league', {}).get('id') == league_id and previous.get('league', {}).get('season') == season
+                snapshot['activitySyncedAt'] = datetime.now(timezone.utc).isoformat() if activity_error is None else previous.get('activitySyncedAt') if same_league else None
                 snapshot['warnings'] += cache_team_logos(snapshot['teams'], os.environ.get('ESPN_S2',''), os.environ.get('ESPN_SWID',''))
             snapshot['news'],news_warnings=collect_news(snapshot['players'],(previous or {}).get('news'))
             snapshot['warnings']=[w for w in snapshot.get('warnings',[]) if 'news unavailable' not in w]+news_warnings

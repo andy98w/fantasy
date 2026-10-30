@@ -8,6 +8,7 @@ import { Empty, Tabs } from "../ui/primitives";
 import { TeamAvatar } from "./avatars";
 import { teamOptions } from "./team-select";
 import { CategoryComparison } from "./category-comparison";
+import { Rivalries } from "./rivalries";
 import { MatchupClash } from "./matchup-clash";
 
 const dayLabel = (date: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
@@ -15,7 +16,7 @@ function Coverage({ projection }: { projection: Projection }) {
   return <span className="forecast-games">{projection.issue ? projection.issue : `${projection.games} games${projection.liveGames ? ` + ${projection.liveGames} live` : ""}`}</span>;
 }
 export function Forecast({ data, today }: { data: Snapshot; today?: TodayData }) {
-  const [horizon, setHorizon] = useState<"next" | "remaining">("next");
+  const [horizon, setHorizon] = useState<"next" | "remaining" | "whatif">("next");
   const [a, setA] = useState(data.teams[0]?.id);
   const [b, setB] = useState<number | null>(null);
   const schedule = data.forecastSchedule;
@@ -29,13 +30,15 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
     const now = Date.now();
     return window && home && away ? [projectTeam(data, home.id, window, now, today), projectTeam(data, away.id, window, now, today)] as const : null;
   }, [data, today, window, home, away]);
+  const views = <Tabs label="Forecast view" value={horizon} onChange={value => { setHorizon(value); setB(null); }} options={[{ value: "next", label: "Next week" }, { value: "remaining", label: "Rest of this week" }, { value: "whatif", label: "What if" }]} />;
+  if (horizon === "whatif") return <div className="forecast-room"><div className="rivalry-toolbar">{views}</div><Rivalries data={data} mode="whatif" /></div>;
   if (!home || !away) return <Empty>Two teams are needed for a forecast.</Empty>;
   const score = projections ? forecastScore(...projections) : null;
   const ready = score && !score.missing;
   const close = projections ? closeCategories(...projections) : [];
   return <div className="forecast-room">
     <div className="rivalry-toolbar">
-      <Tabs label="Forecast period" value={horizon} onChange={value => { setHorizon(value); setB(null); }} options={[{ value: "next", label: "Next week" }, { value: "remaining", label: "Rest of this week" }]} />
+      {views}
       {window && <span className="forecast-dates">Week {period} · {dayLabel(window.start)}–{dayLabel(window.end)}</span>}
     </div>
     <div className="rivalry-selectors">

@@ -96,3 +96,9 @@
   .rivalry-toolbar .tabs button { white-space: nowrap; }
   .rivalry-toolbar > .select-trigger { width: 100%; }
 }
+
+/* Keep secondary navigation inside the page on narrow screens. */
+.rivalry-toolbar { min-width: 0; }
+.rivalry-toolbar .tabs { min-width: 0; max-width: 100%; overflow-x: auto; }
+.rivalry-toolbar .tabs button { flex-shrink: 0; }
+.forecast-room, .records-room { min-width: 0; }

@@ -83,6 +83,21 @@ export const tradeSchema = z.object({
   })).min(1),
 });
 export type Trade = z.infer<typeof tradeSchema>;
+const transactionMoveSchema = z.object({
+  type: z.enum(["ADD", "DROP", "TRADE"]),
+  playerId: z.number().int().positive(),
+  fromTeamId: z.number().int().positive().nullable(),
+  toTeamId: z.number().int().positive().nullable(),
+  via: z.enum(["FREEAGENT", "WAIVERS"]).nullable(),
+}).refine(move => move.type === "ADD" ? move.fromTeamId === null && move.toTeamId !== null
+  : move.type === "DROP" ? move.fromTeamId !== null && move.toTeamId === null
+  : move.fromTeamId !== null && move.toTeamId !== null && move.fromTeamId !== move.toTeamId);
+export const transactionSchema = z.object({
+  id: z.string().min(1),
+  completedAt: z.iso.datetime({ offset: true }),
+  moves: z.array(transactionMoveSchema).min(1),
+});
+export type LeagueTransaction = z.infer<typeof transactionSchema>;
 const forecastScheduleSchema = z.object({
   lineupDate: z.iso.date(),
   windows: z.array(z.object({ period: numeric, start: z.iso.date(), end: z.iso.date() })),
@@ -127,6 +142,9 @@ export const snapshotSchema = z.object({
   ),
   trades: z.array(tradeSchema).default([]),
   tradeSyncError: z.string().nullable().default(null),
+  transactions: z.array(transactionSchema).default([]),
+  activitySyncError: z.string().nullable().default(null),
+  activitySyncedAt: z.iso.datetime({ offset: true }).nullable().default(null),
   model: z.object({
     version: z.string(),
     basis: z.string(),

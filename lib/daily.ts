@@ -73,5 +73,5 @@ export function selectPerformers(rows: DailyPerformer[], mode: DailyMode) {
   const negative = mode === "worst" || mode === "letdown";
   return rows.filter(r => (!negative || r.game.state === "final" && r.line.minutes >= 10) &&
     (mode === "surprise" ? r.delta !== null && r.delta > 0 : mode === "letdown" ? r.delta !== null && r.delta < 0 : true))
-    .sort((a,b) => (mode === "top" ? b.score-a.score : mode === "worst" ? a.score-b.score : mode === "surprise" ? b.delta!-a.delta! : a.delta!-b.delta!) || a.player.id-b.player.id).slice(0, 3);
+    .sort((a,b) => (mode === "top" ? b.score-a.score : mode === "worst" ? a.score-b.score : mode === "surprise" ? b.delta!-a.delta! : a.delta!-b.delta!) || a.player.id-b.player.id).slice(0, 6);
 }

@@ -53,6 +53,8 @@
 .daily-player-card { min-width: 0; text-align: left; padding: 18px; border: 2px solid var(--line); border-top-color: var(--teal); background: var(--surface); }
 .daily-negative .daily-player-card { border-top-color: var(--coral); }
 .daily-player-card:is(:hover,:focus-visible) { background: var(--surface-raised); }
+.daily-player-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.daily-rank { color: var(--gold); font: 600 22px/1 var(--pixel); }
 .daily-player-top { display: flex; gap: 10px; align-items: center; }
 .daily-player-identity { min-width: 0; display: grid; gap: 4px; }
 .daily-player-top strong { font-size: 14px; }

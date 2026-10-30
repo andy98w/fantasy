@@ -1,3 +1,4 @@
+from copy import deepcopy
 import pytest
 from worker.espn import SyncError
 from worker.normalize import normalize, STAT_IDS
@@ -30,9 +31,42 @@ def test_missing_roster_player_rejected():
     raw=fixture();raw['players']=[]
     with pytest.raises(SyncError,match='omitted rostered'):normalize(raw,123,2027,3)
 
-def test_ownership_mismatch_rejected():
+def test_traded_player_uses_current_owner_without_old_lineup_slot():
     raw=fixture();raw['players'][0]['onTeamId']=4
-    with pytest.raises(SyncError,match='ownership'):normalize(raw,123,2027,3)
+    data=normalize(raw,123,2027,3)
+    assert data['players'][0]['teamId']==4
+    assert data['players'][0]['slot'] is None
+    assert data['players'][0]['availability']=='ROSTERED'
+
+def test_same_day_add_drop_preserves_matchup_but_updates_current_roster():
+    raw=fixture()
+    added=deepcopy(raw['players'][0])
+    added['player'].update(id=101,fullName='New Pickup')
+    added['status']='ONTEAM'
+    raw['players'][0].update(onTeamId=0,status='WAIVERS')
+    raw['players'].append(added)
+    data=normalize(raw,123,2027,3)
+    dropped,pickup=data['players']
+    assert (dropped['teamId'],dropped['slot'],dropped['availability'])==(None,None,'WAIVERS')
+    assert (pickup['teamId'],pickup['slot'],pickup['availability'])==(3,None,'ROSTERED')
+    assert data['coverage']['rosteredCount']==1
+    assert data['matchups'][0]['home']['stats']['PTS']==100
+
+def test_new_owned_player_counts_toward_coverage_without_daily_lineup_entry():
+    raw=fixture()
+    added=deepcopy(raw['players'][0]);added['player']['id']=101
+    raw['players'].append(added)
+    assert normalize(raw,123,2027,3)['coverage']['rosteredCount']==2
+
+@pytest.mark.parametrize('owner',[999,-1,'3',True])
+def test_invalid_ownership_rejected(owner):
+    raw=fixture();raw['players'][0]['onTeamId']=owner
+    with pytest.raises(SyncError,match='unknown league team'):normalize(raw,123,2027,3)
+
+def test_missing_ownership_keeps_daily_roster_fallback():
+    raw=fixture();del raw['players'][0]['onTeamId']
+    player=normalize(raw,123,2027,3)['players'][0]
+    assert (player['teamId'],player['slot'])==(3,'PG')
 
 def test_unrecognized_ninth_category_rejected():
     raw=fixture();raw['league']['settings']['scoringSettings']['scoringItems'][-1]['statId']=38

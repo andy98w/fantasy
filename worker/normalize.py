@@ -40,7 +40,6 @@ def normalize(raw, league_id, season, team_id):
         raise SyncError('League categories differ from standard 9-cat; import stopped to avoid incorrect rankings.')
     teams=[]
     roster_map={}
-    roster_players={}
     for t in league['teams']:
         record=t.get('record',{}).get('overall',{})
         teams.append({'id':t['id'],'name':t.get('name') or f"{t.get('location','')} {t.get('nickname','')}".strip() or f"Team {t['id']}",
@@ -51,8 +50,8 @@ def normalize(raw, league_id, season, team_id):
             if not p.get('id'): raise SyncError('Roster entry is missing a player ID.')
             if p['id'] in roster_map: raise SyncError('A player appears on more than one roster.')
             roster_map[p['id']]={'teamId':t['id'],'slot':SLOTS.get(entry.get('lineupSlotId'),'—')}
-            roster_players[p['id']]=p
-    if team_id not in {t['id'] for t in teams}: raise SyncError('Configured team ID was not found in the league.')
+    team_ids={t['id'] for t in teams}
+    if team_id not in team_ids: raise SyncError('Configured team ID was not found in the league.')
     players=[]
     entries={e.get('player',{}).get('id',e.get('id')):e for e in raw['players']}
     # An omitted roster player is a coverage failure, not silently repaired from another endpoint.
@@ -74,10 +73,17 @@ def normalize(raw, league_id, season, team_id):
             if makes in stats and attempts in stats:
                 stats[rate]=stats[makes]/stats[attempts] if stats[attempts] else None
         nba=p.get('proTeamId',0)
-        ownership=e.get('onTeamId')
         roster=roster_map.get(pid,{'teamId':None,'slot':None})
-        if ownership and ownership != roster['teamId']:
-            raise SyncError('Player ownership and roster disagree; retry once ESPN finishes updating.')
+        # mRoster describes the day's lineup, which can stay locked after an
+        # add/drop or trade. The player pool reports current ownership. Keep a
+        # lineup slot only when it belongs to that same current owner.
+        ownership=e.get('onTeamId')
+        if ownership is not None:
+            if type(ownership) is not int or (ownership != 0 and ownership not in team_ids):
+                raise SyncError('Player ownership references an unknown league team.')
+            current_team=ownership or None
+            if current_team != roster['teamId']:
+                roster={'teamId':current_team,'slot':None}
         players.append({'id':pid,'name':p.get('fullName',f'Player {pid}'),
             'nbaTeam':NBA[nba] if 0<=nba<len(NBA) else str(nba),
             'position':SLOTS.get(p.get('defaultPositionId',0)-1,'—'),
@@ -99,5 +105,5 @@ def normalize(raw, league_id, season, team_id):
         'myTeamId':team_id,'scoringType':scoring_type,'matchupPeriod':league['status']['currentMatchupPeriod'],
         'scoringPeriod':league['scoringPeriodId'],'categories':CATS,'rosterSlots':slot_counts},
         'teams':teams,'players':players,'matchups':matchups,'news':[], 'model':model,
-        'coverage':{'playerCount':len(players),'rosteredCount':len(roster_map),'teamCount':len(teams)},
+        'coverage':{'playerCount':len(players),'rosteredCount':sum(p['teamId'] is not None for p in players),'teamCount':len(teams)},
         'warnings':['Weekly projections are not available in this release.']}

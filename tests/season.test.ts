@@ -63,7 +63,7 @@ test("duplicate team/week data is not used for simulated matchups", () => {
   assert.equal(weekSides([match(1,1,1,2),match(2,1,1,3)],1).has(1),false);
 });
 
-test("history pages render completed records and closest meetings without claiming live results are final", async () => {
+test("records default to standings and rivalries distinguish completed and live meetings", async () => {
   const {createElement}=await import("react");
   const {renderToStaticMarkup}=await import("react-dom/server");
   const {Records}=await import("../components/league/records");
@@ -71,8 +71,8 @@ test("history pages render completed records and closest meetings without claimi
   const a=data.teams[0].id,b=data.teams[1].id;
   const snapshot={...data,matchupHistory:[match(100,1,a,b)],matchups:[match(101,2,a,b,8,7,"UNDECIDED")]};
   const records=renderToStaticMarkup(createElement(Records,{data:snapshot}));
-  assert.match(records,/On a Roll/);
-  assert.match(records,/consecutive wins/);
+  assert.match(records,/aria-pressed="true">Standings/);
+  assert.match(records,/aria-label="League standings"/);
   const rivals=renderToStaticMarkup(createElement(Rivalries,{data:snapshot}));
   assert.match(rivals,/Closest/);
   assert.match(rivals,/1–0/);

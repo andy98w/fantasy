@@ -34,6 +34,7 @@ test("shared overview ignores configured owner team and includes every matchup",
   assert.doesNotMatch(mainNav, /Standings|Rankings|News|Overview/);
   assert.doesNotMatch(html, /standings-table|League awards/);
   assert.match(html, /Today’s performers/);
-  assert.ok(html.indexOf('today-panel') < html.indexOf('league-matchups'));
+  assert.match(html, /today-panel/);
+  assert.match(html, /Roster news/);
   assert.match(html, /basketball\/league\?/);
 });

@@ -1,5 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import {
   CATEGORIES,
+  type Category,
   type Player,
   type Snapshot,
   type Team,
@@ -116,7 +120,30 @@ export function TeamRankings({
   players: Player[];
   onTeam: (id: number) => void;
 }) {
-  const values = teamPower(teams, players);
+  const [sort, setSort] = useState<{ key: "power" | Category; descending: boolean }>({
+    key: "power",
+    descending: true,
+  });
+  const values = teamPower(teams, players).sort((a, b) => {
+    const left = sort.key === "power" ? a.score : a.rated ? a.categories[sort.key] : null;
+    const right = sort.key === "power" ? b.score : b.rated ? b.categories[sort.key] : null;
+    if (left === null) return right === null ? a.team.id - b.team.id : 1;
+    if (right === null) return -1;
+    return (sort.descending ? right - left : left - right) || a.team.id - b.team.id;
+  });
+  const sortHeader = (key: "power" | Category) => (
+    <th key={key} aria-sort={sort.key === key ? sort.descending ? "descending" : "ascending" : "none"}>
+      <button onClick={() => setSort(current => ({
+        key,
+        descending: current.key === key ? !current.descending : true,
+      }))}>
+        {key === "power" ? "Power" : key}
+        <span className="sort-arrow" aria-hidden="true">
+          {sort.key === key ? sort.descending ? "↓" : "↑" : ""}
+        </span>
+      </button>
+    </th>
+  );
   return (
     <Panel title="Team power">
       <div
@@ -130,11 +157,9 @@ export function TeamRankings({
             <tr>
               <th>Rank</th>
               <th className="identity-col">Team</th>
-              <th>Power</th>
+              {sortHeader("power")}
               <th>Rated players</th>
-              {CATEGORIES.map((c) => (
-                <th key={c}>{c}</th>
-              ))}
+              {CATEGORIES.map(sortHeader)}
             </tr>
           </thead>
           <AnimatedRows revision={values.map(v => `${v.team.id}:${v.score}`).join("|")}>

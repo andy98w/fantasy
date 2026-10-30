@@ -12,7 +12,7 @@ export type NbaGame = {
   home: NbaTeam;
   away: NbaTeam;
 };
-export type TodayData = {
+export type PerformanceDay = {
   performances?: import("./daily").DailyLine[];
   boxscoreStatus?: "ready" | "partial" | "error";
   date: string;
@@ -20,6 +20,8 @@ export type TodayData = {
   status: "ready" | "stale" | "error";
   games: NbaGame[];
 };
+
+export type TodayData = PerformanceDay & { performerDay?: PerformanceDay };
 
 export function nbaDate(now: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: NBA_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

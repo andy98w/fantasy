@@ -20,7 +20,6 @@ import { Records } from "./league/records";
 import { TradeHub } from "./league/trade-hub";
 import { Connection } from "./league/connection";
 import { DailyPerformers } from "./league/daily-performers";
-import { weeklyMVPs } from "@/lib/weekly";
 import { Today } from "./league/today";
 import type { TodayData } from "@/lib/nba";
 import { NewsFeed } from "./league/news-feed";
@@ -131,7 +130,6 @@ export default function Dashboard({
     () => relevantNews(data.news, data.players),
     [data.news, data.players],
   );
-  const weeklyRatings = useMemo(() => weeklyMVPs(data.matchups), [data.matchups]);
   const teamNews = team ? relevantNews(data.news, data.players, team.id) : [];
   const espn = `https://fantasy.espn.com/basketball/league?leagueId=${data.league.id}&seasonId=${data.league.season}`;
   const tableProps = {
@@ -236,7 +234,8 @@ export default function Dashboard({
               </Button>
             </Toolbar>
             <MatchupBoard
-              ratings={weeklyRatings}
+              players={data.players}
+              onPlayer={(player) => setSelectedId(player.id)}
               matchup={
                 data.matchups.find((matchup) => matchup.id === matchupId) ??
                 data.matchups[0]

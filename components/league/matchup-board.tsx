@@ -1,22 +1,23 @@
-import { type Snapshot, type Team } from "@/lib/schema";
+import { type Snapshot, type Team, type Player } from "@/lib/schema";
 import { TeamAvatar } from "./avatars";
 import { CategoryComparison } from "./category-comparison";
 import { Button, Empty } from "../ui/primitives";
 import { PixelIcon } from "../ui/pixel-icon";
 import { MatchupClash } from "./matchup-clash";
-import { MatchupMVP } from "./weekly-highlights";
-import type { weeklyMVPs } from "@/lib/weekly";
+import { MatchupPlayers } from "./matchup-players";
 import { MotionNumber } from "../ui/motion";
 export function MatchupBoard({
   matchup,
   teams,
   onDetails,
-  ratings = [],
+  players,
+  onPlayer,
 }: {
   matchup?: Snapshot["matchups"][number];
   teams: Team[];
   onDetails?: () => void;
-  ratings?: ReturnType<typeof weeklyMVPs>;
+  players: Player[];
+  onPlayer: (player: Player) => void;
 }) {
   const home = teams.find((t) => t.id === matchup?.home.teamId),
     away = teams.find((t) => t.id === matchup?.away.teamId);
@@ -71,7 +72,7 @@ export function MatchupBoard({
         </div>
       </div>
       <CategoryComparison home={matchup.home} away={matchup.away} homeName={home.name} awayName={away.name} finished={matchup.result !== "UNDECIDED"} />
-      <MatchupMVP matchup={matchup} teams={teams} ratings={ratings} />
+      <MatchupPlayers key={matchup.id} matchup={matchup} teams={[home, away]} players={players} onPlayer={onPlayer} />
     </section>
   );
 }

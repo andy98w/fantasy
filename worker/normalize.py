@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from .espn import SyncError
 from .rankings import rank_players, rank_teams, CATS
-from .weekly import weekly_players
+from .weekly import weekly_players, matchup_score
 from .forecast import forecast_schedule
 
 STAT_IDS={'0':'PTS','1':'BLK','2':'STL','3':'AST','6':'REB','11':'TO','13':'FGM','14':'FGA','15':'FTM','16':'FTA','17':'3PM','19':'FG%','20':'FT%','40':'MIN','42':'GP'}
@@ -20,9 +20,9 @@ def team_logo(value):
 
 def normalize_matchup(m, season, include_players=True):
     def side(s):
-        cumulative=s.get('cumulativeScore') or {}
+        cumulative=matchup_score(s, live=m.get('winner', 'UNDECIDED') == 'UNDECIDED')
         stats={STAT_IDS.get(str(k),str(k)):v.get('score') for k,v in (cumulative.get('scoreByStat') or {}).items()}
-        performers, complete = weekly_players(s, season) if include_players else ([], False)
+        performers, complete = weekly_players(s, season, cumulative) if include_players else ([], False)
         return {'teamId':s['teamId'],'wins':cumulative.get('wins'),
                 'ties':cumulative.get('ties'),'stats':stats,'performers':performers,'performanceComplete':complete}
     winner=m.get('winner','UNDECIDED')

@@ -44,3 +44,24 @@ def test_zero_attempts_are_not_missing_data():
         value['cumulativeScore']['scoreByStat'][key]['score'] = 0
     players, complete = weekly_players(value, 2027)
     assert complete and players[0]['stats']['FT%'] is None
+
+def test_live_player_totals_use_live_team_score_instead_of_delayed_score():
+    from worker.normalize import normalize_matchup
+    value = side()
+    value['teamId'] = 1
+    value['cumulativeScoreLive'] = deepcopy(value['cumulativeScore'])
+    value['cumulativeScoreLive'].update(wins=6, ties=0)
+    value['cumulativeScoreLive']['scoreByStat'].update({'19': {'score': .5}, '20': {'score': 1}})
+    value['cumulativeScore']['scoreByStat']['0']['score'] = 5
+    value['cumulativeScore']['wins'] = 3
+    m = {'id': 1, 'matchupPeriodId': 2, 'home': value, 'away': deepcopy(value)}
+    normalized = normalize_matchup(m, 2027)
+    assert normalized['home']['stats']['PTS'] == 12
+    assert normalized['home']['wins'] == 6
+    assert normalized['home']['performanceComplete'] is True
+    # Final results remain authoritative; an incomplete live payload falls back.
+    m['winner'] = 'HOME'
+    assert normalize_matchup(m, 2027)['home']['stats']['PTS'] == 5
+    m['winner'] = 'UNDECIDED'
+    del value['cumulativeScoreLive']['scoreByStat']['1']
+    assert normalize_matchup(m, 2027)['home']['stats']['PTS'] == 5

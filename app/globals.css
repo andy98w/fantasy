@@ -1542,3 +1542,13 @@ input::placeholder {
     padding: 13px 16px;
   }
 }
+
+.matchup-players { padding: 24px; min-width: 0; border-top: 1px solid var(--line); }
+.matchup-players .filters { margin-bottom: 16px; }
+.weekly-players-table { min-width: 100%; }
+.weekly-players-table th, .weekly-players-table td { white-space: nowrap; }
+.weekly-shooting { display: block; color: var(--muted); font-size: 11px; }
+@media (max-width: 600px) {
+  .matchup-players { padding: 16px 8px; }
+  .matchup-players .section-heading { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+}

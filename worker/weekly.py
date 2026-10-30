@@ -3,7 +3,20 @@ import math
 
 COUNTS = {'0':'PTS','1':'BLK','2':'STL','3':'AST','6':'REB','11':'TO','13':'FGM','14':'FGA','15':'FTM','16':'FTA','17':'3PM'}
 
-def weekly_players(side, season):
+def matchup_score(side, live=True):
+    """Live player splits must be compared with live, not delayed, team totals."""
+    score = side.get('cumulativeScoreLive') or {}
+    values = score.get('scoreByStat') or {}
+    required = ['0', '1', '2', '3', '6', '11', '17', '19', '20']
+    valid = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    if live and valid(score.get('wins')) and 0 <= score['wins'] <= 9 and all(
+        valid(values.get(k, {}).get('score')) for k in required
+    ):
+        return score
+    return side.get('cumulativeScore') or {}
+
+
+def weekly_players(side, season, official_score=None):
     entries = (side.get('rosterForMatchupPeriod') or {}).get('entries')
     if not isinstance(entries, list): return [], False
     players, seen = [], set()
@@ -31,7 +44,7 @@ def weekly_players(side, season):
         stats['FG%'] = stats['FGM'] / stats['FGA'] if stats['FGA'] else None
         stats['FT%'] = stats['FTM'] / stats['FTA'] if stats['FTA'] else None
         players.append({'playerId': pid, 'name': player.get('fullName', f'Player {pid}'), 'stats': stats})
-    official = (side.get('cumulativeScore') or {}).get('scoreByStat') or {}
+    official = (official_score if official_score is not None else matchup_score(side)).get('scoreByStat') or {}
     for key, name in COUNTS.items():
         expected = official.get(key, {}).get('score')
         if not isinstance(expected, (int, float)) or not math.isfinite(expected) or abs(sum(p['stats'][name] for p in players) - expected) > .01:

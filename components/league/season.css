@@ -8,7 +8,7 @@
 .rivalry-fighter.away { animation-name: rival-enter-right; }
 .rivalry-fighter .avatar-large { width: 84px; height: 84px; border: 3px solid var(--teal); box-shadow: 5px 5px 0 var(--shadow); }
 .rivalry-fighter.away .avatar-large { border-color: var(--coral); }
-.rivalry-fighter h2 { font: 500 26px/1.2 var(--pixel); overflow-wrap: anywhere; max-width: 100%; margin: 0; text-shadow: 2px 2px var(--shadow); }
+.rivalry-fighter h2 { font: 600 26px/1.2 var(--body); overflow-wrap: anywhere; max-width: 100%; margin: 0; text-shadow: 2px 2px var(--shadow); }
 .rivalry-fighter > strong { font-size: 44px; line-height: 1; }
 .rivalry-vs { z-index: 1; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .rivalry-vs > span { background: var(--surface-deep); padding: 10px 16px; color: var(--gold); border: 2px solid var(--gold); box-shadow: 4px 4px var(--shadow); font: 600 40px var(--pixel); animation: vs-land 650ms ease-out both; }

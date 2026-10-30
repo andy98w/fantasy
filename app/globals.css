@@ -401,7 +401,7 @@ h2 {
 }
 .contender h3 {
   text-shadow: 0 1px 3px var(--surface-deep), 1px 0 var(--surface-deep), -1px 0 var(--surface-deep);
-  font: 500 24px/1.15 var(--pixel);
+  font: 600 24px/1.15 var(--body);
   max-width: 240px;
   overflow-wrap: anywhere;
 }

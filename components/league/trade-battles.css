@@ -8,7 +8,7 @@
 .battle-arena > .trade-side:nth-child(2) { border-top: 3px solid var(--coral); }
 .trade-side > header { display: flex; align-items: center; gap: 12px; }
 .trade-side > header > div { min-width: 0; flex: 1; }
-.trade-side h3 { font: 500 22px/1.2 var(--pixel); overflow-wrap: anywhere; }
+.trade-side h3 { font: 600 22px/1.2 var(--body); overflow-wrap: anywhere; }
 .trade-side p, .trade-side time { font-size: 11px; color: var(--muted); }
 .trade-side p { margin: 4px 0 0; }
 .trade-side time { align-self: flex-start; white-space: nowrap; }
@@ -68,7 +68,7 @@
 .battle-arena .trade-side { position: relative; }
 .battle-picked { z-index: 2; animation: battle-pick 950ms ease-out both; }
 .battle-passed { transition: opacity 250ms, transform 350ms; opacity: .4; transform: scale(.97); }
-.battle-mmr-gain { position: absolute; top: -12px; right: 20px; z-index: 3; padding: 6px 12px; background: var(--gold); color: var(--bg); font: 600 22px var(--pixel); pointer-events: none; animation: mmr-rise 950ms ease-out both; }
+.battle-mmr-gain { position: absolute; top: -12px; right: 20px; z-index: 3; padding: 6px 12px; background: var(--gold); color: var(--bg); font: 600 22px var(--body); font-variant-numeric: lining-nums tabular-nums; pointer-events: none; animation: mmr-rise 950ms ease-out both; }
 @keyframes battle-pick { 0% { transform: scale(1); } 25% { transform: scale(1.025); box-shadow: 0 0 0 3px var(--gold), 0 8px 30px #ffcd7520; } 80%, 100% { transform: scale(1.01); box-shadow: 0 0 0 2px var(--gold); } }
 @keyframes mmr-rise { 0% { opacity: 0; transform: translateY(16px) scale(.85); } 25%, 70% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-14px); } }
 @media (prefers-reduced-motion: reduce) { .battle-picked, .battle-mmr-gain { animation: none; } .battle-passed { transition: none; transform: none; } }

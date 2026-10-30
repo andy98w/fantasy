@@ -173,7 +173,7 @@ export default function Dashboard({
               </Button>
             }
           >
-            Sync failed. Showing the last import.
+            Updates unavailable. Showing the last import.
           </Notice>
         ) : (minutes ?? 0) > 15 ? (
           <Notice

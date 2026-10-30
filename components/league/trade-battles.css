@@ -20,6 +20,17 @@
 .battle-players { padding: 0; margin: 0; list-style: none; display: grid; align-content: start; gap: 10px; }
 .battle-players li { display: flex; align-items: center; gap: 8px; font-size: 13px; overflow-wrap: anywhere; }
 .battle-players .avatar { flex-shrink: 0; width: 34px; height: 34px; }
+.player-preview-trigger { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.player-preview-trigger:hover, .player-preview-trigger:focus-visible { color: var(--gold); }
+.player-preview { position: fixed; inset: auto; margin: 0; width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px; border: 2px solid var(--gold); background: var(--surface-deep); color: var(--text); box-shadow: 6px 6px 0 #0006; text-align: left; }
+.player-preview::backdrop { background: transparent; pointer-events: none; }
+.player-preview header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.player-preview strong { display: block; font-size: 15px; }
+.player-preview small, .player-preview p { display: block; font-size: 11px; color: var(--muted); margin: 5px 0 0; }
+.player-preview p { margin-top: 16px; }
+.player-preview dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 0; }
+.player-preview dt { color: var(--muted); font-size: 11px; }
+.player-preview dd { margin: 3px 0 0; font-size: 16px; font-variant-numeric: tabular-nums; }
 .trade-side > .button { width: 100%; }
 .battle-versus { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--surface-deep); color: var(--gold); padding: 8px 4px; font: 500 22px var(--pixel); }
 .battle-feedback { min-height: 38px; padding: 8px 0; font-size: 12px; color: var(--gold); }

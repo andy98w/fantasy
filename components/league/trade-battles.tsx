@@ -4,13 +4,14 @@ import type { Snapshot } from "@/lib/schema";
 import { chooseBattle, rankEntries, tradeEntries, type BattleRating, type BattleVote, type TradeEntry, type VoteResult } from "@/lib/trade-battles";
 import { AnimatedRows, MotionNumber, useReducedMotion } from "../ui/motion";
 import { Button, Empty, Panel } from "../ui/primitives";
-import { PlayerAvatar, TeamAvatar } from "./avatars";
+import { TeamAvatar } from "./avatars";
+import { PlayerPreview } from "./player-preview";
 
 const date = (value: string) => new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }).format(new Date(value));
 function TradePlayers({ ids, data }: { ids: number[]; data: Snapshot }) {
   return <ul className="battle-players">{ids.map(id => {
     const player = data.players.find(p => p.id === id);
-    return <li key={id}>{player && <PlayerAvatar player={player} />}<span>{player?.name ?? `Player #${id}`}</span></li>;
+    return <li key={id}>{player ? <PlayerPreview player={player} /> : <span>Player #{id}</span>}</li>;
   })}</ul>;
 }
 export function TradeSide({ entry, data, children, className = "" }: { entry: TradeEntry; data: Snapshot; children?: React.ReactNode; className?: string }) {
@@ -59,7 +60,7 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
       if (running) return;
       running = true;
       try {
-        const response = await fetch("/api/trade-battles", { cache: "no-store", signal: controller.signal });
+        const response = await fetch("/api/trade-battles", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         const value = await response.json();
         if (!response.ok) throw new Error(value.error);
         if (!controller.signal.aborted) { setRatings(value.ratings); setReady(true); setRankError(""); }

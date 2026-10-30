@@ -2,6 +2,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
+import { createPool } from "./postgres";
 import { snapshotSchema, type Snapshot } from "./schema";
 import demo from "./demo.json";
 const globalDb = globalThis as unknown as { pool?: Pool };
@@ -22,7 +23,7 @@ export async function loadLeague(): Promise<DataResult> {
     let value: unknown;
     let syncFailure: string | null = null;
     if (process.env.DATABASE_URL) {
-      const pool = (globalDb.pool ??= new Pool({
+      const pool = (globalDb.pool ??= createPool({
         connectionString: process.env.DATABASE_URL,
         max: 3,
         connectionTimeoutMillis: 5000,
@@ -37,12 +38,18 @@ export async function loadLeague(): Promise<DataResult> {
         params,
       );
       value = result.rows[0]?.payload;
-      const status = await pool.query(
-        "SELECT succeeded,message FROM sync_runs WHERE league_id=$1 AND season=$2 ORDER BY finished_at DESC,id DESC LIMIT 1",
-        params,
-      );
-      if (status.rows[0]?.succeeded === false)
-        syncFailure = status.rows[0].message;
+      try {
+        const status = await pool.query(
+          "SELECT succeeded,message FROM sync_runs WHERE league_id=$1 AND season=$2 ORDER BY finished_at DESC,id DESC LIMIT 1",
+          params,
+        );
+        if (status.rows[0]?.succeeded === false)
+          syncFailure = status.rows[0].message;
+      } catch {
+        // Optional diagnostics must not hide an already loaded valid snapshot.
+        syncFailure = "Sync status unavailable. Showing the saved import.";
+        console.error("Sync-status lookup failed; keeping the saved league snapshot.");
+      }
     } else {
       const file = path.resolve(
         /* turbopackIgnore: true */ process.env.SNAPSHOT_PATH ??

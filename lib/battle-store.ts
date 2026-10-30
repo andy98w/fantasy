@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
+import { createPool } from "./postgres";
 import { elo, type BattleMode, type BattleRating, type BattleVote, type VoteResult } from "./trade-battles";
 
 export class VoteConflict extends Error { readonly code = "VOTE_CONFLICT"; }
@@ -98,7 +99,7 @@ export function battleStore() {
     if (!process.env.DATABASE_URL && process.env.NODE_ENV === "production" && !process.env.BATTLE_DB_PATH)
       throw new Error("Configure durable battle storage before enabling production voting.");
     globalStore.battleStore = process.env.DATABASE_URL
-      ? new PostgresBattleStore(new Pool({ connectionString: process.env.DATABASE_URL, max: 3, connectionTimeoutMillis: 5000, statement_timeout: 10000 }))
+      ? new PostgresBattleStore(createPool({ connectionString: process.env.DATABASE_URL, max: 3, connectionTimeoutMillis: 5000, statement_timeout: 10000 }))
       : new LocalBattleStore(path.resolve(/* turbopackIgnore: true */ process.env.BATTLE_DB_PATH ?? "data/trade-battles.sqlite"));
   }
   return globalStore.battleStore;

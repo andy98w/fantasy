@@ -89,6 +89,8 @@ Voting requires no account and intentionally allows repeat votes. One shared Elo
 
 `GET /api/trade-battles` returns ratings. `POST /api/trade-battles` validates both entries against the current league snapshot, then atomically records the vote and updates both ratings. A UUID request ID prevents a network retry from recording the same submission twice; a fresh vote always has a new ID. No voter identifier, login, or IP address is stored by this feature.
 
+Player names in Battles, History, and expanded trade rankings offer a shared hover/focus/tap stat preview. These are current season per-game stats, not historical trade-date values. Rankings requests time out after 15 seconds so a stalled request cannot permanently block refreshes. Database pools handle idle disconnects without crashing the process, and a failed optional sync-status lookup preserves the validated league snapshot with a status warning.
+
 Local development persists votes in ignored `data/trade-battles.sqlite` (override with `BATTLE_DB_PATH`). When `DATABASE_URL` is configured, the web app uses PostgreSQL and creates the two battle tables if missing; they are also included in `db/schema.sql`. PostgreSQL advisory locks serialize concurrent votes across web instances. Production voting requires PostgreSQL or an explicit `BATTLE_DB_PATH` on a persistent volume; ephemeral container storage is not enabled by default. Back up the vote database separately from ESPN snapshots. Local SQLite votes are not automatically migrated to hosted PostgreSQL. Demo, live, league, and season ratings remain isolated.
 
 ### Weekly highlights and motion

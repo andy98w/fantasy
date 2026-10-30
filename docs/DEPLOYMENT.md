@@ -40,14 +40,14 @@ Tests create and remove unique schemas, never use `DATABASE_URL`, and make no ES
 | Start command | Leave unset; use image CMD | Leave unset; use image CMD |
 | Public networking | HTTPS domain, target port matching deploy logs | None |
 | Health check | `/api/ready` | None |
-| Schedule | Always running | Custom cron: `*/5 * * * *` |
-| Restart policy | On Failure, 3 retries | Never (set automatically for cron) |
+| Schedule | Always running | Always running; **No schedule** |
+| Restart policy | On Failure, 3 retries | Always |
 
-Set these values directly in each service's Railway Settings. New services cannot opt into Railway's deprecated Config as Code, so do not rely on the checked-in TOML files being applied. In particular, explicitly set sync's Dockerfile path to `worker/Dockerfile`; automatic detection selects the root web Dockerfile. Save the custom cron expression before deploying the staged changes. Legacy Config as Code services can explicitly select `/railway.web.toml` for web or `/worker/railway.toml` for sync until Railway retires support. There is deliberately no default root `railway.toml`: a shared default that selects the web image can override the worker's build selection.
+Set these values directly in each service's Railway Settings. New services cannot opt into Railway's deprecated Config as Code, so do not rely on the checked-in TOML files being applied. In particular, explicitly set sync's Dockerfile path to `worker/Dockerfile`; automatic detection selects the root web Dockerfile. Remove the existing cron schedule and use the image CMD (`.venv/bin/python -m worker.live`) before deploying the staged changes. Legacy Config as Code services can explicitly select `/railway.web.toml` for web or `/worker/railway.json` for sync (explicitly clears the cron schedule) until Railway retires support. There is deliberately no default root `railway.toml`: a shared default that selects the web image can override the worker's build selection.
 
 Keep both services and Postgres in the same environment/region. Do not set the sync service root to `/worker`; it needs the root dependency files and database schema. Leave application sleeping disabled for the web service so scheduled data updates remain visible without cold starts. Use the platform-provided `PORT`; the image defaults to 3000. When generating the public domain, match its target port to the deploy log (for example, `0.0.0.0:8080` means target port **8080**). Do not assume the container default overrides Railway’s `PORT`.
 
-Railway's [config file path is independent of the root directory](https://docs.railway.com/builds/build-configuration). Its [cron scheduler](https://docs.railway.com/cron-jobs) supports a minimum five-minute interval and skips a run if the previous process has not exited. Sync is a one-shot command that closes its database connection when done.
+Railway's [config file path is independent of the root directory](https://docs.railway.com/builds/build-configuration). The sync service now runs continuously: full imports every five minutes and lightweight matchup scores approximately every 30 seconds during games. Do not retain the old cron schedule. Each operation closes its database connection and shares an advisory lock with full imports. `python -m worker.sync` remains available for a one-shot manual import.
 
 ## Runtime variables
 
@@ -92,7 +92,7 @@ The deployment [health check](https://docs.railway.com/deployments/healthchecks)
 
 `/api/health` is process liveness. `/api/ready` checks saved league data and vote storage; it exposes only a generic status, not credentials or upstream payloads. ESPN freshness is separate: a temporary upstream failure keeps the last data visible and the dashboard shows its age/failure state. Do not restart a healthy web service simply because ESPN is down.
 
-If ESPN denies access, renew cookies **only on sync** and trigger another job. If readiness fails, check database connectivity, a successful first sync, and matching league/season variables. If cron stops progressing, check whether the prior run is still active. Do not increase polling frequency to fix missing data.
+If ESPN denies access, renew cookies **only on sync** and trigger another job. If readiness fails, check database connectivity, a successful first sync, and matching league/season variables. If live scores stop progressing, check the continuous worker logs and confirm its start command, No schedule setting, and Always restart policy.
 
 To roll back a bad release, redeploy the previous known-good web/sync commit while retaining the database. This release uses additive, idempotent schema creation. Future destructive schema changes need a backup and a separate migration/rollback plan. Keep both services on compatible snapshot versions.
 

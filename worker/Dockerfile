@@ -9,4 +9,4 @@ COPY worker ./worker
 COPY db ./db
 RUN useradd --create-home app && mkdir -p data && chown app:app data
 USER app
-CMD [".venv/bin/python", "-m", "worker.sync"]
+CMD [".venv/bin/python", "-m", "worker.live"]

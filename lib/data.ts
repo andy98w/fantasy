@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { createPool } from "./postgres";
 import { snapshotSchema, type Snapshot } from "./schema";
 import demo from "./demo.json";
+import { mergeLiveScores } from "./live-scores";
 import { applyResultCorrections } from "./result-corrections";
 const globalDb = globalThis as unknown as { pool?: Pool };
 export type DataResult = {
@@ -22,6 +23,7 @@ export async function loadLeague(): Promise<DataResult> {
   }
   try {
     let value: unknown;
+    let liveScores: unknown;
     let syncFailure: string | null = null;
     if (process.env.DATABASE_URL) {
       const pool = (globalDb.pool ??= createPool({
@@ -39,6 +41,9 @@ export async function loadLeague(): Promise<DataResult> {
         params,
       );
       value = result.rows[0]?.payload;
+      try {
+        liveScores = (await pool.query("SELECT payload FROM league_live_scores WHERE league_id=$1 AND season=$2", params)).rows[0]?.payload;
+      } catch { /* Optional during migration or a live-score outage; full imports still work. */ }
       try {
         const status = await pool.query(
           "SELECT succeeded,message FROM sync_runs WHERE league_id=$1 AND season=$2 ORDER BY finished_at DESC,id DESC LIMIT 1",
@@ -81,7 +86,7 @@ export async function loadLeague(): Promise<DataResult> {
       snapshot.league.season !== Number(process.env.ESPN_SEASON ?? 2027)
     )
       throw new Error("Snapshot identity mismatch");
-    return { snapshot: applyResultCorrections(snapshot), error: null, syncFailure };
+    return { snapshot: applyResultCorrections(mergeLiveScores(snapshot, liveScores)), error: null, syncFailure };
   } catch {
     return {
       snapshot: null,

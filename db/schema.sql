@@ -30,3 +30,11 @@ CREATE TABLE IF NOT EXISTS battle_votes (
   result TEXT NOT NULL, created_at TEXT NOT NULL,
   PRIMARY KEY (scope, request_id)
 );
+
+-- One replaceable live scoreboard per league; do not grow full snapshot history at live cadence.
+CREATE TABLE IF NOT EXISTS league_live_scores (
+  league_id bigint NOT NULL,
+  season integer NOT NULL,
+  payload jsonb NOT NULL,
+  PRIMARY KEY (league_id, season)
+);

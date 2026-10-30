@@ -88,6 +88,7 @@ export const snapshotSchema = z.object({
   mode: z.enum(["demo", "live"]),
   syncedAt: z.string().datetime({ offset: true }),
   newsSyncedAt: z.string().optional(),
+  matchupSyncedAt: z.string().datetime({ offset: true }).nullable().default(null),
   powerBaselineAt: z.string().datetime({ offset: true }).nullable().default(null),
   league: z.object({
     id: numeric,

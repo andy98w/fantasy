@@ -1,4 +1,5 @@
 import "server-only";
+import { normalizeBoxscore, type DailyLine } from "./daily";
 import { nbaDate, nextDate, normalizeScoreboard, type TodayData } from "./nba";
 
 type Cache = { date: string; checkedAt: number; value?: TodayData; pending?: Promise<TodayData> };
@@ -11,7 +12,7 @@ export async function loadToday(): Promise<TodayData> {
     ? globalCache.nbaScoreboard
     : (globalCache.nbaScoreboard = { date, checkedAt: 0 });
   if (cache.pending) return cache.pending;
-  if (cache.value && now - cache.checkedAt < 60_000) return cache.value;
+  if (cache.value && now - cache.checkedAt < 20_000) return cache.value;
   cache.pending = (async () => {
     try {
       // ESPN dates use Eastern time; include the next date, then filter to the
@@ -25,7 +26,15 @@ export async function loadToday(): Promise<TodayData> {
       }));
       const games = [...new Map(batches.flat().map((game) => [game.id, game])).values()]
         .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-      cache.value = { date, fetchedAt: new Date().toISOString(), status: "ready", games };
+      const results = await Promise.allSettled(games.filter(g => ["live", "final"].includes(g.state)).map(async game => {
+        const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${encodeURIComponent(game.id)}`, { cache: "no-store", signal: AbortSignal.timeout(6000) });
+        if (!response.ok) throw new Error("Box score unavailable");
+        return normalizeBoxscore(await response.json(), game);
+      }));
+      const performances: DailyLine[] = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+      const failed = results.filter(r => r.status === "rejected").length;
+      cache.value = { date, fetchedAt: new Date().toISOString(), status: "ready", games, performances,
+        boxscoreStatus: failed ? failed === results.length ? "error" : "partial" : "ready" };
     } catch {
       const previous = cache.value;
       cache.value = previous?.fetchedAt && now - Date.parse(previous.fetchedAt) < 15 * 60_000

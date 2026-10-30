@@ -13,7 +13,7 @@ export function AutoRefresh() {
       if (!pending && document.visibilityState === "visible" && navigator.onLine)
         startTransition(() => router.refresh());
     };
-    const timer = window.setInterval(refresh, 60_000);
+    const timer = window.setInterval(refresh, 15_000);
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("online", refresh);
     return () => {

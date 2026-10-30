@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Snapshot, Team } from "@/lib/schema";
 import { MatchupClash } from "./matchup-clash";
 import { TeamAvatar } from "./avatars";
@@ -9,17 +10,23 @@ export function MatchupGrid({
   matchups,
   teams,
   period,
+  fetchedAt,
   onMatchup,
 }: {
   matchups: Snapshot["matchups"];
   teams: Team[];
   period: number;
+  fetchedAt?: string;
   onMatchup: (id: number) => void;
 }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => { setNow(Date.now()); const timer = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(timer); }, []);
+  const age = fetchedAt && now ? Math.max(0, Math.floor((now - Date.parse(fetchedAt)) / 1000)) : null;
   return (
     <section className="league-matchups" aria-label={`Week ${period} matchups`}>
       <div className="section-heading">
         <h2>Week {period}</h2>
+        {age !== null && <span title="Time since ESPN matchup scores were fetched">Scores {age < 60 ? `${age}s` : `${Math.floor(age / 60)}m`} ago</span>}
       </div>
       {matchups.length ? (
         <div className="matchup-grid">

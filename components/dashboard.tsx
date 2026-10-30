@@ -11,7 +11,6 @@ import { PowerMovers } from "./league/power-movers";
 import { PlayerFilters } from "./league/player-filters";
 import { TeamSelect } from "./league/team-select";
 import {
-  Standings,
   TeamRankings,
   TeamProfile,
   RankingHelp,
@@ -20,7 +19,7 @@ import { Rivalries } from "./league/rivalries";
 import { Records } from "./league/records";
 import { TradeHub } from "./league/trade-hub";
 import { Connection } from "./league/connection";
-import { LeagueAwards } from "./league/weekly-highlights";
+import { DailyPerformers } from "./league/daily-performers";
 import { weeklyMVPs } from "@/lib/weekly";
 import { Today } from "./league/today";
 import type { TodayData } from "@/lib/nba";
@@ -216,31 +215,13 @@ export default function Dashboard({
           <RankingHelp model={data.model} />
         )}
         {view === "league" && (
-          <>
-            <MatchupGrid
-              matchups={data.matchups}
-              teams={data.teams}
-              period={data.league.matchupPeriod}
-              onMatchup={(id) => {
-                setMatchupId(id);
-                go("matchup");
-              }}
-            />
-            <LeagueAwards matchups={data.matchups} teams={data.teams} onTeam={openTeam} />
-            <div className="overview-grid">
-              <Standings
-                title="Standings"
-                teams={data.teams}
-                onTeam={openTeam}
-              />
-              <div className="league-sidebar">
-                <Panel title="Roster news">
-                  <NewsFeed items={news} limit={6} />
-                </Panel>
-                <Today data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
-              </div>
-            </div>
-          </>
+          <div className="league-live">
+            <Today data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
+            <MatchupGrid matchups={data.matchups} teams={data.teams} period={data.league.matchupPeriod} fetchedAt={data.matchupSyncedAt ?? data.syncedAt}
+              onMatchup={(id) => { setMatchupId(id); go("matchup"); }} />
+            <DailyPerformers data={data} today={today} onPlayer={(player) => setSelectedId(player.id)} />
+            <Panel title="Roster news"><NewsFeed items={news} limit={6} /></Panel>
+          </div>
         )}
         {view === "matchup" && (
           <>
@@ -326,7 +307,7 @@ export default function Dashboard({
           <TradeHub data={data} active={view === "trades"} />
         </div>
         {view === "rivalries" && <Rivalries data={data} />}
-        {view === "records" && <Records data={data} />}
+        {view === "records" && <Records data={data} onTeam={openTeam} />}
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />
         )}

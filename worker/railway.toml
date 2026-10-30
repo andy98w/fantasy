@@ -1,7 +1,8 @@
-# Set this as the sync service's config path. Keep service root at repository root.
+# Legacy TOML configuration. Remove any dashboard cron schedule first.
+# Prefer worker/railway.json, which explicitly clears cronSchedule.
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "worker/Dockerfile"
 [deploy]
-cronSchedule = "*/5 * * * *"
-restartPolicyType = "NEVER"
+startCommand = ".venv/bin/python -m worker.live"
+restartPolicyType = "ALWAYS"

@@ -6,6 +6,8 @@ import { Tabs, Empty } from "../ui/primitives";
 import { AwardReveal, MotionNumber, useReducedMotion } from "../ui/motion";
 import { PixelIcon } from "../ui/pixel-icon";
 import { TeamAvatar } from "./avatars";
+import { LeagueAwards } from "./weekly-highlights";
+import { Standings } from "./team-views";
 
 function RecordCard({ record, data, season }: { record: LeagueRecord; data: Snapshot; season: boolean }) {
   const signature = `${record.value}:${record.holders.map(h => `${h.teamId}:${h.matchupId}`).join()}`;
@@ -34,16 +36,16 @@ function RecordCard({ record, data, season }: { record: LeagueRecord; data: Snap
     <div className="record-holders">{holders.slice(0, 2).map(holder)}{holders.length > 2 && <details><summary>{holders.length - 2} more tied</summary>{holders.slice(2).map(holder)}</details>}</div>
   </article></AwardReveal>;
 }
-export function Records({ data }: { data: Snapshot }) {
+export function Records({ data, onTeam = () => {} }: { data: Snapshot; onTeam?: (id: number) => void }) {
   const matches = useMemo(() => seasonMatchups(data), [data]);
   const finals = matches.filter(m => m.result !== "UNDECIDED");
-  const [tab, setTab] = useState<"week" | "season">(finals.length ? "season" : "week");
+  const [tab, setTab] = useState<"week" | "season" | "standings">(finals.length ? "season" : "week");
   const selected = tab === "season" ? finals : matches.filter(m => m.period === data.league.matchupPeriod);
   const records = leagueRecords(selected);
   return <div className="records-room">
-    <div className="rivalry-toolbar"><Tabs label="Record book" value={tab} onChange={setTab} options={[{value:"week",label:"This week"},{value:"season",label:"Season records"}]} /><span className="records-period">{tab === "week" ? `Week ${data.league.matchupPeriod}${selected.some(m => m.result === "UNDECIDED") ? " · In progress" : " · Final"}` : `${data.league.season - 1}–${String(data.league.season).slice(2)}`}</span></div>
+    <div className="rivalry-toolbar"><Tabs label="Record book" value={tab} onChange={setTab} options={[{value:"standings",label:"Standings"},{value:"week",label:"This week"},{value:"season",label:"Season records"}]} /><span className="records-period">{tab === "week" ? `Week ${data.league.matchupPeriod}${selected.some(m => m.result === "UNDECIDED") ? " · In progress" : " · Final"}` : `${data.league.season - 1}–${String(data.league.season).slice(2)}`}</span></div>
     {data.historySyncError && <p className="history-warning" role="status">{data.historySyncError} Showing saved records.</p>}
-    {records.length ? <div className="record-cabinet" key={tab}>{records.map(record => <RecordCard record={record} data={data} season={tab === "season"} key={record.id} />)}</div>
+    {tab === "standings" ? <Standings title="Standings" teams={data.teams} onTeam={onTeam} /> : tab === "week" ? <LeagueAwards matchups={data.matchups} teams={data.teams} onTeam={onTeam} /> : records.length ? <div className="record-cabinet" key={tab}>{records.map(record => <RecordCard record={record} data={data} season={tab === "season"} key={record.id} />)}</div>
       : <div className="record-vacant"><PixelIcon name="standings" size={64} /><h2>{tab === "season" ? "The record book is waiting." : "No scores yet."}</h2><Empty>{tab === "season" ? "Season records unlock after the first completed matchup." : "Weekly leaders appear when games begin."}</Empty></div>}
   </div>;
 }

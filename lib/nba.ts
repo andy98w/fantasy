@@ -12,6 +12,8 @@ export type NbaGame = {
   away: NbaTeam;
 };
 export type TodayData = {
+  performances?: import("./daily").DailyLine[];
+  boxscoreStatus?: "ready" | "partial" | "error";
   date: string;
   fetchedAt: string | null;
   status: "ready" | "stale" | "error";

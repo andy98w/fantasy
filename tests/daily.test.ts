@@ -1,0 +1,51 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { normalizeBoxscore, dailyPerformers, selectPerformers } from "../lib/daily";
+import { snapshotSchema } from "../lib/schema";
+import { normalizeScoreboard } from "../lib/nba";
+import demo from "../lib/demo.json";
+import box from "./fixtures/nba-boxscore.json";
+import scoreboard from "./fixtures/nba-scoreboard.json";
+const game = { ...normalizeScoreboard(scoreboard, "2026-10-29")[0], id: "401909895", state: "live" as const, home: { ...normalizeScoreboard(scoreboard, "2026-10-29")[0].home, id: "22" }, away: { ...normalizeScoreboard(scoreboard, "2026-10-29")[0].away, id: "29" } };
+// The public fixture carries ESPN's actual NBA team identifiers.
+game.home.id = box.boxscore.players[1].team.id;
+game.away.id = box.boxscore.players[0].team.id;
+test("daily parser matches by stat keys, preserves zero stats and skips DNPs", () => {
+  const rows = normalizeBoxscore(box, game);
+  assert.equal(rows[0].stats.PTS, 14);
+  assert.equal(rows[0].stats.FGM, 6);
+  assert.equal(rows[0].stats.FTA, 0);
+  const bad = structuredClone(box);
+  bad.boxscore.players[0].statistics[0].athletes[0].didNotPlay = true;
+  assert.equal(normalizeBoxscore(bad, game).length, rows.length - 1);
+  bad.header.id = "wrong";
+  assert.throws(() => normalizeBoxscore(bad, game));
+  const missing = structuredClone(box);
+  missing.boxscore.players[0].statistics[0].athletes[0].stats[1] = "--";
+  assert.throws(() => normalizeBoxscore(missing, game));
+});
+test("daily value uses 9-cat production, shooting volume and inverted turnovers", () => {
+  const data = snapshotSchema.parse(demo);
+  const line = normalizeBoxscore(box, game)[0];
+  const player = { ...data.players[0], id: line.playerId, teamId: 1, slot: "PG", gamesPlayed: 5 };
+  data.players.push(player);
+  const result = dailyPerformers(data, [line], [game]);
+  assert.equal(result.length, 1);
+  const worse = dailyPerformers(data, [{...line, stats:{...line.stats,TO:line.stats.TO+10,FGA:line.stats.FGA+10}}], [game]);
+  assert.ok(worse[0].score < result[0].score);
+  data.players.at(-1)!.gamesPlayed = 1;
+  assert.equal(dailyPerformers(data, [line], [game])[0].delta, null);
+  data.players.at(-1)!.slot = "IR";
+  assert.equal(dailyPerformers(data, [line], [game]).length, 0);
+});
+test("unfinished games and tiny-minute appearances are never shamed; surprise requires a positive delta", () => {
+  const data = snapshotSchema.parse(demo), line = normalizeBoxscore(box, game)[0];
+  data.players.push({...data.players[0],id:line.playerId,teamId:1,slot:"PG"});
+  const row = dailyPerformers(data,[line],[game])[0];
+  assert.equal(selectPerformers([{...row,delta:-20}],"worst").length,0);
+  assert.equal(selectPerformers([{...row,delta:-20}],"letdown").length,0);
+  assert.equal(selectPerformers([{...row,delta:-20}],"surprise").length,0);
+  const final = {...row,game:{...game,state:"final" as const},delta:-20};
+  assert.equal(selectPerformers([final],"letdown").length,1);
+  assert.equal(selectPerformers([{...final,line:{...line,minutes:2}}],"worst").length,0);
+});

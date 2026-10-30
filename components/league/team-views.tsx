@@ -158,7 +158,6 @@ export function TeamRankings({
               <th>Rank</th>
               <th className="identity-col">Team</th>
               {sortHeader("power")}
-              <th>Rated players</th>
               {CATEGORIES.map(sortHeader)}
             </tr>
           </thead>
@@ -178,11 +177,6 @@ export function TeamRankings({
                   </button>
                 </td>
                 <td><MotionNumber>{value.score?.toFixed(1) ?? "—"}</MotionNumber></td>
-                <td>
-                  <Coverage
-                    roster={players.filter((p) => p.teamId === value.team.id)}
-                  />
-                </td>
                 {CATEGORIES.map((category) => (
                   <td key={category}>
                     <CategoryValue

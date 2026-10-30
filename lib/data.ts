@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { createPool } from "./postgres";
 import { snapshotSchema, type Snapshot } from "./schema";
 import demo from "./demo.json";
+import { applyResultCorrections } from "./result-corrections";
 const globalDb = globalThis as unknown as { pool?: Pool };
 export type DataResult = {
   snapshot: Snapshot | null;
@@ -80,7 +81,7 @@ export async function loadLeague(): Promise<DataResult> {
       snapshot.league.season !== Number(process.env.ESPN_SEASON ?? 2027)
     )
       throw new Error("Snapshot identity mismatch");
-    return { snapshot, error: null, syncFailure };
+    return { snapshot: applyResultCorrections(snapshot), error: null, syncFailure };
   } catch {
     return {
       snapshot: null,

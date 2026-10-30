@@ -82,9 +82,24 @@ def test_retention_preserves_recent_daily_other_leagues_and_votes():
                 db.execute("INSERT INTO league_snapshots(league_id,season,payload,raw_payload) VALUES(2,2027,'{}','{\"raw\":true}')")
                 db.execute("INSERT INTO battle_ratings(scope,mode,entry_id) VALUES('live:1:2027','best','a:1')")
                 db.execute("INSERT INTO sync_runs(league_id,season,succeeded,message,finished_at) VALUES(1,2027,true,'old',now()-interval '40 days'),(1,2027,true,'latest',now())")
-                with db.transaction(): prune_snapshots(db,1,2027,30)
-                count = db.execute('SELECT count(*) FROM league_snapshots WHERE league_id=1').fetchone()[0]
-                assert 53 <= count <= 54
+                with db.transaction():
+                    # Recent captures can cross UTC midnight and overlap a daily
+                    # checkpoint. Verify which captures survive, not a fixed count.
+                    captures = db.execute("""SELECT id,captured_at,
+                        (captured_at AT TIME ZONE 'UTC')::date
+                        FROM league_snapshots WHERE league_id=1
+                        ORDER BY captured_at DESC,id DESC""").fetchall()
+                    cutoff = db.execute("SELECT now()-interval '30 days'").fetchone()[0]
+                    expected = {row[0] for row in captures[:24]}
+                    seen_days = set()
+                    for capture_id, captured_at, day in captures:
+                        if captured_at >= cutoff and day not in seen_days:
+                            expected.add(capture_id)
+                            seen_days.add(day)
+                    prune_snapshots(db,1,2027,30)
+                    retained = {row[0] for row in db.execute(
+                        'SELECT id FROM league_snapshots WHERE league_id=1').fetchall()}
+                    assert retained == expected
                 assert db.execute("SELECT count(*) FROM league_snapshots WHERE league_id=1 AND raw_payload <> '{}'::jsonb").fetchone()[0] == 1
                 assert db.execute("SELECT raw_payload FROM league_snapshots WHERE league_id=2").fetchone()[0] == {'raw': True}
                 assert db.execute('SELECT count(*) FROM battle_ratings').fetchone()[0] == 1

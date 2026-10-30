@@ -79,7 +79,7 @@ export function RankingHelp({ model }: { model: Snapshot["model"] }) {
         </p>
         <p>
           Player power runs from 0–100. Team power adds up the roster’s category
-          scores. Ratings use season averages and require {model.minimumGames} games.
+          scores, excluding IR. Ratings use season averages and require {model.minimumGames} games.
         </p>
         <p>
           Estimated scores treat unrated players as average. Trade priorities

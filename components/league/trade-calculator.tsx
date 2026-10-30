@@ -49,7 +49,7 @@ function TradeRoster({
   const team = teams.find((t) => t.id === teamId)!;
   const roster = players.filter((p) => p.teamId === teamId);
   const outgoing = roster.filter((p) => selected.includes(p.id));
-  const value = rosterValue(outgoing);
+  const value = rosterValue(outgoing, DEFAULT_WEIGHTS, { includeIR: true });
   return (
     <Panel title={label}>
       <div className="trade-roster-controls">
@@ -95,6 +95,7 @@ function TradeRoster({
                   {player.status === "ACTIVE"
                     ? player.nbaTeam
                     : statusText(player.status)}
+                  {player.slot === "IR" ? " · IR" : ""}
                 </small>
               </span>
               <span title="Player value">
@@ -167,7 +168,7 @@ function TradeImpact({
           <div>
             <span>Roster</span>
             <strong>
-              {before.size} → {after.size}
+              {beforeRoster.length} → {afterRoster.length}
             </strong>
           </div>
           <div>
@@ -204,9 +205,9 @@ function TradeImpact({
             </strong>
           </div>
         </div>
-        {after.size > capacity && (
+        {afterRoster.length > capacity && (
           <p className="inline-notice">
-            Roster exceeds the {capacity}-player limit by {after.size - capacity}.
+            Roster exceeds the {capacity}-player limit by {afterRoster.length - capacity}.
           </p>
         )}
         <p className="trade-verdict" aria-live="polite" hidden={!active}>

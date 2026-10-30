@@ -16,9 +16,11 @@ const rounded = (value: number) =>
 export function rosterValue(
   roster: Player[],
   weights: Weights = DEFAULT_WEIGHTS,
+  { includeIR = false }: { includeIR?: boolean } = {},
 ) {
-  const rated = roster.filter((player) => player.zTotal !== null);
-  const missing = roster.filter((player) => player.zTotal === null);
+  const contributing = roster.filter((player) => includeIR || player.slot !== "IR");
+  const rated = contributing.filter((player) => player.zTotal !== null);
+  const missing = contributing.filter((player) => player.zTotal === null);
   const categories = Object.fromEntries(
     CATEGORIES.map((category) => [
       category,
@@ -31,7 +33,7 @@ export function rosterValue(
     ]),
   ) as Record<Category, number>;
   return {
-    size: roster.length,
+    size: contributing.length,
     rated: rated.length,
     missing,
     categories,

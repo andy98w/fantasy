@@ -60,3 +60,23 @@ def test_team_ties_and_no_measured_players():
     rank_teams(teams,players)
     assert [t['talentRank'] for t in teams] == [1,1,3,None]
     assert teams[3]['talent'] is None
+
+
+def test_ir_does_not_contribute_to_team_power_categories_or_coverage():
+    players=[
+        {'id':1,'teamId':1,'slot':'BE','status':'OUT','zTotal':2,'contributions':{'AST':2}},
+        {'id':2,'teamId':1,'slot':'IR','zTotal':10,'contributions':{'AST':10}},
+        {'id':3,'teamId':1,'slot':'IR','zTotal':-5,'contributions':{'AST':-5}},
+        {'id':4,'teamId':1,'slot':'IR','zTotal':None,'contributions':{}},
+        {'id':5,'teamId':2,'slot':'IR','zTotal':20,'contributions':{'AST':20}},
+    ]
+    teams=[{'id':1},{'id':2}]
+    rank_teams(teams,players)
+    assert teams[0]['talent']==2
+    assert teams[0]['categoryProfile']['AST']==2
+    assert teams[0]['rankedPlayers']==teams[0]['rosterSize']==1
+    assert teams[1]['talent'] is None and teams[1]['talentRank'] is None
+    assert players[1]['zTotal']==10
+    players[1]['slot']='BE'
+    rank_teams(teams,players)
+    assert teams[0]['talent']==12

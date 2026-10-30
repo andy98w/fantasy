@@ -40,7 +40,7 @@ function RecordCard({ record, data, season }: { record: LeagueRecord; data: Snap
 export function Records({ data, onTeam = () => {} }: { data: Snapshot; onTeam?: (id: number) => void }) {
   const matches = useMemo(() => seasonMatchups(data), [data]);
   const finals = matches.filter(m => m.result !== "UNDECIDED");
-  const [tab, setTab] = useState<"week" | "season" | "standings" | "duel" | "whatif">(finals.length ? "season" : "week");
+  const [tab, setTab] = useState<"week" | "season" | "standings" | "duel" | "whatif">("standings");
   const selected = tab === "season" ? finals : matches.filter(m => m.period === data.league.matchupPeriod);
   const records = leagueRecords(selected);
   return <div className="records-room">

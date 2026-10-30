@@ -1,0 +1,23 @@
+.forecast-room { display: grid; gap: 24px; }
+.forecast-room .rivalry-toolbar, .forecast-room .rivalry-selectors { margin: 0; }
+.forecast-dates { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.forecast-vs span { font-size: 20px; padding: 12px; }
+.forecast-games { display: block; color: var(--text); font-size: 14px; margin-top: 8px; text-shadow: 1px 1px var(--shadow); }
+.forecast-details { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.forecast-details summary { cursor: pointer; color: var(--gold); width: fit-content; }
+.forecast-details p { max-width: 85ch; }
+.forecast-breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.forecast-breakdowns h3 { color: var(--text); }
+.forecast-breakdowns ul { padding: 0; list-style: none; max-width: 560px; }
+.forecast-breakdowns li { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-soft); padding: 5px 0; }
+@media (max-width: 640px) {
+  .forecast-vs span { font-size: 14px; padding: 8px; }
+  .forecast-games { font-size: 12px; }
+  .forecast-breakdowns { grid-template-columns: 1fr; gap: 12px; }
+}
+@media (max-width: 650px) {
+  .forecast-duel .rivalry-stage { grid-template-columns: 1fr 1fr; padding-top: 48px; }
+  .forecast-duel .forecast-vs { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); white-space: nowrap; flex-direction: row; }
+  .forecast-duel .forecast-vs > span { font-size: 16px; padding: 5px 10px; animation: none; }
+  .forecast-duel .rivalry-fighter h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; height: 2.4em; }
+}

@@ -7,7 +7,7 @@ export const navigation = [
   { value: "team", label: "Teams", icon: "roster" },
   { value: "players", label: "Players", icon: "players" },
   { value: "trades", label: "Trades", icon: "trade" },
-  { value: "rivalries", label: "Rivalries", icon: "matchup" },
+  { value: "forecast", label: "Forecast", icon: "matchup" },
   { value: "records", label: "Records", icon: "standings" },
 ] as const satisfies readonly {
   value: string;

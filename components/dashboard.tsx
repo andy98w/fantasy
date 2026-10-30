@@ -15,7 +15,7 @@ import {
   TeamProfile,
   RankingHelp,
 } from "./league/team-views";
-import { Rivalries } from "./league/rivalries";
+import { Forecast } from "./league/forecast";
 import { Records } from "./league/records";
 import { TradeHub } from "./league/trade-hub";
 import { Connection } from "./league/connection";
@@ -74,6 +74,7 @@ export default function Dashboard({
         rankings: "players",
         news: "league",
         teams: "team",
+        rivalries: "forecast",
       };
       const value = aliases[hash] ?? hash;
       if (
@@ -306,7 +307,7 @@ export default function Dashboard({
         <div hidden={view !== "trades"}>
           <TradeHub data={data} active={view === "trades"} />
         </div>
-        {view === "rivalries" && <Rivalries data={data} />}
+        {view === "forecast" && <Forecast data={data} today={today} />}
         {view === "records" && <Records data={data} onTeam={openTeam} />}
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />

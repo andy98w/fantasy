@@ -83,6 +83,14 @@ export const tradeSchema = z.object({
   })).min(1),
 });
 export type Trade = z.infer<typeof tradeSchema>;
+const forecastScheduleSchema = z.object({
+  lineupDate: z.iso.date(),
+  windows: z.array(z.object({ period: numeric, start: z.iso.date(), end: z.iso.date() })),
+  games: z.array(z.object({ id: z.string(), startsAt: z.iso.datetime({ offset: true }), date: z.iso.date(), home: z.string(), away: z.string(), scoringPeriod: numeric })),
+  pairs: z.array(z.object({ period: numeric, home: numeric, away: numeric })),
+  slots: z.array(z.string()).min(1).max(12),
+});
+export type ForecastSchedule = z.infer<typeof forecastScheduleSchema>;
 export const snapshotSchema = z.object({
   schemaVersion: z.literal(1),
   mode: z.enum(["demo", "live"]),
@@ -104,6 +112,7 @@ export const snapshotSchema = z.object({
   teams: z.array(teamSchema),
   players: z.array(playerSchema),
   matchups: z.array(matchupSchema),
+  forecastSchedule: forecastScheduleSchema.nullable().default(null).catch(null),
   matchupHistory: z.array(matchupSchema).default([]),
   historySyncError: z.string().nullable().default(null),
   news: z.array(

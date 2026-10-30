@@ -7,6 +7,7 @@
 @import "../components/league/trade-battles.css";
 @import "../components/league/weekly-highlights.css";
 @import "../components/league/season.css";
+@import "../components/league/forecast.css";
 @import "../components/league/power-movers.css";
 
 :root {

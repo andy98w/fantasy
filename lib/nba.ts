@@ -8,6 +8,7 @@ export type NbaGame = {
   startsAt: string;
   state: "scheduled" | "live" | "final" | "delayed" | "postponed" | "cancelled" | "suspended" | "unknown";
   detail: string;
+  remainingFraction?: number | null;
   home: NbaTeam;
   away: NbaTeam;
 };
@@ -33,6 +34,7 @@ const aliases: Record<string, string> = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "
 export const nbaAbbrev = (value: string) => aliases[value.toUpperCase()] ?? value.toUpperCase();
 
 const statusSchema = z.object({
+  period: z.number().optional(), clock: z.number().optional(),
   type: z.object({ name: z.string(), state: z.string(), completed: z.boolean().optional(), shortDetail: z.string().optional() }),
 });
 const competitorSchema = z.object({
@@ -68,7 +70,11 @@ export function normalizeScoreboard(payload: unknown, date: string): NbaGame[] {
         score: ["live", "final", "suspended"].includes(state) && Number.isFinite(number) && number >= 0 ? number : null,
       };
     };
-    return [{ id: event.id, startsAt: start.toISOString(), state, detail: type.shortDetail ?? "", home: side("home"), away: side("away") }];
+    const { period, clock } = competition.status;
+    const remainingFraction = state === "final" ? 0 : state === "scheduled" ? 1 :
+      state === "live" && period != null && period >= 1 && clock != null && clock >= 0 && clock <= (period > 4 ? 300 : 720)
+        ? Math.min(1, (Math.max(0, 4 - period) * 720 + clock) / 2880) : null;
+    return [{ remainingFraction, id: event.id, startsAt: start.toISOString(), state, detail: type.shortDetail ?? "", home: side("home"), away: side("away") }];
   });
 }
 

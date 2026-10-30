@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 from .espn import SyncError
 from .rankings import rank_players, rank_teams, CATS
 from .weekly import weekly_players
+from .forecast import forecast_schedule
 
 STAT_IDS={'0':'PTS','1':'BLK','2':'STL','3':'AST','6':'REB','11':'TO','13':'FGM','14':'FGA','15':'FTM','16':'FTA','17':'3PM','19':'FG%','20':'FT%','40':'MIN','42':'GP'}
 SLOTS={0:'PG',1:'SG',2:'SF',3:'PF',4:'C',5:'G',6:'F',7:'SG/SF',8:'G/F',9:'PF/C',10:'F/C',11:'UTIL',12:'BE',13:'IR',15:'Rookie'}
@@ -104,6 +105,7 @@ def normalize(raw, league_id, season, team_id):
         'league':{'id':league_id,'season':season,'name':settings.get('name','Fantasy league'),
         'myTeamId':team_id,'scoringType':scoring_type,'matchupPeriod':league['status']['currentMatchupPeriod'],
         'scoringPeriod':league['scoringPeriodId'],'categories':CATS,'rosterSlots':slot_counts},
+        'forecastSchedule':forecast_schedule(raw, SLOTS),
         'teams':teams,'players':players,'matchups':matchups,'news':[], 'model':model,
         'coverage':{'playerCount':len(players),'rosteredCount':sum(p['teamId'] is not None for p in players),'teamCount':len(teams)},
-        'warnings':['Weekly projections are not available in this release.']}
+        'warnings':[]}

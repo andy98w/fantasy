@@ -17,9 +17,10 @@ function WeekSelect({ matches, value, onChange }: { matches: Matchup[]; value: n
   return <Select label="Matchup week" value={String(value)} onChange={v => onChange(Number(v))}
     options={periods.map(period => ({ value: String(period), label: `Week ${period}${matches.some(m => m.period === period && m.result === "UNDECIDED") ? " · Live" : " · Final"}` }))} />;
 }
-export function Rivalries({ data }: { data: Snapshot }) {
+export function Rivalries({ data, mode }: { data: Snapshot; mode?: "duel" | "whatif" }) {
   const matches = useMemo(() => seasonMatchups(data), [data]);
-  const [tab, setTab] = useState<"duel" | "whatif">("duel");
+  const [selectedTab, setTab] = useState<"duel" | "whatif">("duel");
+  const tab = mode ?? selectedTab;
   const [a, setA] = useState(data.teams[0]?.id);
   const [b, setB] = useState(data.teams[1]?.id);
   const [period, setPeriod] = useState(data.league.matchupPeriod);
@@ -37,7 +38,7 @@ export function Rivalries({ data }: { data: Snapshot }) {
   const completeWeek = matches.some(m => m.period === selectedPeriod) && !matches.some(m => m.period === selectedPeriod && m.result === "UNDECIDED");
   if (!home || !away) return <Empty>Two teams are needed for rivalries.</Empty>;
   return <div className="rivalries">
-    <div className="rivalry-toolbar"><Tabs label="Rivalries" value={tab} onChange={setTab} options={[{ value: "duel", label: "Head-to-head" }, { value: "whatif", label: "What if" }]} /><WeekSelect matches={matches} value={selectedPeriod} onChange={setPeriod} /></div>
+    <div className="rivalry-toolbar">{!mode && <Tabs label="Rivalries" value={tab} onChange={setTab} options={[{ value: "duel", label: "Head-to-head" }, { value: "whatif", label: "What if" }]} />}<WeekSelect matches={matches} value={selectedPeriod} onChange={setPeriod} /></div>
     {data.historySyncError && <p className="history-warning" role="status">{data.historySyncError} Showing saved results.</p>}
     {tab === "duel" ? <>
       <div className="rivalry-selectors">

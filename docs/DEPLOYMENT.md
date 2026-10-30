@@ -35,12 +35,15 @@ Tests create and remove unique schemas, never use `DATABASE_URL`, and make no ES
 | --- | --- | --- |
 | Repository | `andy98w/fantasy` | `andy98w/fantasy` |
 | Root directory | `/` | `/` |
-| Railway config file | `/railway.toml` | `/worker/railway.toml` |
+| Builder | Dockerfile | Dockerfile |
 | Dockerfile | `Dockerfile` | `worker/Dockerfile` |
 | Start command | Leave unset; use image CMD | Leave unset; use image CMD |
 | Public networking | HTTPS domain, target port matching deploy logs | None |
 | Health check | `/api/ready` | None |
-| Schedule | Always running | Every five minutes, from config |
+| Schedule | Always running | Custom cron: `*/5 * * * *` |
+| Restart policy | On Failure, 3 retries | Never (set automatically for cron) |
+
+Set these values directly in each service's Railway Settings. New services cannot opt into Railway's deprecated Config as Code, so do not rely on the checked-in TOML files being applied. In particular, explicitly set sync's Dockerfile path to `worker/Dockerfile`; automatic detection selects the root web Dockerfile. Save the custom cron expression before deploying the staged changes. Existing legacy Config as Code services can use the TOML files until Railway retires support.
 
 Keep both services and Postgres in the same environment/region. Do not set the sync service root to `/worker`; it needs the root dependency files and database schema. Leave application sleeping disabled for the web service so scheduled data updates remain visible without cold starts. Use the platform-provided `PORT`; the image defaults to 3000. When generating the public domain, match its target port to the deploy log (for example, `0.0.0.0:8080` means target port **8080**). Do not assume the container default overrides Railway’s `PORT`.
 
@@ -53,6 +56,7 @@ Set these in Railway's service Variables panel. Do not put secrets in Git, Docke
 | Variable | web | sync |
 | --- | --- | --- |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | `${{Postgres.DATABASE_URL}}` |
+| `RAILWAY_DOCKERFILE_PATH` | `/Dockerfile` | `/worker/Dockerfile` |
 | `DATA_MODE` | `live` | Not needed |
 | `ESPN_LEAGUE_ID` | `1834203755` | `1834203755` |
 | `ESPN_SEASON` | `2027` | `2027` |
@@ -61,7 +65,7 @@ Set these in Railway's service Variables panel. Do not put secrets in Git, Docke
 | `ESPN_SWID` | **Do not set** | Signed-in ESPN cookie, private secret |
 | `SNAPSHOT_RETENTION_DAYS` | Not needed | `30` (enable bounded storage for the new database) |
 
-The web container refuses to start with demo mode, missing database/league identity, or ESPN cookies. The sync image requires `DATABASE_URL`; it cannot silently save into ephemeral local storage. No `SNAPSHOT_PATH` or `BATTLE_DB_PATH` is needed in Railway. Keep PostgreSQL on private networking; only web needs a public domain.
+Set the [explicit Dockerfile path variable](https://docs.railway.com/builds/dockerfiles#custom-dockerfile-path) as well as the service setting so each service builds the intended image. The web container refuses to start with demo mode, missing database/league identity, or ESPN cookies. The sync image requires `DATABASE_URL`; it cannot silently save into ephemeral local storage. No `SNAPSHOT_PATH` or `BATTLE_DB_PATH` is needed in Railway. Keep PostgreSQL on private networking; only web needs a public domain.
 
 ## First launch
 

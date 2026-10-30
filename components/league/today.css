@@ -43,16 +43,13 @@
 .today-game-state.live i { animation: live-score-pulse 2.5s ease-in-out infinite; }
 @keyframes live-score-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .today-game-state.live i { animation: none; } }
-/* The League page is a live score desk; history lives in Records. */
-.league-live > .today-panel { margin-bottom: 28px; }
-.league-live > .today-panel .today-games { display: flex; overflow-x: auto; }
-.league-live > .today-panel .today-game { flex: 1 0 170px; }
-.league-live > .today-panel .today-tabs .tabs { width: auto; }
-.league-live > .today-panel .today-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px,1fr)); max-height: 380px; }
+.league-main { min-width: 0; container: league-main / inline-size; }
+@container league-main (max-width: 980px) { .matchup-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container league-main (max-width: 600px) { .matchup-grid { grid-template-columns: 1fr; } }
 .daily-performers { margin: 28px 0; }
 .daily-performers > .tabs { margin-bottom: 16px; max-width: 100%; overflow-x: auto; }
 .daily-performers > .tabs button { white-space: nowrap; }
-.daily-player-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.daily-player-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 16px; }
 .daily-player-card { min-width: 0; text-align: left; padding: 18px; border: 2px solid var(--line); border-top-color: var(--teal); background: var(--surface); }
 .daily-negative .daily-player-card { border-top-color: var(--coral); }
 .daily-player-card:is(:hover,:focus-visible) { background: var(--surface-raised); }
@@ -69,5 +66,4 @@
 .daily-shooting { display: flex; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--line-soft); padding-top: 12px; font-size: 11px; color: var(--muted); }
 .daily-delta { display: block; margin-top: 12px; color: var(--teal); font-size: 12px; }
 .daily-negative .daily-delta { color: var(--coral); }
-@media (max-width: 1050px) { .daily-player-grid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .daily-performers > .tabs button { font: 500 12px/1.4 var(--body); padding: 10px; } }

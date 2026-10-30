@@ -216,12 +216,16 @@ export default function Dashboard({
           <RankingHelp model={data.model} />
         )}
         {view === "league" && (
-          <div className="league-live">
-            <Today data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
-            <MatchupGrid matchups={data.matchups} teams={data.teams} period={data.league.matchupPeriod} fetchedAt={data.matchupSyncedAt ?? data.syncedAt}
-              onMatchup={(id) => { setMatchupId(id); go("matchup"); }} />
-            <DailyPerformers data={data} today={today} onPlayer={(player) => setSelectedId(player.id)} />
-            <Panel title="Roster news"><NewsFeed items={news} limit={6} /></Panel>
+          <div className="overview-grid">
+            <div className="league-main">
+              <MatchupGrid matchups={data.matchups} teams={data.teams} period={data.league.matchupPeriod} fetchedAt={data.matchupSyncedAt ?? data.syncedAt}
+                onMatchup={(id) => { setMatchupId(id); go("matchup"); }} />
+              <DailyPerformers data={data} today={today} onPlayer={(player) => setSelectedId(player.id)} />
+            </div>
+            <aside className="league-sidebar" aria-label="League news and today's games">
+              <Panel title="Roster news"><NewsFeed items={news} limit={6} /></Panel>
+              <Today data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
+            </aside>
           </div>
         )}
         {view === "matchup" && (

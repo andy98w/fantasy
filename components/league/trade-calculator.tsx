@@ -1,5 +1,6 @@
 "use client";
 
+import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { useState } from "react";
 import {
   CATEGORIES,
@@ -21,7 +22,7 @@ import { SearchField } from "../ui/search-field";
 import { teamOptions } from "./team-select";
 import { PlayerAvatar, TeamAvatar } from "./avatars";
 import { CategoryValue } from "./team-views";
-import { signedZ as signed, statusText } from "./format";
+import { signedZ as signed, statusText, categorySearch } from "./format";
 import { CategoryMeter } from "../ui/category-meter";
 import { ValueFeedback } from "../ui/value-feedback";
 
@@ -148,6 +149,11 @@ function TradeImpact({
   const gains = CATEGORIES.filter((c) => weights[c] > 0 && delta(c) >= 0.05);
   const losses = CATEGORIES.filter((c) => weights[c] > 0 && delta(c) <= -0.05);
   const allPunted = CATEGORIES.every((c) => weights[c] === 0);
+  const [priority, setPriority] = useState("all");
+  const control = useTableControls(CATEGORIES.filter(category => priority === "all" || String(weights[category]) === priority), {
+    search: categorySearch,
+    value: (category, key) => key === "category" ? category : key === "before" ? before.rated ? before.categories[category] : null : key === "after" ? after.rated ? after.categories[category] : null : key === "change" ? hasData ? delta(category) : null : weights[category],
+  });
   const deltaRange = Math.max(1, ...CATEGORIES.map((c) => Math.abs(delta(c))));
   return (
     <Panel>
@@ -225,6 +231,9 @@ function TradeImpact({
                   "No notable category changes."}
         </p>
       </div>
+      <TableToolbar label={`Search ${team.name} categories`} query={control.query} onQuery={control.setQuery}>
+        <Select label={`${team.name} priority filter`} value={priority} onChange={setPriority} options={[{value:"all",label:"All priorities"},{value:"0",label:"Punt"},{value:"1",label:"Normal"},{value:"2",label:"Priority"}]} />
+      </TableToolbar>
       <div
         className="table-scroll"
         tabIndex={0}
@@ -234,15 +243,11 @@ function TradeImpact({
         <table className="data-table trade-impact-table">
           <thead>
             <tr>
-              <th>Category</th>
-              <th>Before</th>
-              <th>After</th>
-              <th>Change</th>
-              <th>Priority</th>
+              {[["category", "Category"], ["before", "Before"], ["after", "After"], ["change", "Change"], ["priority", "Priority"]].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "category"}>{label}</SortableHeader>)}
             </tr>
           </thead>
           <tbody>
-            {CATEGORIES.map((category) => (
+            {control.rows.map((category) => (
               <tr
                 key={category}
                 className={weights[category] === 0 ? "punted-category" : ""}
@@ -273,6 +278,7 @@ function TradeImpact({
                 </td>
               </tr>
             ))}
+            {!control.rows.length && <TableEmpty columns={5} />}
           </tbody>
         </table>
       </div>

@@ -1,4 +1,5 @@
-import type { Player } from "@/lib/schema";
+import { compareTableValues } from "@/lib/table";
+import type { Player, Team } from "@/lib/schema";
 export const stat = (value: number | null | undefined, category: string) =>
   value == null
     ? "—"
@@ -25,14 +26,9 @@ export const ratingReason = (player: Player, minimum: number) =>
     ? `${player.gamesPlayed}/${minimum} games required`
     : "Incomplete statistics";
 export type Sort = { key: string; descending: boolean };
-export function sortPlayers(players: Player[], sort: Sort) {
-  return [...players].sort((a, b) => {
-    const av = sort.key === "power" ? a.zTotal : sort.key === "powerChange7d" ? a.powerChange7d : a.stats[sort.key];
-    const bv = sort.key === "power" ? b.zTotal : sort.key === "powerChange7d" ? b.powerChange7d : b.stats[sort.key];
-    if (av == null) return bv == null ? a.name.localeCompare(b.name) : 1;
-    if (bv == null) return -1;
-    return (sort.descending ? bv - av : av - bv) || a.id - b.id;
-  });
+export function sortPlayers(players: Player[], sort: Sort, teams: Team[] = []) {
+  const value = (p: Player) => sort.key === "name" ? p.name : sort.key === "rank" ? p.rank : sort.key === "team" ? teams.find(t => t.id === p.teamId)?.abbrev ?? (p.availability === "WAIVERS" ? "Waivers" : p.availability === "FREEAGENT" ? "FA" : null) : sort.key === "status" ? statusText(p.status) : sort.key === "power" ? p.zTotal : sort.key === "powerChange7d" ? p.powerChange7d : p.stats[sort.key];
+  return [...players].sort((a, b) => compareTableValues(value(a), value(b), sort.descending) || a.id - b.id);
 }
 export const dateLabel = (date: string) =>
   new Date(date).toLocaleDateString("en-US", {
@@ -45,3 +41,5 @@ export function signedZ(value: number) {
   const rounded = Math.abs(value) < 0.05 ? 0 : value;
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
 }
+
+export const categorySearch = (category: string) => `${category} ${{ PTS: "points", REB: "rebounds", AST: "assists", STL: "steals", BLK: "blocks", "3PM": "threes three pointers", "FG%": "field goal percentage", "FT%": "free throw percentage", TO: "turnovers" }[category] ?? ""}`;

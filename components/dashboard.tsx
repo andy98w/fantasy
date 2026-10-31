@@ -102,7 +102,7 @@ export default function Dashboard({
   const onSort = (key: string) =>
     setSort((current) => ({
       key,
-      descending: current.key === key ? !current.descending : key !== "TO",
+      descending: current.key === key ? !current.descending : !["TO", "name", "rank", "team", "status"].includes(key),
     }));
   const team = data.teams.find((team) => team.id === teamId);
   const roster = team
@@ -122,9 +122,9 @@ export default function Dashboard({
               (availability === "available" &&
                 ["FREEAGENT", "WAIVERS"].includes(player.availability))),
         ),
-        sort,
+        sort, data.teams,
       ),
-    [data.players, query, position, availability, sort],
+    [data.players, data.teams, query, position, availability, sort],
   );
   const news = useMemo(
     () => relevantNews(data.news, data.players),
@@ -265,7 +265,7 @@ export default function Dashboard({
                 <TeamProfile team={team} teams={data.teams} roster={roster} />
                 <Panel>
                   <PlayerTable
-                    players={sortPlayers(roster, sort)}
+                    players={sortPlayers(roster, sort, data.teams)}
                     {...tableProps}
                   />
                 </Panel>
@@ -303,7 +303,7 @@ export default function Dashboard({
             />
             <PowerMovers players={visiblePlayers} teams={data.teams} baselineAt={data.powerBaselineAt} onSelect={tableProps.onSelect} />
             <Panel>
-              <PlayerTable players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt} />
+              <PlayerTable searchable={false} players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt} />
             </Panel>
           </>
         )}

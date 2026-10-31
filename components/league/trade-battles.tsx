@@ -1,4 +1,6 @@
 "use client";
+import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
+import { TeamSelect } from "./team-select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Snapshot } from "@/lib/schema";
 import { chooseBattle, rankEntries, tradeEntries, type BattleRating, type BattleVote, type TradeEntry, type VoteResult } from "@/lib/trade-battles";
@@ -105,6 +107,11 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
     } catch (err) { if (mounted.current) setError(err instanceof Error && err.name !== "TimeoutError" && err.name !== "TypeError" ? err.message : "Could not confirm your vote. Pick again to retry."); }
     finally { if (mounted.current && !advance.current) { submitting.current = false; setBusy(false); } }
   };
+  const [rankTeam, setRankTeam] = useState("all");
+  const control = useTableControls(rankEntries(entries, ratings).filter(row => rankTeam === "all" || String(row.entry.teamId) === rankTeam), {
+    search: row => `${data.teams.find(t => t.id === row.entry.teamId)?.name ?? ""} ${date(row.entry.completedAt)} ${[...row.entry.received, ...row.entry.sent].map(id => data.players.find(p => p.id === id)?.name ?? "").join(" ")}`,
+    value: (row, key) => key === "deal" ? data.teams.find(t => t.id === row.entry.teamId)?.name : key === "rating" ? row.votes ? row.rating : null : key === "rank" ? row.rank : row.votes,
+  });
   const contenders = pair?.map(id => entries.find(e => e.id === id));
   return <div className="trade-battles">
     {data.tradeSyncError && <p className="battle-error" role="status">{data.tradeSyncError} Showing the last import.</p>}
@@ -122,12 +129,15 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
       <div className="battle-feedback" aria-live="polite">{error || feedback}</div>
     </>}
     <Panel title="Trade rankings">
+      <TableToolbar label="Search trades" query={control.query} onQuery={control.setQuery}>
+        <TeamSelect label="Filter trade rankings team" teams={data.teams} value={rankTeam} onChange={setRankTeam} allLabel="All teams" />
+      </TableToolbar>
       {rankError ? <div className="battle-error" role="status">{rankError} <Button variant="quiet" onClick={() => setRefresh(n => n + 1)}>Retry</Button></div> : !ready ? <Empty>Loading rankings…</Empty> : !entries.length ? <Empty>No completed trades yet.</Empty> : <div className="battle-ranking-scroll"><table className="battle-rankings">
-        <thead><tr><th>Rank</th><th>Deal</th><th title="Starts at 1,000. Winning votes raises MMR; losing lowers it. Higher MMR means a better-rated deal.">MMR</th><th>Votes</th></tr></thead>
-        <AnimatedRows revision={JSON.stringify(ratings)}>{rankEntries(entries, ratings).map(row => {
+        <thead><tr>{[["rank", "Rank"], ["deal", "Deal"], ["rating", "MMR"], ["votes", "Votes"]].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["rank", "deal"].includes(key)}>{label}</SortableHeader>)}</tr></thead>
+        <AnimatedRows revision={JSON.stringify(ratings)}>{control.rows.map(row => {
           const team = data.teams.find(t => t.id === row.entry.teamId);
           return <tr key={row.entry.id} data-motion-key={row.entry.id}><td>{row.rank === null ? "—" : `#${row.rank}`}</td><td><details><summary>{team && <TeamAvatar team={team} />}<span>{team?.name ?? `Team ${row.entry.teamId}`}<small>{date(row.entry.completedAt)}</small></span></summary><div className="ranked-deal"><TradeSide entry={row.entry} data={data} /></div></details></td><td><MotionNumber>{row.votes ? Math.round(row.rating).toLocaleString("en-US") : "—"}</MotionNumber></td><td><MotionNumber>{row.votes}</MotionNumber></td></tr>;
-        })}</AnimatedRows>
+        })}{!control.rows.length && <TableEmpty columns={4} />}</AnimatedRows>
       </table></div>}
     </Panel>
   </div>;

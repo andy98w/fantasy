@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import {
   CATEGORIES,
   type Category,
@@ -25,8 +25,13 @@ export function Standings({
   onTeam: (id: number) => void;
 }) {
   const ranks = recordRanks(teams);
+  const control = useTableControls(teams, {
+    initialSort: { key: "rank", descending: false }, search: team => `${team.name} ${team.abbrev}`,
+    value: (team, key) => key === "rank" ? ranks.get(team.id) : key === "name" ? team.name : key === "wins" ? team.wins : key === "losses" ? team.losses : team.ties,
+  });
   return (
     <Panel title={title}>
+      <TableToolbar label="Search standings" query={control.query} onQuery={control.setQuery} />
       <div
         className="table-scroll"
         tabIndex={0}
@@ -36,18 +41,11 @@ export function Standings({
         <table className="data-table standings-table">
           <thead>
             <tr>
-              <th>Rank</th>
-              <th className="identity-col">Team</th>
-              <th>W</th>
-              <th>L</th>
-              <th>T</th>
+              {[ ["rank", "Rank"], ["name", "Team"], ["wins", "W"], ["losses", "L"], ["ties", "T"] ].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["rank", "name", "losses"].includes(key)} className={key === "name" ? "identity-col" : undefined}>{label}</SortableHeader>)}
             </tr>
           </thead>
           <AnimatedRows revision={teams.map(t => `${t.id}:${t.wins}:${t.losses}:${t.ties}`).join("|")}>
-            {[...teams]
-              .sort(
-                (a, b) => ranks.get(a.id)! - ranks.get(b.id)! || a.id - b.id,
-              )
+            {control.rows
               .map((team) => (
                 <tr key={team.id} data-motion-key={team.id}>
                   <td className="rank-cell">{ranks.get(team.id)}</td>
@@ -65,6 +63,7 @@ export function Standings({
                   <td><MotionNumber>{team.ties}</MotionNumber></td>
                 </tr>
               ))}
+            {!control.rows.length && <TableEmpty columns={5} />}
           </AnimatedRows>
         </table>
       </div>
@@ -123,32 +122,16 @@ export function TeamRankings({
   players: Player[];
   onTeam: (id: number) => void;
 }) {
-  const [sort, setSort] = useState<{ key: "power" | Category; descending: boolean }>({
-    key: "power",
-    descending: true,
+  const control = useTableControls(teamPower(teams, players), {
+    initialSort: { key: "power", descending: true },
+    search: value => `${value.team.name} ${value.team.abbrev}`,
+    value: (value, key) => key === "name" ? value.team.name : key === "rank" ? value.rank : key === "power" ? value.score : value.rated ? value.categories[key as Category] : null,
   });
-  const values = teamPower(teams, players).sort((a, b) => {
-    const left = sort.key === "power" ? a.score : a.rated ? a.categories[sort.key] : null;
-    const right = sort.key === "power" ? b.score : b.rated ? b.categories[sort.key] : null;
-    if (left === null) return right === null ? a.team.id - b.team.id : 1;
-    if (right === null) return -1;
-    return (sort.descending ? right - left : left - right) || a.team.id - b.team.id;
-  });
-  const sortHeader = (key: "power" | Category) => (
-    <th key={key} aria-sort={sort.key === key ? sort.descending ? "descending" : "ascending" : "none"}>
-      <button onClick={() => setSort(current => ({
-        key,
-        descending: current.key === key ? !current.descending : true,
-      }))}>
-        {key === "power" ? "Power" : key}
-        <span className="sort-arrow" aria-hidden="true">
-          {sort.key === key ? sort.descending ? "↓" : "↑" : ""}
-        </span>
-      </button>
-    </th>
-  );
+  const values = control.rows;
+  const sortHeader = (key: string, label = key) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["name", "rank"].includes(key)} className={key === "name" ? "identity-col" : undefined}>{label}</SortableHeader>;
   return (
     <Panel title="Team power">
+      <TableToolbar label="Search team power" query={control.query} onQuery={control.setQuery} />
       <div
         className="table-scroll"
         tabIndex={0}
@@ -158,10 +141,10 @@ export function TeamRankings({
         <table className="data-table heatmap-table">
           <thead>
             <tr>
-              <th>Rank</th>
-              <th className="identity-col">Team</th>
-              {sortHeader("power")}
-              {CATEGORIES.map(sortHeader)}
+              {sortHeader("rank", "Rank")}
+              {sortHeader("name", "Team")}
+              {sortHeader("power", "Power")}
+              {CATEGORIES.map(category => sortHeader(category))}
             </tr>
           </thead>
           <AnimatedRows revision={values.map(v => `${v.team.id}:${v.score}`).join("|")}>
@@ -189,6 +172,7 @@ export function TeamRankings({
                 ))}
               </tr>
             ))}
+            {!values.length && <TableEmpty columns={CATEGORIES.length + 3} />}
           </AnimatedRows>
         </table>
       </div>

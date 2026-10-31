@@ -1,7 +1,7 @@
 "use client";
 
 import * as SelectPrimitive from "@radix-ui/react-select";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PixelIcon } from "./pixel-icon";
 
 export type SelectOption = {
@@ -30,6 +30,9 @@ export function Select({
   className = "",
   disabled,
 }: SelectProps) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | undefined>();
+  useEffect(() => { setPortalContainer(trigger.current?.closest("dialog") ?? undefined); }, []);
   const selected = [
     ...options,
     ...groups.flatMap((group) => group.options),
@@ -60,6 +63,7 @@ export function Select({
       disabled={disabled}
     >
       <SelectPrimitive.Trigger
+        ref={trigger}
         aria-label={label}
         className={`select-trigger ${className}`}
       >
@@ -75,7 +79,7 @@ export function Select({
           <PixelIcon name="chevron" size={12} />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
-      <SelectPrimitive.Portal>
+      <SelectPrimitive.Portal container={portalContainer}>
         <SelectPrimitive.Content
           aria-label={label}
           className="select-menu"

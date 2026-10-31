@@ -1,4 +1,7 @@
 "use client";
+import { useState } from "react";
+import { matchesSearch } from "@/lib/table";
+import { SortableHeader, TableToolbar } from "../ui/table-controls";
 import { CATEGORIES, type Player, type Team } from "@/lib/schema";
 import { PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText, type Sort } from "./format";
@@ -15,6 +18,7 @@ export function PlayerTable({
   ownership = false,
   trends = false,
   baselineAt,
+  searchable = true,
 }: {
   players: Player[];
   teams: Team[];
@@ -26,9 +30,14 @@ export function PlayerTable({
   ownership?: boolean;
   trends?: boolean;
   baselineAt?: string | null;
+  searchable?: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const visible = players.filter(player => !searchable || matchesSearch(`${player.name} ${player.nbaTeam} ${player.position} ${statusText(player.status)}`, query));
   const categories = compact ? ["PTS", "REB", "AST"] : CATEGORIES;
   return (
+    <>
+    {searchable && <TableToolbar label="Search roster" query={query} onQuery={setQuery} />}
     <div
       className="table-scroll"
       tabIndex={0}
@@ -38,32 +47,14 @@ export function PlayerTable({
       <table className={`data-table players-table ${compact ? "compact" : ""}`}>
         <thead>
           <tr>
-            <th className="identity-col">Player</th>
-            <th title="Overall player rank">Rank</th>
-            {["power", ...(trends ? ["powerChange7d"] : []), ...categories].map((key) => (
-              <th
-                key={key}
-                aria-sort={
-                  sort.key === key
-                    ? sort.descending
-                      ? "descending"
-                      : "ascending"
-                    : "none"
-                }
-              >
-                <button onClick={() => onSort(key)}>
-                  {key === "power" ? "Power" : key === "powerChange7d" ? "7d change" : key}
-                  <span className="sort-arrow" aria-hidden="true">
-                    {sort.key === key ? (sort.descending ? "↓" : "↑") : ""}
-                  </span>
-                </button>
-              </th>
-            ))}
-            <th>{ownership ? "Team" : "Status"}</th>
+            <SortableHeader column="name" sort={sort} onSort={onSort} descending={false} className="identity-col">Player</SortableHeader>
+            <SortableHeader column="rank" sort={sort} onSort={onSort} descending={false}>Rank</SortableHeader>
+            {["power", ...(trends ? ["powerChange7d"] : []), ...categories].map(key => <SortableHeader key={key} column={key} sort={sort} onSort={onSort} descending={key !== "TO"}>{key === "power" ? "Power" : key === "powerChange7d" ? "7d change" : key}</SortableHeader>)}
+            <SortableHeader column={ownership ? "team" : "status"} sort={sort} onSort={onSort} descending={false}>{ownership ? "Team" : "Status"}</SortableHeader>
           </tr>
         </thead>
         <tbody>
-          {players.map((player) => (
+          {visible.map((player) => (
             <tr key={player.id}>
               <td className="identity-col">
                 <button className="identity" onClick={() => onSelect(player)}>
@@ -127,9 +118,10 @@ export function PlayerTable({
           ))}
         </tbody>
       </table>
-      {!players.length && (
+      {!visible.length && (
         <Empty>No matching players.</Empty>
       )}
     </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
 @import "../components/ui/controls.css";
 @import "../components/league/trade.css";
+@import "../components/league/auction-house.css";
 @import "../components/league/transaction-ledger.css";
 @import "../components/league/matchup-clash.css";
 @import "../components/ui/game-feel.css";

@@ -1,7 +1,7 @@
 // Exercise the built standalone package with fictional data; no ESPN or production DB.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 const root = path.resolve('.next/standalone');
@@ -42,10 +42,26 @@ try {
   assert.ok(assets.length > 0, 'No bundled assets found');
   for (const asset of new Set(assets)) assert.equal((await fetch(new URL(asset, base))).status, 200, `Missing ${asset}`);
   assert.equal((await fetch(`${base}/api/trade-battles`)).status, 200);
+  const demo = JSON.parse(await readFile('lib/demo.json', 'utf8'));
+  const player = demo.players.find(p => p.teamId !== null);
+  const postListing = body => fetch(`${base}/api/auction`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify(body) });
+  const listing = { action: 'save', playerId: player.id, teamId: player.teamId, note: 'Assists', version: 0 };
+  assert.equal((await postListing({ ...listing, teamId: 999999 })).status, 409);
+  assert.equal((await postListing({ ...listing, note: 'x'.repeat(241) })).status, 400);
+  const saved = await postListing(listing);
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).listing.version, 1);
+  assert.equal((await postListing(listing)).status, 200, 'Safe retry');
+  assert.equal((await postListing({ ...listing, note: 'Conflicting edit' })).status, 409);
+  const board = await (await fetch(`${base}/api/auction`)).json();
+  assert.equal(board.listings.length, 1);
+  assert.equal(board.listings[0].active, true);
+  assert.equal((await postListing({ ...listing, action: 'close', version: 1 })).status, 200);
+  assert.equal((await (await fetch(`${base}/api/auction`)).json()).listings[0].active, false);
   assert.equal((await fetch(`${base}/api/ready`)).status, 503, 'Demo must not pass live readiness');
   for (const file of ['/.env', '/data/league.json', '/data/raw-latest.json'])
     assert.equal((await fetch(`${base}${file}`)).status, 404, `Private path exposed: ${file}`);
-  console.log('Standalone smoke passed: page, assets, votes, readiness and private paths.');
+  console.log('Standalone smoke passed: page, assets, votes, auction listings, readiness and private paths.');
 } finally {
   const stopped = new Promise(resolve => child.once('exit', resolve));
   if (child.exitCode === null) { child.kill('SIGTERM'); await stopped; }

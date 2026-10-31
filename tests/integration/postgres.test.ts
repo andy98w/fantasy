@@ -33,3 +33,35 @@ test('PostgreSQL votes serialize concurrent retries and persist across connectio
     await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end();
   }
 });
+
+test('PostgreSQL listings persist across instances and serialize simultaneous edits', async () => {
+  const { PostgresAuctionStore } = await import('../../lib/auction-store');
+  const { ListingConflict } = await import('../../lib/auction');
+  const admin = new Pool({ connectionString: url });
+  const schema = `test_${randomUUID().replaceAll('-', '')}`;
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 4 });
+  const second = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 4 });
+  try {
+    await pool.query(await readFile('db/schema.sql', 'utf8'));
+    const a = new PostgresAuctionStore(pool), b = new PostgresAuctionStore(second);
+    const input = { action: 'save' as const, playerId: 1, teamId: 2, version: 0, note: 'Assists' };
+    const created = await Promise.all([a.mutate('league', input), b.mutate('league', input)]);
+    assert.deepEqual(created[0], created[1]);
+    assert.equal((await b.list('league')).length, 1);
+    const edits = await Promise.allSettled([
+      a.mutate('league', { ...input, version: 1, note: 'Blocks' }),
+      b.mutate('league', { ...input, version: 1, note: 'Rebounds' }),
+    ]);
+    assert.equal(edits.filter(r => r.status === 'fulfilled').length, 1);
+    const failed = edits.find(r => r.status === 'rejected') as PromiseRejectedResult;
+    assert.ok(failed.reason instanceof ListingConflict);
+    const closed = await a.mutate('league', { ...input, version: 2, action: 'close' });
+    assert.equal(closed.active, false);
+    assert.deepEqual(await b.list('league'), [closed]);
+    assert.deepEqual(await b.list('different-season'), []);
+  } finally {
+    await pool.end(); await second.end();
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end();
+  }
+});

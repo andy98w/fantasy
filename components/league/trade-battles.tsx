@@ -26,14 +26,6 @@ export function TradeSide({ entry, data, children, className = "" }: { entry: Tr
     {children}
   </article>;
 }
-export function TradeHistory({ data }: { data: Snapshot }) {
-  const entries = tradeEntries(data.trades);
-  return <div className="trade-history">
-    {data.tradeSyncError && <p role="status" className="battle-error">{data.tradeSyncError} Showing the last import.</p>}
-    {!data.trades.length ? <Empty>{data.tradeSyncError ? "Trade history unavailable." : "No completed trades yet."}</Empty> : data.trades.map(trade =>
-      <div className="trade-history-deal" key={trade.id}>{entries.filter(e => e.tradeId === trade.id).map(entry => <TradeSide key={entry.id} entry={entry} data={data} />)}</div>)}
-  </div>;
-}
 export function TradeBattles({ data, active }: { data: Snapshot; active: boolean }) {
   const entries = useMemo(() => tradeEntries(data.trades), [data.trades]);
   const [pair, setPair] = useState<[string, string] | null>(null);

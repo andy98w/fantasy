@@ -38,3 +38,10 @@ CREATE TABLE IF NOT EXISTS league_live_scores (
   payload jsonb NOT NULL,
   PRIMARY KEY (league_id, season)
 );
+
+-- Shared, anonymous trade-block listings; one current listing per player and league season.
+CREATE TABLE IF NOT EXISTS auction_listings (
+  scope TEXT NOT NULL, player_id INTEGER NOT NULL, team_id INTEGER NOT NULL,
+  note TEXT NOT NULL, active INTEGER NOT NULL, version INTEGER NOT NULL,
+  updated_at TEXT NOT NULL, PRIMARY KEY (scope, player_id)
+);

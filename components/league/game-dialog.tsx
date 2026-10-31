@@ -84,7 +84,7 @@ export function GameDialog({ game: initialGame, onClose }: { game: NbaGame; onCl
   const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: NBA_TIMEZONE }).format(new Date(game.startsAt));
   const hasStats = data?.teams.some((team) => team.players.length > 0);
   return <dialog ref={dialog} className="player-dialog game-dialog" aria-label={`${game.away.name} at ${game.home.name} box score`}
-    onCancel={onClose} onClick={(event) => { if (event.target === dialog.current) onClose(); }}>
+    onCancel={(event) => { event.stopPropagation(); onClose(); }} onClick={(event) => { if (event.target === dialog.current) onClose(); }}>
     <div className="dialog-topline"><span>Box score</span><Button variant="quiet" aria-label="Close box score" onClick={onClose}><PixelIcon name="close" size={16} /></Button></div>
     <div className="boxscore-scoreboard">
       {[game.away, game.home].map((team) => <div className="boxscore-side" key={team.id}>

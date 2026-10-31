@@ -1589,3 +1589,19 @@ button.today-game { width: 100%; text-align: left; color: var(--text); }
   .boxscore-player .avatar { display: none; }
 }
 .boxscore-table td, .boxscore-table tbody th[scope="row"] { font-size: 13px; }
+
+.player-recent-games { margin: 20px 0; border-block: 1px solid var(--line); padding-bottom: 8px; }
+.player-recent-games h3 { padding: 16px 24px; margin: 0; }
+.player-games-table { font-variant-numeric: tabular-nums; }
+.player-games-table th, .player-games-table td { padding: 10px; text-align: right; white-space: nowrap; }
+.player-games-table tbody td { font-size: 13px; }
+.player-games-table th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; }
+.player-games-table tbody tr { cursor: pointer; }
+.player-games-table tbody tr:hover, .player-games-table tbody tr:hover th { background: var(--surface-raised); }
+.player-games-table button { display: grid; gap: 3px; text-align: left; color: var(--text); min-width: 62px; font: 13px var(--body); }
+.player-games-table button span { color: var(--muted); font-size: 11px; }
+.player-games-table button strong { font-weight: 500; }
+.player-profile-dialog { width: min(820px, calc(100vw - 32px)); }
+.player-profile-dialog > .dialog-topline { position: sticky; top: 0; z-index: 3; }
+.player-recent-games h3 { font: 500 22px var(--pixel); }
+.player-games-table th button { display: grid; justify-content: start; }

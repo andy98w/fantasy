@@ -5,6 +5,7 @@ import { PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText } from "./format";
 import { NewsFeed } from "./news-feed";
 import { Button } from "../ui/primitives";
+import { PlayerRecentGames } from "./player-games";
 import { PixelIcon } from "../ui/pixel-icon";
 export function PlayerDialog({
   player,
@@ -24,7 +25,7 @@ export function PlayerDialog({
   return (
     <dialog
       ref={ref}
-      className="player-dialog"
+      className="player-dialog player-profile-dialog"
       aria-label="Player details"
       onCancel={onClose}
       onClick={(event) => {
@@ -78,6 +79,7 @@ export function PlayerDialog({
               Unrated: {ratingReason(player, data.model.minimumGames)}.
             </p>
           )}
+          <PlayerRecentGames key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} />
           <div className="contribution-header">
             <h3>Category value</h3>
             <span>Per game / Value</span>

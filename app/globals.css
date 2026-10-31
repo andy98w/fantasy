@@ -1553,3 +1553,39 @@ input::placeholder {
   .matchup-players { padding: 16px 8px; }
   .matchup-players .section-heading { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
 }
+
+/* NBA game detail */
+button.today-game { width: 100%; text-align: left; color: var(--text); }
+.game-dialog { width: min(1140px, calc(100vw - 24px)); }
+.game-dialog .dialog-topline { position: sticky; top: 0; z-index: 3; }
+.boxscore-scoreboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 26px 24px 18px; background: var(--surface-deep); }
+.boxscore-side { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; font-weight: 600; }
+.boxscore-side + .boxscore-side { border-left: 1px solid var(--line); padding-left: 20px; }
+.boxscore-side .avatar { width: 44px; height: 44px; }
+.boxscore-side strong { font: 600 34px var(--body); font-variant-numeric: tabular-nums; }
+.boxscore-status { grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--muted); }
+.boxscore-status.positive-text { color: var(--teal); }
+.boxscore-team h3 { display: flex; align-items: center; gap: 12px; margin: 0; padding: 18px 20px; font: 600 18px var(--body); }
+.boxscore-team + .boxscore-team { border-top: 2px solid var(--line); }
+.boxscore-table { width: 100%; font-variant-numeric: tabular-nums; }
+.boxscore-table th, .boxscore-table td { padding: 10px 12px; white-space: nowrap; text-align: right; }
+.boxscore-table th:first-child { text-align: left; }
+.boxscore-table tbody th[scope="row"] { font-weight: 500; color: var(--text); }
+.boxscore-player { display: flex; align-items: center; gap: 10px; }
+.boxscore-player .avatar { width: 30px; height: 30px; flex-shrink: 0; }
+.boxscore-table .boxscore-group th { padding: 7px 20px; background: var(--surface-deep); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.boxscore-table .boxscore-reason { text-align: left; color: var(--muted); font-size: 12px; }
+.boxscore-table tfoot { border-top: 1px solid var(--line); background: var(--surface-raised); font-weight: 600; }
+.boxscore-table tfoot th { padding-left: 20px; }
+@media (max-width: 650px) {
+  .boxscore-scoreboard { gap: 14px; padding: 20px 14px; }
+  .boxscore-side { grid-template-columns: auto 1fr; gap: 8px; font-size: 12px; }
+  .boxscore-side strong { grid-column: 1 / -1; text-align: center; }
+  .boxscore-side + .boxscore-side { padding-left: 12px; }
+  .boxscore-side .avatar { width: 32px; height: 32px; }
+  .boxscore-table th, .boxscore-table td { padding: 8px 10px; }
+  .boxscore-table th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+  .boxscore-player { gap: 7px; font-size: 12px; }
+  .boxscore-player .avatar { display: none; }
+}
+.boxscore-table td, .boxscore-table tbody th[scope="row"] { font-size: 13px; }

@@ -8,10 +8,11 @@ import { Panel, Tabs, Empty, ResultCount } from "../ui/primitives";
 import { Select } from "../ui/select";
 import { NbaAvatar, PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText } from "./format";
+import { GameDialog } from "./game-dialog";
 
-function GameCard({ game }: { game: NbaGame }) {
+function GameCard({ game, onOpen }: { game: NbaGame; onOpen: () => void }) {
   return (
-    <a className="today-game" href={`https://www.espn.com/nba/game/_/gameId/${encodeURIComponent(game.id)}`} target="_blank" rel="noopener noreferrer"
+    <button type="button" className="today-game" onClick={onOpen} aria-haspopup="dialog"
       aria-label={`${game.away.name} at ${game.home.name}, ${gameLabel(game)}`}>
       <span className={`today-game-state ${game.state === "live" ? "live" : ""}`}>
         {game.state === "live" && <i aria-hidden="true" />}{gameLabel(game)}
@@ -23,13 +24,14 @@ function GameCard({ game }: { game: NbaGame }) {
           <strong><MotionNumber>{team.score ?? "—"}</MotionNumber></strong>
         </span>
       ))}
-    </a>
+    </button>
   );
 }
 
 export function Today({ data, players, minimumGames, onPlayer }: {
   data?: TodayData; players: Player[]; minimumGames: number; onPlayer: (player: Player) => void;
 }) {
+  const [selectedGame, setSelectedGame] = useState<NbaGame | null>(null);
   const [tab, setTab] = useState<"games" | "available">("games");
   const [category, setCategory] = useState<Category | "all">("all");
   const [notStarted, setNotStarted] = useState(false);
@@ -53,7 +55,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
         : <>
           {data.status === "stale" && <p className="today-stale" role="status">Scores may be out of date.</p>}
           {tab === "games" ? (
-            data.games.length ? <div className="today-games">{data.games.map((game) => <GameCard key={game.id} game={game} />)}</div> : <Empty>No NBA games today.</Empty>
+            data.games.length ? <div className="today-games">{data.games.map((game) => <GameCard key={game.id} game={game} onOpen={() => setSelectedGame(game)} />)}</div> : <Empty>No NBA games today.</Empty>
           ) : <>
             <div className="today-filters">
               <Select label="Category strength" value={category} onChange={(value) => setCategory(value as Category | "all")}
@@ -84,6 +86,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
             </div>
           </>}
         </>}
+      {selectedGame && <GameDialog key={selectedGame.id} game={selectedGame} onClose={() => setSelectedGame(null)} />}
     </Panel>
   );
 }

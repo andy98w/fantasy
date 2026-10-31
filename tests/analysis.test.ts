@@ -7,14 +7,17 @@ import {
   recordRanks,
   relevantNews,
   rosterValue,
+  teamRating,
+  taperCategory,
   teamPower,
 } from "../lib/analysis";
 import demo from "../lib/demo.json";
 const data = snapshotSchema.parse(demo);
-test("trade baselines agree with worker team scores and ranks", () => {
+test("team leaderboard uses the same tapered rating as team profiles and trade fit", () => {
   for (const value of teamPower(data.teams, data.players)) {
-    assert.equal(value.score, value.team.talent);
-    assert.equal(value.rank, value.team.talentRank);
+    const roster = data.players.filter(p => p.teamId === value.team.id);
+    assert.equal(value.score, teamRating(roster).score);
+    assert.deepEqual(value.categories, rosterValue(roster).categories);
   }
 });
 const p = (id: number, teamId: number, value: number | null): Player => ({
@@ -58,7 +61,7 @@ test("incomplete teams are provisional, equal scores tie, and unmeasured teams r
   assert.equal(partial.provisional, true);
   assert.equal(partial.rated, 1);
   assert.equal(partial.size, 2);
-  assert.equal(partial.score, 2);
+  assert.equal(partial.score, teamRating([players[0]]).score);
   assert.equal(players[1].zTotal, null);
   assert.equal(power[2].score, null);
 });
@@ -158,4 +161,38 @@ test("news only includes rostered players and prioritizes same-day availability 
     ["injury", "recap"],
   );
   assert.equal(relevantNews(news, [p(1, 1, 2)], 2).length, 0);
+});
+
+test("category taper is symmetric, monotone, near-linear at zero, and has no hard cap", () => {
+  assert.equal(taperCategory(0), 0);
+  assert.ok(Math.abs(taperCategory(.01) - .01) < .000001);
+  for (const z of [.1, 1, 4, 10, 100]) {
+    assert.equal(taperCategory(-z), -taperCategory(z));
+    assert.ok(taperCategory(z + 1) > taperCategory(z));
+    assert.ok(taperCategory(z + 1) - taperCategory(z) < taperCategory(z) - taperCategory(z - 1));
+  }
+  assert.ok(taperCategory(10.8) - taperCategory(4.6) < taperCategory(4.6));
+});
+
+test("team rating rewards spread strength, tapers after aggregation, and leaves player values intact", () => {
+  const concentrated = { ...p(100, 1, 10.8), contributions: { ...p(100, 1, 0).contributions, BLK: 10.8 } };
+  const balanced = { ...p(101, 2, 10.8), contributions: { ...p(101, 2, 0).contributions, BLK: 5.4, AST: 5.4 } };
+  const before = JSON.stringify([concentrated, balanced]);
+  assert.ok(teamRating([balanced]).score! > teamRating([concentrated]).score!);
+  assert.equal(teamRating([concentrated]).categories.BLK, 10.8);
+  const halves = [1,2].map(id => ({ ...concentrated, id, contributions: { ...concentrated.contributions, BLK: 5.4 } }));
+  assert.equal(teamRating(halves).score, teamRating([concentrated]).score);
+  assert.equal(JSON.stringify([concentrated, balanced]), before);
+});
+
+test("tapered team fit respects IR, unknowns, punts and priorities", () => {
+  const roster = [p(201,1,10), { ...p(202,1,100), slot: "IR" }, p(203,1,null)];
+  const rating = teamRating(roster);
+  assert.equal(rating.score, teamRating([roster[0]]).score);
+  assert.equal(rating.provisional, true);
+  assert.equal(teamRating([roster[1],roster[2]]).score, null);
+  assert.equal(teamRating(roster, { ...DEFAULT_WEIGHTS, AST: 0 }).score, 0);
+  const priority = teamRating(roster, { ...DEFAULT_WEIGHTS, AST: 2 });
+  assert.ok(Math.abs(priority.score! - 2 * rating.score!) <= .001);
+  assert.deepEqual(priority.categories, rating.categories);
 });

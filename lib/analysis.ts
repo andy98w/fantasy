@@ -49,6 +49,25 @@ export function rosterValue(
   };
 }
 
+// Smooth, symmetric logarithmic taper. Near zero its slope is one; beyond
+// roughly four category z-points, extra strength has progressively less weight.
+// This is a scoring preference, not a fitted weekly win-probability model.
+export const TEAM_POWER_SCALE = 4;
+export function taperCategory(value: number): number {
+  return TEAM_POWER_SCALE * Math.asinh(value / TEAM_POWER_SCALE);
+}
+
+/** Taper the roster's total in each category, never individual player values. */
+export function teamRating(roster: Player[], weights: Weights = DEFAULT_WEIGHTS) {
+  const value = rosterValue(roster);
+  return {
+    ...value,
+    score: value.score === null ? null : rounded(CATEGORIES.reduce(
+      (sum, category) => sum + taperCategory(value.categories[category]) * weights[category], 0,
+    )),
+  };
+}
+
 /** Record rank is intentionally separate from ESPN's imported playoff seed. */
 export function recordRanks(teams: Team[]): Map<number, number> {
   const percentage = (team: Team) => {
@@ -74,7 +93,7 @@ export function recordRanks(teams: Team[]): Map<number, number> {
 export function teamPower(teams: Team[], players: Player[]) {
   const values = teams.map((team) => ({
     team,
-    ...rosterValue(players.filter((player) => player.teamId === team.id)),
+    ...teamRating(players.filter((player) => player.teamId === team.id)),
     rank: null as number | null,
   }));
   values.sort((a, b) =>

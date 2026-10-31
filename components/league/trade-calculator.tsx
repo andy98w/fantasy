@@ -12,6 +12,7 @@ import {
   DEFAULT_WEIGHTS,
   exchangePlayers,
   rosterValue,
+  teamRating,
   type Weights,
 } from "@/lib/analysis";
 import { Button, Empty, Notice, Panel, Toolbar } from "../ui/primitives";
@@ -139,8 +140,8 @@ function TradeImpact({
   capacity: number;
   active: boolean;
 }) {
-  const before = rosterValue(beforeRoster, weights),
-    after = rosterValue(afterRoster, weights);
+  const before = teamRating(beforeRoster, weights),
+    after = teamRating(afterRoster, weights);
   const hasData = before.rated > 0 && after.rated > 0;
   const delta = (category: Category) =>
     after.categories[category] - before.categories[category];

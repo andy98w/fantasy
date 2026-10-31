@@ -8,7 +8,7 @@ import {
   type Snapshot,
   type Team,
 } from "@/lib/schema";
-import { recordRanks, rosterValue, teamPower } from "@/lib/analysis";
+import { recordRanks, rosterValue, teamRating, teamPower } from "@/lib/analysis";
 import { TeamAvatar } from "./avatars";
 import { Panel } from "../ui/primitives";
 import { signedZ } from "./format";
@@ -82,11 +82,14 @@ export function RankingHelp({ model }: { model: Snapshot["model"] }) {
           fewer is better. Category scores are relative values, not stat totals.
         </p>
         <p>
-          Player power runs from 0–100. Team power adds up the roster’s category
-          scores, excluding IR. Ratings use season averages and require {model.minimumGames} games.
+          Player power runs from 0–100. Team power tapers each roster category before
+          adding them: extreme strengths and weaknesses count progressively less.
+          IR is excluded. The heatmap shows the original category values.
         </p>
         <p>
-          Estimated scores treat unrated players as average. Trade priorities
+          Ratings use season averages and require {model.minimumGames} games.
+          Team power is a rating, not a win probability. Estimated scores treat
+          unrated players as average. Trade priorities
           adjust team fit: Punt ignores a category; Priority counts it twice.
         </p>
       </div>
@@ -230,7 +233,7 @@ export function TeamProfile({
   teams: Team[];
   roster: Player[];
 }) {
-  const value = rosterValue(roster);
+  const value = teamRating(roster);
   return (
     <>
       <div className="team-profile">

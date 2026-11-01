@@ -125,3 +125,7 @@ The full worker sync imports the read-only ESPN activity feed (codes 178/180 add
 ### Diminishing returns in team ratings
 
 Team rankings, team-profile Power, and trade Team fit use the same rating: sum `4 × asinh(category_z / 4)` over the roster’s nine category totals (after excluding IR). Trade priority weights apply after the taper. The scale of 4 is an explicit tuning choice, not a learned variance or a win-probability estimate. The curve is nearly linear around zero, symmetric for strengths and weaknesses, and logarithmic at large magnitudes; it never hard-caps a category. A +10.8 category contributes about +6.88 rather than +10.8. Category heatmaps, exchanged-player value, individual player ratings, and schedule forecasts retain their original calculations. Missing active players still contribute reference-average zero and mark the team estimate provisional; fully unrated rosters remain unranked. Imported legacy `talent` fields are raw totals and are not used for the displayed team ranking. Calibrated category win probabilities require completed weekly history that the current import does not yet provide.
+
+### MCP integration
+
+Agents can connect to the hosted read-only Streamable HTTP endpoint at `/mcp`. See [MCP setup and tool reference](docs/MCP.md) for the URL, client example and data semantics. No extra Railway service or ESPN credentials are needed for the agent.

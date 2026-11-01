@@ -1,5 +1,7 @@
 // Exercise the built standalone package with fictional data; no ESPN or production DB.
 import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readdir, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -42,6 +44,21 @@ try {
   assert.ok(assets.length > 0, 'No bundled assets found');
   for (const asset of new Set(assets)) assert.equal((await fetch(new URL(asset, base))).status, 200, `Missing ${asset}`);
   assert.equal((await fetch(`${base}/api/trade-battles`)).status, 200);
+  const mcp = new Client({ name: 'production-smoke', version: '1.0.0' });
+  try {
+    await mcp.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
+    const { tools } = await mcp.listTools();
+    assert.equal(tools.length, 13);
+    assert.ok(tools.every(tool => tool.annotations?.readOnlyHint === true));
+    const league = await mcp.callTool({ name: 'fantasy_get_league', arguments: {} });
+    assert.notEqual(league.isError, true);
+    assert.equal(league.structuredContent.metadata.mode, 'demo');
+    const players = await mcp.callTool({ name: 'fantasy_search_players', arguments: { limit: 2 } });
+    assert.equal(players.structuredContent.items.length, 2);
+    const invalid = await mcp.callTool({ name: 'fantasy_search_players', arguments: { limit: 1000 } });
+    assert.equal(invalid.isError, true);
+  } finally { await mcp.close(); }
+
   const demo = JSON.parse(await readFile('lib/demo.json', 'utf8'));
   const player = demo.players.find(p => p.teamId !== null);
   const postListing = body => fetch(`${base}/api/auction`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify(body) });
@@ -61,7 +78,7 @@ try {
   assert.equal((await fetch(`${base}/api/ready`)).status, 503, 'Demo must not pass live readiness');
   for (const file of ['/.env', '/data/league.json', '/data/raw-latest.json'])
     assert.equal((await fetch(`${base}${file}`)).status, 404, `Private path exposed: ${file}`);
-  console.log('Standalone smoke passed: page, assets, votes, auction listings, readiness and private paths.');
+  console.log('Standalone smoke passed: page, assets, MCP, votes, auction listings, readiness and private paths.');
 } finally {
   const stopped = new Promise(resolve => child.once('exit', resolve));
   if (child.exitCode === null) { child.kill('SIGTERM'); await stopped; }

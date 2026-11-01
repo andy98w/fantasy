@@ -11,6 +11,7 @@
 @import "../components/league/season.css";
 @import "../components/league/forecast.css";
 @import "../components/league/power-movers.css";
+@import "../components/league/mcp-connect.css";
 
 :root {
   color-scheme: dark;
@@ -164,6 +165,8 @@ a {
   gap: 16px;
 }
 .navigation-row nav {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: stretch;
   gap: 3px;
@@ -178,6 +181,9 @@ a {
   border-bottom: 3px solid transparent;
   margin-bottom: -2px;
   white-space: nowrap;
+}
+.navigation-row nav .nav-mcp {
+  margin-left: auto;
 }
 .navigation-row nav a:hover {
   background: var(--surface);
@@ -1228,6 +1234,8 @@ input::placeholder {
     justify-content: start;
   }
   .navigation-row nav {
+    flex: 0 0 auto;
+    min-width: 100%;
     width: auto;
     justify-content: start;
     gap: 0;

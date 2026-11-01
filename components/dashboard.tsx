@@ -18,6 +18,7 @@ import {
 import { Forecast } from "./league/forecast";
 import { Records } from "./league/records";
 import { TradeHub } from "./league/trade-hub";
+import { McpConnect } from "./league/mcp-connect";
 import { Connection } from "./league/connection";
 import { DailyPerformers } from "./league/daily-performers";
 import { Today } from "./league/today";
@@ -312,6 +313,7 @@ export default function Dashboard({
         </div>
         {view === "forecast" && <Forecast data={data} today={today} />}
         {view === "records" && <Records data={data} onTeam={openTeam} />}
+        {view === "mcp" && <McpConnect />}
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />
         )}

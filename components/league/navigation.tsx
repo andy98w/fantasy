@@ -9,6 +9,7 @@ export const navigation = [
   { value: "trades", label: "Trades", icon: "trade" },
   { value: "forecast", label: "Forecast", icon: "matchup" },
   { value: "records", label: "Records", icon: "standings" },
+  { value: "mcp", label: "MCP", icon: "code" },
 ] as const satisfies readonly {
   value: string;
   label: string;
@@ -55,6 +56,27 @@ export function Navigation({
           </span>
         </div>
         <div className="header-actions">
+          <div className="sync-control">
+            <a
+              href="#connection"
+              title="Sync status"
+              aria-label={`Sync status: ${data.mode === "demo" ? "demo" : minutes === null ? "imported" : `updated ${minutes} minutes ago`}`}
+              onClick={() => go("connection")}
+              className={view === "connection" ? "selected" : ""}
+            >
+              <span
+                key={data.syncedAt}
+                className={`sync-dot ${data.mode === "demo" || (minutes ?? 0) > 15 ? "stale" : ""}`}
+              />
+              {data.mode === "demo"
+                ? "Demo"
+                : minutes === null
+                  ? "Imported"
+                  : minutes === 0
+                    ? "Updated now"
+                    : `Updated ${minutes}m ago`}
+            </a>
+          </div>
           <a
             href={espn}
             className="button button-quiet espn-link"
@@ -71,6 +93,7 @@ export function Navigation({
           {navigation.map((item) => (
             <a
               key={item.value}
+              className={item.value === "mcp" ? "nav-mcp" : undefined}
               href={`#${item.value}`}
               onClick={() => go(item.value)}
               aria-current={
@@ -85,27 +108,6 @@ export function Navigation({
             </a>
           ))}
         </nav>
-        <div className="sync-control">
-          <a
-            href="#connection"
-            title="Sync status"
-            aria-label={`Sync status: ${data.mode === "demo" ? "demo" : minutes === null ? "imported" : `updated ${minutes} minutes ago`}`}
-            onClick={() => go("connection")}
-            className={view === "connection" ? "selected" : ""}
-          >
-            <span
-              key={data.syncedAt}
-              className={`sync-dot ${data.mode === "demo" || (minutes ?? 0) > 15 ? "stale" : ""}`}
-            />
-            {data.mode === "demo"
-              ? "Demo"
-              : minutes === null
-                ? "Imported"
-                : minutes === 0
-                  ? "Updated now"
-                  : `Updated ${minutes}m ago`}
-          </a>
-        </div>
       </div>
     </header>
   );

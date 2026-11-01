@@ -29,7 +29,7 @@ test("shared overview ignores configured owner team and includes every matchup",
   const mainNav = html.match(
     /<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/,
   )![1];
-  assert.equal((mainNav.match(/<a /g) ?? []).length, 6);
+  assert.equal((mainNav.match(/<a /g) ?? []).length, 7);
   assert.match(mainNav, /Trades/);
   assert.doesNotMatch(mainNav, /Standings|Rankings|News|Overview/);
   assert.doesNotMatch(html, /standings-table|League awards/);

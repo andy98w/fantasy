@@ -28,17 +28,57 @@ export function elo(winner: number, loser: number): { winner: number; loser: num
   const delta = 32 * (1 - expected);
   return { winner: winner + delta, loser: loser - delta, delta };
 }
-export function chooseBattle(entries: TradeEntry[], previous?: [string, string]): [string, string] | null {
-  const pairs: [string, string][] = [];
+type BattlePair = [string, string];
+type BattleSelection = {
+  ratings?: BattleRating[];
+  previous?: BattlePair;
+  recent?: BattlePair[];
+  random?: () => number;
+};
+
+// Mix weighted selection with 20% uniform exploration so established deals and
+// distant MMR opponents can still appear. Random is injectable for simulations.
+function weightedPick<T>(items: T[], weight: (item: T) => number, random: () => number): T {
+  const weights = items.map(weight);
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  let cursor = random();
+  for (let i = 0; i < items.length; i++) {
+    cursor -= 0.2 / items.length + 0.8 * weights[i] / total;
+    if (cursor < 0) return items[i];
+  }
+  return items[items.length - 1];
+}
+
+export function chooseBattle(entries: TradeEntry[], { ratings = [], previous, recent = [], random = Math.random }: BattleSelection = {}): BattlePair | null {
+  const pairs: [TradeEntry, TradeEntry][] = [];
   for (let i = 0; i < entries.length; i++) for (let j = i + 1; j < entries.length; j++) {
     if (entries[i].tradeId === entries[j].tradeId) continue;
-    pairs.push([entries[i].id, entries[j].id]);
+    pairs.push([entries[i], entries[j]]);
   }
-  const fresh = pairs.filter(pair => !previous || !pair.every(id => previous.includes(id)));
-  const pool = fresh.length ? fresh : pairs;
+  const fresh = pairs.filter(pair => !previous || !pair.every(entry => previous.includes(entry.id)));
+  let pool = fresh.length ? fresh : pairs;
   if (!pool.length) return null;
-  const pair = pool[Math.floor(Math.random() * pool.length)];
-  return Math.random() < 0.5 ? pair : [pair[1], pair[0]];
+
+  // Prefer a new actual trade, not just the other team's side of the same deal.
+  // Small leagues fall back gracefully when both sides cannot be replaced.
+  const byId = new Map(entries.map(entry => [entry.id, entry]));
+  const previousTrades = new Set(previous?.map(id => byId.get(id)?.tradeId));
+  const overlap = (pair: [TradeEntry, TradeEntry]) => pair.filter(entry => previousTrades.has(entry.tradeId)).length;
+  const leastOverlap = Math.min(...pool.map(overlap));
+  pool = pool.filter(pair => overlap(pair) === leastOverlap);
+
+  const ratingById = new Map(ratings.map(rating => [rating.entryId, rating]));
+  const recentTrades = recent.slice(-3).flatMap(pair => pair.map(id => byId.get(id)?.tradeId));
+  const freshness = (entry: TradeEntry) => 0.5 ** recentTrades.filter(id => id === entry.tradeId).length;
+  const eligible = [...new Map(pool.flat().map(entry => [entry.id, entry])).values()];
+  const anchor = weightedPick(eligible, entry => freshness(entry) / Math.sqrt(1 + (ratingById.get(entry.id)?.votes ?? 0)), random);
+  const opponents = pool.filter(pair => pair.includes(anchor)).map(pair => pair[0] === anchor ? pair[1] : pair[0]);
+  const anchorRating = ratingById.get(anchor.id)?.rating ?? 1000;
+  const opponent = weightedPick(opponents, entry => {
+    const gap = ((ratingById.get(entry.id)?.rating ?? 1000) - anchorRating) / 200;
+    return freshness(entry) / (1 + gap * gap);
+  }, random);
+  return random() < 0.5 ? [anchor.id, opponent.id] : [opponent.id, anchor.id];
 }
 export function rankEntries(entries: TradeEntry[], ratings: BattleRating[]) {
   const map = new Map(ratings.map(r => [r.entryId, r]));

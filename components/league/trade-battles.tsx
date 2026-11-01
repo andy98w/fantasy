@@ -43,37 +43,53 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (advance.current) clearTimeout(advance.current); }; }, []);
   const pending = useRef<BattleVote | null>(null);
   const submitting = useRef(false);
+  const currentRatings = useRef<BattleRating[]>([]);
+  const ratingRevision = useRef(0);
+  const recentPairs = useRef<[string, string][]>([]);
   useEffect(() => {
-    setPair(old => old && old.every(id => entries.some(e => e.id === id)) ? old : chooseBattle(entries));
-  }, [entries]);
+    if (!ready) return;
+    setPair(old => old && old.every(id => entries.some(e => e.id === id)) ? old : chooseBattle(entries, { ratings: currentRatings.current }));
+  }, [entries, ready]);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
     let running = false;
     const load = async () => {
-      if (running) return;
+      if (running || submitting.current) return;
       running = true;
+      const revision = ratingRevision.current;
       try {
         const response = await fetch("/api/trade-battles", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         const value = await response.json();
         if (!response.ok) throw new Error(value.error);
-        if (!controller.signal.aborted) { setRatings(value.ratings); setReady(true); setRankError(""); }
+        if (!controller.signal.aborted && revision === ratingRevision.current) {
+          currentRatings.current = value.ratings;
+          setRatings(value.ratings); setReady(true); setRankError("");
+        }
       } catch {
-        if (!controller.signal.aborted) setRankError("Rankings unavailable. Try again.");
+        if (!controller.signal.aborted) {
+          setRankError("Rankings unavailable. Try again.");
+          setPair(old => old ?? chooseBattle(entries, { ratings: currentRatings.current }));
+        }
       } finally { running = false; }
     };
     void load();
     const timer = setInterval(() => { if (document.visibilityState === "visible") void load(); }, 20000);
     return () => { controller.abort(); clearInterval(timer); };
-  }, [active, refresh]);
+  }, [active, refresh, entries]);
+  const advancePair = (previous: [string, string] | null) => {
+    if (previous) recentPairs.current = [...recentPairs.current, previous].slice(-3);
+    setPair(chooseBattle(entries, { ratings: currentRatings.current, previous: previous ?? undefined, recent: recentPairs.current }));
+  };
   const next = () => {
     if (submitting.current) return;
     pending.current = null; setError(""); setFeedback("");
-    setPair(old => chooseBattle(entries, old ?? undefined));
+    advancePair(pair);
   };
   const vote = async (winnerId: string) => {
     if (!pair || submitting.current) return;
     submitting.current = true; setBusy(true); setError(""); setFeedback("");
+    ratingRevision.current += 1;
     const old = pending.current;
     const body: BattleVote = old && old.leftId === pair[0] && old.rightId === pair[1] && old.winnerId === winnerId ? old : {
       requestId: crypto.randomUUID(), mode: "best", leftId: pair[0], rightId: pair[1], winnerId,
@@ -85,15 +101,26 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
       if (!response.ok) throw new Error(value.error ?? "Vote could not be saved.");
       if (!mounted.current) return;
       const result = value.result as VoteResult;
+      // Apply the saved result before selecting again, including reduced-motion
+      // mode. A GET begun before this vote must not overwrite it afterward.
+      ratingRevision.current += 1;
+      const updated = new Map(currentRatings.current.map(row => [row.entryId, row]));
+      for (const id of pair) {
+        const row = updated.get(id) ?? { entryId: id, rating: 1000, votes: 0, wins: 0 };
+        const won = id === result.winnerId;
+        updated.set(id, { ...row, rating: won ? result.winnerRating : result.loserRating, votes: row.votes + 1, wins: row.wins + Number(won) });
+      }
+      currentRatings.current = [...updated.values()];
+      setRatings(currentRatings.current);
       setFeedback(`Vote saved · +${Math.round(result.delta)} MMR`);
       pending.current = null;
-      setRefresh(n => n + 1);
-      if (reduced) setPair(chooseBattle(entries, pair));
+      if (reduced) { advancePair(pair); setRefresh(n => n + 1); }
       else {
         setVerdict({ winnerId, delta: Math.round(result.delta) });
         advance.current = setTimeout(() => {
-          setVerdict(null); setPair(chooseBattle(entries, pair));
+          setVerdict(null); advancePair(pair);
           submitting.current = false; setBusy(false); advance.current = null;
+          setRefresh(n => n + 1);
         }, 950);
       }
     } catch (err) { if (mounted.current) setError(err instanceof Error && err.name !== "TimeoutError" && err.name !== "TypeError" ? err.message : "Could not confirm your vote. Pick again to retry."); }
@@ -107,7 +134,7 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
   const contenders = pair?.map(id => entries.find(e => e.id === id));
   return <div className="trade-battles">
     {data.tradeSyncError && <p className="battle-error" role="status">{data.tradeSyncError} Showing the last import.</p>}
-    {!contenders || contenders.some(e => !e) ? <Empty>Two completed trades are needed for battles.</Empty> : <>
+    {!contenders || contenders.some(e => !e) ? <Empty>{new Set(entries.map(entry => entry.tradeId)).size >= 2 && !ready && !rankError ? "Loading battles…" : "Two completed trades are needed for battles."}</Empty> : <>
       <div className="battle-heading"><h2>Which team made the better deal?</h2><Button variant="quiet" disabled={busy} onClick={next}>Skip</Button></div>
       <div className="battle-arena" aria-busy={busy}>
         {contenders.map((entry, i) => <TradeSide key={`${entry!.id}:${i}`} entry={entry!} data={data} className={verdict ? verdict.winnerId === entry!.id ? "battle-picked" : "battle-passed" : ""}>

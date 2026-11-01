@@ -56,3 +56,69 @@ test("equal displayed MMR shares rank and unvoted entries have no rank", () => {
   const ranked=rankEntries(entries,[{entryId:"a:1",rating:1016.1,votes:1,wins:1},{entryId:"a:2",rating:1016.2,votes:1,wins:1}]);
   assert.deepEqual(ranked.map(r=>r.rank),[1,1,null,null]);
 });
+
+function seededRandom(seed = 42) {
+  return () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+}
+const selectionEntries = (count: number) => Array.from({ length: count }, (_, i) => ({
+  id: `deal-${i}:1`, tradeId: `deal-${i}`, teamId: 1, completedAt: trades[0].completedAt, received: [1], sent: [2],
+}));
+test("low-vote deals appear more often without excluding established deals", () => {
+  const pool = selectionEntries(8), random = seededRandom();
+  const ratings = pool.map((entry, i) => ({ entryId: entry.id, rating: 1000, votes: i < 2 ? 0 : 100, wins: 0 }));
+  const appearances = new Map(pool.map(entry => [entry.id, 0]));
+  for (let i = 0; i < 12000; i++) {
+    for (const id of chooseBattle(pool, { ratings, random })!) appearances.set(id, appearances.get(id)! + 1);
+  }
+  const low = pool.slice(0, 2).reduce((sum, entry) => sum + appearances.get(entry.id)!, 0) / 2;
+  const established = pool.slice(2).reduce((sum, entry) => sum + appearances.get(entry.id)!, 0) / 6;
+  assert.ok(low > established * 2, `Low-vote appearances ${low}, established ${established}`);
+  for (const count of appearances.values()) assert.ok(count > 500, "Every deal retains a meaningful chance");
+});
+test("similar MMR opponents are favored while cross-rating battles remain possible", () => {
+  const pool = selectionEntries(8), random = seededRandom(7);
+  const ratings = pool.map((entry, i) => ({ entryId: entry.id, rating: i < 4 ? 800 : 1600, votes: 10, wins: 5 }));
+  const group = new Map(ratings.map(row => [row.entryId, row.rating]));
+  let close = 0, distant = 0, leftLow = 0;
+  for (let i = 0; i < 12000; i++) {
+    const pair = chooseBattle(pool, { ratings, random })!;
+    if (group.get(pair[0]) === group.get(pair[1])) close++; else distant++;
+    if (group.get(pair[0]) === 800) leftLow++;
+  }
+  assert.ok(close > distant * 3);
+  assert.ok(distant > 800, "Exploration still compares distant ratings");
+  assert.ok(leftLow > 5400 && leftLow < 6600, "Presentation does not favor one side");
+});
+test("repeat avoidance rotates actual trades, handles small pools and ignores removed history", () => {
+  const pool = tradeEntries([...trades, ...trades.map(t => ({ ...t, id: `new-${t.id}` }))]);
+  const random = seededRandom();
+  const previous: [string, string] = ["a:1", "b:2"];
+  for (let i = 0; i < 100; i++) {
+    const pair = chooseBattle(pool, { previous, recent: [previous], random })!;
+    assert.ok(pair.every(id => id.startsWith("new-")), "Do not just swap to the other side of the same trade");
+    const small = chooseBattle(entries, { previous, random })!;
+    assert.ok(!small.every(id => previous.includes(id)), "Avoid the same pair when another pair exists");
+    assert.notEqual(small[0].split(":")[0], small[1].split(":")[0]);
+  }
+  const minimal = [entries[0], entries[2]];
+  assert.deepEqual(new Set(chooseBattle(minimal, { previous, random })!), new Set(previous));
+  assert.equal(chooseBattle([], { previous, random }), null);
+  assert.equal(chooseBattle(entries.slice(0, 2), { previous, random }), null);
+  assert.ok(chooseBattle(pool, { previous: ["removed:1", "removed:2"], random }));
+});
+test("recently shown trades get a soft cooldown and missing ratings start at zero votes", () => {
+  const pool = selectionEntries(6), random = seededRandom(16);
+  let recent = 0, fresh = 0;
+  for (let i = 0; i < 8000; i++) {
+    const pair = chooseBattle(pool, { recent: [[pool[0].id, pool[1].id]], random })!;
+    for (const id of pair) if (id === pool[0].id || id === pool[1].id) recent++; else fresh++;
+  }
+  assert.ok(fresh / 4 > recent / 2 * 1.3);
+  assert.ok(recent > 1000, "Cooldown does not permanently exclude deals");
+  const unrated = chooseBattle(pool, { random: seededRandom(24) });
+  const defaults = chooseBattle(pool, { ratings: pool.map(entry => ({ entryId: entry.id, rating: 1000, votes: 0, wins: 0 })), random: seededRandom(24) });
+  assert.deepEqual(unrated, defaults);
+});

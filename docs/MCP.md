@@ -12,6 +12,15 @@ The dashboard also exposes a read-only Model Context Protocol server. It shares 
 
 Add the hosted URL as a remote HTTP MCP server in your agent. No ESPN cookies, database credentials, new Railway service, or separate worker are needed. A browser GET returns **405** by design: MCP clients use POST. Legacy SSE-only clients need Streamable HTTP support.
 
+## Connect without writing code
+
+Open the dashboard's **MCP** tab. Choose **ChatGPT**, **Claude**, or **Other** for setup steps, then select your fantasy team and copy the starter prompt into a connected chat. The page always supplies the hosted URL, including when viewed locally, because cloud chat clients cannot reach your localhost. Connecting the server is required; a prompt alone does not install it. No separate skill file is required.
+
+- [ChatGPT setup](https://developers.openai.com/api/docs/guides/custom-mcp-server): add the server as a custom plugin, choose no authentication, install it, then select Fantasy with `@` in a conversation.
+- [Claude setup](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp): add a custom connector under Customize → Connectors, choose No sign in, then enable it in the conversation.
+
+The server provides agent instructions during initialization: identify the user's team and punts, check freshness, use the appropriate review/streamer/trade tools, and distinguish actual results from estimates. Existing clients may need to refresh/reconnect to receive updated instructions.
+
 ## Try it
 
 From this repository after `npm install`:

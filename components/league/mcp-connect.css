@@ -1,11 +1,16 @@
-.mcp-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); align-items: start; gap: 24px; }
+.mcp-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
 .mcp-layout .panel { min-width: 0; }
 .mcp-content { padding: 24px; }
-.mcp-intro { margin: 0 0 24px; color: var(--muted); }
+.mcp-content > .tabs { margin-bottom: 24px; }
+.mcp-team-picker { display: grid; gap: 8px; margin-bottom: 24px; }
+.mcp-team-picker > span { color: var(--gold); font-size: 12px; }
+.mcp-team-picker .select-trigger { width: 100%; }
 .copy-field label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--gold); }
 .copy-field-row { display: flex; gap: 10px; }
-.copy-field input { min-width: 0; flex: 1; padding: 13px 12px; border: 2px solid var(--line); background: var(--surface-deep); color: var(--text); font: 13px/1.5 var(--body); }
+.copy-field input, .copy-field textarea { min-width: 0; flex: 1; padding: 13px 12px; border: 2px solid var(--line); background: var(--surface-deep); color: var(--text); font: 13px/1.5 var(--body); }
 .copy-field .button { flex-shrink: 0; }
+.copy-field-multiline { flex-direction: column; align-items: stretch; }
+.copy-field textarea { width: 100%; min-height: 300px; resize: vertical; }
 .copy-field .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .copy-field-message { display: block; margin-top: 8px; color: var(--gold); font-size: 12px; }
 .mcp-steps { padding-left: 22px; margin: 28px 0; display: grid; gap: 18px; line-height: 1.7; }
@@ -15,13 +20,11 @@
 .mcp-details { margin-top: 24px; border-top: 1px solid var(--line-soft); padding-top: 18px; }
 .mcp-details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 .mcp-details p { color: var(--muted); line-height: 1.6; font-size: 12px; max-width: 65ch; }
-.mcp-prompts ul { list-style: none; padding: 0 24px; margin: 0; }
-.mcp-prompts li { padding: 22px 0; line-height: 1.7; }
-.mcp-prompts li + li { border-top: 1px solid var(--line-soft); }
-.mcp-prompts > p { margin: 0; padding: 0 24px 24px; color: var(--muted); font-size: 12px; }
 @media (max-width: 900px) { .mcp-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 520px) {
   .mcp-content { padding: 18px; }
   .copy-field-row { flex-direction: column; align-items: stretch; }
-  .copy-field input { width: 100%; font-size: 12px; }
+  .copy-field input, .copy-field textarea { width: 100%; font-size: 12px; }
+  .mcp-content > .tabs { display: flex; }
+  .mcp-content > .tabs button { flex: 1; padding-inline: 12px; }
 }

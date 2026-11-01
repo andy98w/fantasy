@@ -1,37 +1,66 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import type { Team } from "../../lib/schema";
 import { CopyField } from "../ui/copy-field";
-import { Panel } from "../ui/primitives";
+import { Panel, Tabs } from "../ui/primitives";
+import { Select } from "../ui/select";
 
-export function McpConnect() {
-  const [endpoint, setEndpoint] = useState("https://web-production-8d109.up.railway.app/mcp");
-  useEffect(() => { setEndpoint(new URL("/mcp", window.location.origin).href); }, []);
+// Cloud chat clients cannot reach the viewer's localhost, even on the local dashboard.
+const endpoint = "https://web-production-8d109.up.railway.app/mcp";
+const apps = [
+  { value: "chatgpt", label: "ChatGPT" },
+  { value: "claude", label: "Claude" },
+  { value: "other", label: "Other" },
+] as const;
+
+export function McpConnect({ teams }: { teams: Pick<Team, "id" | "name">[] }) {
+  const [app, setApp] = useState<"chatgpt" | "claude" | "other">("chatgpt");
+  const [teamId, setTeamId] = useState("choose");
+  const team = teams.find(t => String(t.id) === teamId);
+  const prompt = `Use the connected Fantasy tools to help me with our 9-category basketball league. ${team ? `My fantasy team is ${JSON.stringify(team.name)} (team ID ${team.id}).` : "Ask me which fantasy team I manage."}
+
+Check current rosters, injuries, schedules and data freshness before recommending moves. Suggest pickups and trades based on category strengths and weaknesses. Ask which categories I'm punting rather than assuming. Distinguish actual stats from forecasts, and flag missing or stale data.
+
+Start by reviewing my team and this week's matchup. If the Fantasy tools aren't connected, tell me to finish the connection setup first.`;
   return <div className="mcp-layout">
-    <Panel title="Connect your agent" className="mcp-connection">
+    <Panel title="1. Connect your app" className="mcp-connection">
       <div className="mcp-content">
-        <p className="mcp-intro">Ask your agent about this league’s players, matchups, and trades.</p>
-        <CopyField label="MCP server URL" value={endpoint} />
-        <ol className="mcp-steps">
+        <Tabs label="AI app" value={app} options={apps} onChange={setApp} />
+        <CopyField label="Server URL" value={endpoint} />
+        {app === "chatgpt" ? <ol className="mcp-steps">
+          <li>In ChatGPT on the web, open <strong>Plugins</strong>. Choose <strong>+</strong>, then <strong>Add custom MCP server</strong>.</li>
+          <li>Name it <strong>Fantasy</strong>, paste the URL above, and choose <strong>No authentication</strong>.</li>
+          <li>Review the connection notice, create the plugin, then install it. In a chat, type <strong>@</strong> and select <strong>Fantasy</strong>.</li>
+        </ol> : app === "claude" ? <ol className="mcp-steps">
+          <li>In Claude, open <strong>Customize → Connectors</strong>. Choose <strong>+ Add → Add custom connector</strong>.</li>
+          <li>Name it <strong>Fantasy</strong> and paste the URL above. Continue with <strong>No sign in</strong>, then add it.</li>
+          <li>In a chat, open <strong>+ → Connectors</strong> and enable <strong>Fantasy</strong>.</li>
+        </ol> : <ol className="mcp-steps">
           <li>Open your agent’s MCP settings and add a <strong>remote server</strong>.</li>
-          <li>Name it <strong>Fantasy</strong> and paste the URL above. Choose <strong>Streamable HTTP</strong> if asked for a transport. Authentication: <strong>None</strong>.</li>
+          <li>Name it <strong>Fantasy</strong> and paste the URL above. Transport: <strong>Streamable HTTP</strong>. Authentication: <strong>None</strong>.</li>
           <li>Save, then reconnect or refresh the tool list.</li>
-        </ol>
-        <p className="mcp-access">Read-only access. No login or API key needed.</p>
+        </ol>}
+        <p className="mcp-access">Read-only. No Fantasy login, API key or skill file needed.</p>
         <details className="mcp-details">
-          <summary>Connection details</summary>
-          <p>Your client must support remote MCP over Streamable HTTP. The URL is for an MCP client; opening it in a browser returns “Method not allowed.”</p>
-          <p>The tools read the same league data as this dashboard. They cannot change rosters, submit trades, vote, or post auction listings.</p>
-          <p>If tools don’t appear, check that the URL ends in <code>/mcp</code>, then reconnect.</p>
+          <summary>Need help connecting?</summary>
+          <p>Connect first; pasting a prompt alone won’t give your app access to the league. If the option is missing, check your app’s workspace permissions.</p>
+          {app === "chatgpt" && <p><a href="https://developers.openai.com/api/docs/guides/custom-mcp-server" target="_blank" rel="noreferrer">ChatGPT setup guide</a></p>}
+          {app === "claude" && <p><a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp" target="_blank" rel="noreferrer">Claude setup guide</a></p>}
+          <p>The server uses Streamable HTTP. Opening its URL in a browser returns “Method not allowed.” If tools don’t appear, check the URL ends in <code>/mcp</code> and reconnect.</p>
         </details>
       </div>
     </Panel>
-    <Panel title="Try asking" className="mcp-prompts">
-      <ul>
-        <li>Which free agents playing today could help Kirk’s Mercs in blocks?</li>
-        <li>Which categories are closest in my matchup, and how many games are left?</li>
-        <li>How has my team’s power changed over the past week?</li>
-      </ul>
-      <p>Tell your agent which team you manage.</p>
+    <Panel title="2. Start a conversation" className="mcp-prompts">
+      <div className="mcp-content">
+        <div className="mcp-team-picker">
+          <span>Your fantasy team</span>
+          <Select label="Your fantasy team" value={teamId} onChange={setTeamId} options={[
+            { value: "choose", label: "Choose a team" },
+            ...teams.map(t => ({ value: String(t.id), label: t.name })),
+          ]} />
+        </div>
+        <CopyField key={prompt} label="Paste this into your connected chat" value={prompt} multiline buttonLabel="Copy starter prompt" />
+      </div>
     </Panel>
   </div>;
 }

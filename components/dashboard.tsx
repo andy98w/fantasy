@@ -313,7 +313,7 @@ export default function Dashboard({
         </div>
         {view === "forecast" && <Forecast data={data} today={today} />}
         {view === "records" && <Records data={data} onTeam={openTeam} />}
-        {view === "mcp" && <McpConnect />}
+        {view === "mcp" && <McpConnect teams={data.teams} />}
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />
         )}

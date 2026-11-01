@@ -75,7 +75,7 @@ test("player search filters, numeric sorting and pagination preserve nulls", asy
     assert.equal(player.player.stats.BLK, null);
   } finally { await client.close(); }
 });
-test("team power and trade simulations reuse dashboard rules, exclude IR and never mutate rosters", async () => {
+test("team power and trade simulations reuse dashboard rules, include IR and never mutate rosters", async () => {
   const s = fixture(), left = s.teams[0].id, right = s.teams[1].id;
   const leftPlayers = s.players.filter(p => p.teamId === left), rightPlayers = s.players.filter(p => p.teamId === right);
   leftPlayers[0].slot = "IR";
@@ -84,7 +84,7 @@ test("team power and trade simulations reuse dashboard rules, exclude IR and nev
   try {
     const team = await call(client, "fantasy_get_team", { teamId: left });
     assert.equal(team.power, teamRating(leftPlayers).score);
-    assert.equal(team.contributingPlayers, leftPlayers.filter(p => p.slot !== "IR").length);
+    assert.equal(team.contributingPlayers, leftPlayers.length);
     const result = await call(client, "fantasy_analyze_trade", { leftTeamId: left, rightTeamId: right,
       leftPlayerIds: [leftPlayers[1].id], rightPlayerIds: [rightPlayers[1].id], punts: ["TO"] });
     assert.equal(result.simulated, true);
@@ -195,6 +195,12 @@ test("streamers filter availability, opponent, category and started games; error
     assert.deepEqual(both.items.map((row: any) => row.player.id), [101,100]);
     const free = await call(client, "fantasy_find_streamers", { availability: "free_agent" });
     assert.equal(free.total, 1); assert.equal(free.items[0].player.id, 100);
+    s.players[1].status = "OUT";
+    const healthy = await call(client, "fantasy_find_streamers");
+    assert.equal(healthy.total, 1);
+    assert.equal(healthy.availabilityAsOf, s.syncedAt);
+    assert.equal((await call(client, "fantasy_find_streamers", { includeInjured: true })).total, 2);
+    s.players[1].status = "ACTIVE";
     deps.now = () => Date.parse("2026-11-02T02:00:00Z");
     assert.equal((await call(client, "fantasy_find_streamers")).total, 0);
     assert.equal((await call(client, "fantasy_find_streamers", { notStarted: false })).total, 2);
@@ -233,4 +239,33 @@ test("game log dates filter before pagination; category sorting handles percenta
     const ascending = await call(client, "fantasy_get_player_games", { playerId: s.players[0].id, from: "2026-11-01", sortBy: "FG%", descending: false });
     assert.deepEqual(ascending.items.map((row: any) => row.game.id), ["3","4","2"]);
   } finally { await client.close(); }
+});
+
+test("MCP exposes availability scenarios, activation constraints, and separate trade production", async () => {
+  const s=fixture(), home=s.teams[0].id, away=s.teams[1].id;
+  const template=s.players[0];
+  const stats={PTS:20,REB:5,AST:4,STL:1,BLK:1,"3PM":2,TO:2,FGM:5,FGA:10,FTM:4,FTA:5};
+  s.players=[{...template,id:201,teamId:home,slot:"BE",status:"DAY_TO_DAY",nbaTeam:"ATL",eligibleSlots:["UTIL"],stats,gamesPlayed:5},
+    {...template,id:202,teamId:away,slot:"IR",status:"OUT",nbaTeam:"ATL",eligibleSlots:["UTIL"],stats,gamesPlayed:5}];
+  const period=s.league.matchupPeriod+1;
+  s.forecastSchedule={lineupDate:"2026-11-01",slots:["UTIL"],pairs:[{period,home,away}],windows:[{period,start:"2026-11-02",end:"2026-11-08"}],
+    games:[{id:"401234567",startsAt:"2026-11-03T01:00:00Z",date:"2026-11-02",home:"ATL",away:"BOS",scoringPeriod:11}]};
+  const client=await connect(dependencies(s));
+  try {
+    const baseline=await call(client,"fantasy_forecast_matchup",{teamId:home});
+    assert.equal(baseline.home.scenario,"conservative"); assert.equal(baseline.home.games,0);
+    assert.equal(baseline.home.assumptions[0].status,"DAY_TO_DAY");
+    assert.equal(baseline.home.exclusions[0].date,"2026-11-02");
+    const possible=await call(client,"fantasy_forecast_matchup",{teamId:home,scenario:"if_available"});
+    assert.equal(possible.home.stats.PTS,20);assert.equal(possible.away.stats.PTS,20);
+    assert.deepEqual(possible.away.activationPlayerIds,[202]);
+    const opportunities=await call(client,"fantasy_get_matchup_opportunities",{teamId:home,period,scenario:"if_available"});
+    assert.equal(opportunities.home.remainingScheduledGames,possible.home.games);
+    assert.deepEqual(opportunities.home.assumptions,possible.home.assumptions);
+    const trade=await call(client,"fantasy_analyze_trade",{leftTeamId:home,rightTeamId:away,leftPlayerIds:[201],rightPlayerIds:[202]});
+    assert.equal(trade.left.upcomingProduction.length,2);
+    assert.equal(trade.left.upcomingProduction[0].after.games,0);
+    assert.equal(trade.left.upcomingProduction[1].after.stats.PTS,20);
+    assert.equal(trade.left.after.contributingPlayers,1);
+  } finally {await client.close();}
 });

@@ -8,7 +8,7 @@ import { createScoreboardLoader } from "../lib/mcp/scoreboard-loader";
 import demo from "../lib/demo.json";
 import board from "./fixtures/nba-scoreboard.json";
 
-test("history uses historical rosters, excludes IR and never fills absent dates or leagues", () => {
+test("history uses historical rosters, includes IR and never fills absent dates or leagues", () => {
   const old = snapshotSchema.parse(structuredClone(demo));
   old.syncedAt = "2026-10-30T22:00:00Z";
   const current = structuredClone(old); current.syncedAt = "2026-11-01T19:00:00Z";
@@ -21,7 +21,8 @@ test("history uses historical rosters, excludes IR and never fills absent dates 
   assert.deepEqual(history.points.map(p => p.date), ["2026-10-30", "2026-11-01"]);
   assert.equal(history.points[0].power, teamRating(old.players.filter(p => p.teamId === id)).score);
   assert.equal(history.points[1].power, teamRating(current.players.filter(p => p.teamId === id)).score);
-  assert.ok(!history.points[1].rosterIds!.includes(player.id));
+  assert.ok(history.points[1].rosterIds!.includes(player.id));
+  assert.equal(history.points[0].power, history.points[1].power);
   const previous = { ...old, powerHistory: [{ date: "2026-10-29", capturedAt: "2026-10-30T01:00:00Z", ratings: { [player.id]: 45 }, model: { version: "old" } }] };
   const players = extractPowerHistory([previous, current], current, { ...request, kind: "player", id: player.id }, "local");
   assert.equal(players.points[0].power, 45);

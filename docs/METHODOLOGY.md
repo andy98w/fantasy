@@ -1,6 +1,6 @@
 # Rankings and trade comparisons v2
 
-This release measures observed season-per-game player value. It does not project future production, simulate weekly outcomes, or optimize lineups.
+Power measures observed season-per-game roster value. Forecasts separately estimate production using schedules, legal lineups and explicit availability scenarios.
 
 ## Player value
 
@@ -18,17 +18,17 @@ The League table ranks by `(wins + 0.5 × ties) / completed games`, with zero be
 
 ## Team power estimates
 
-Team power is the sum of category z-scores across the whole roster, including bench but excluding IR. An unrated player is assigned reference-average value (zero z-score in each category) **only for the provisional team estimate**; the player remains unrated. A team with no rated players has no score or rank. Teams with partial coverage participate in the ranking and are visibly marked provisional. Coverage counts and missing-player names are available in the team view. Coverage is not a confidence probability.
+Team power sums `4 * asinh(category_z_total / 4)` across the nine categories of the entire roster, including bench and IR. Injuries do not discount per-game value, and moving a player between bench and IR does not change power. An unrated player is assigned reference-average value (zero z-score in each category) **only for the provisional team estimate**; the player remains unrated. A team with no rated players has no score or rank. Teams with partial coverage participate in the ranking and are visibly marked provisional. Coverage counts and missing-player names are available in the team view. Coverage is not a confidence probability.
 
 This neutral imputation avoids silently dropping ten teams from the league leaderboard, but it can overvalue or undervalue unknown players. It is particularly uncertain for injured stars or very small samples. Scores can be negative; zero means a reference-average roster contribution, not zero production. Roster size affects the sum. This is a descriptive roster-value model, not schedule-adjusted competitive strength.
 
 ## Trade calculator
 
-The calculator swaps the selected players in memory without mutating imported rosters or issuing ESPN writes. Each side keeps independent category weights: Punt = 0, Normal = 1, Priority = 2. Before/after category heatmaps show unweighted contributions; fit scores sum those contributions with the team's weights. A positive turnover contribution means lower turnovers. Shooting rows show standardized volume-weighted impact, not pooled team FG% or FT%.
+The calculator swaps the selected players in memory without mutating imported rosters or issuing ESPN writes. Each side keeps independent category weights: Punt = 0, Normal = 1, Priority = 2. Before/after category heatmaps show unweighted contributions; fit scores apply the team's weights after tapering each category total. A positive turnover contribution means lower turnovers. Shooting rows show standardized volume-weighted impact, not pooled team FG% or FT%.
 
 Outgoing player value is unweighted. Unknown player values remain visible as unrated and use the same reference-average assumption in provisional roster totals. Comparisons with no measured data on either side of the before/after calculation remain unavailable. All-punted preferences show no fit evaluation.
 
-Player ownership, distinct teams, and duplicate selections are validated. If a background import invalidates selected player ownership, the comparison stops and asks for a reset. Draft selections survive tab navigation during the current page session; reloading starts a fresh draft. Total roster-slot overages are flagged, but positional/IR eligibility and ESPN trade rules are not validated. Empty slots and required drops are not optimized. The UI provides category gains/losses rather than a single trade-winner claim.
+Player ownership, distinct teams, and duplicate selections are validated. If a background import invalidates selected player ownership, the comparison stops and asks for a reset. Draft selections survive tab navigation during the current page session; reloading starts a fresh draft. Total roster-slot overages are flagged, but positional/IR eligibility and ESPN trade rules are not validated. Empty slots and required drops are not optimized. The UI provides category gains/losses rather than a single trade-winner claim. Both UI and MCP show next-week production before/after in conservative and if-available scenarios, separate from roster value. Incoming IR placement is retained as an explicit production assumption, not verified destination eligibility. Missing schedules, missing stats or activation capacity prevent a complete production estimate.
 
 ## News
 
@@ -36,7 +36,7 @@ League news includes headlines matched to rostered players; team news matches th
 
 ## Weekly forecast
 
-The Forecast tab uses current roster season per-game averages and the imported NBA schedule. For each date, a maximum-weight legal assignment fills as many starting slots as possible, then maximizes summed player z-scores. Bench players can start on future dates; IR and players marked out/suspended cannot. Day-to-day players are assumed available. Future transactions and return dates are not predicted. A selected player with missing count stats or no games prevents a complete forecast rather than contributing invented zeros.
+The Forecast tab uses current roster season per-game averages and the imported NBA schedule. For each date, a maximum-weight legal assignment fills as many starting slots as possible, then maximizes summed player z-scores. Conservative availability excludes IR and every non-ACTIVE status, including day-to-day and unknown. The optional `if_available` scenario assumes uncertain players play and OUT, suspended and IR players become available after today. Today’s OUT/IR exclusions and started lineup locks are preserved. IR activation consumes non-IR roster capacity for the rest of the window; if capacity is insufficient the scenario is withheld and reports the number of slots to free. No drops are assumed. These are conditional scenarios, not return-date predictions or probabilistic bounds: ESPN supplies current status, not a confirmed future absence or return date. Per-player assumptions, per-date exclusions and the status snapshot timestamp accompany the result. A selected player with missing count stats or no games prevents a complete forecast rather than contributing invented zeros.
 
 Counting totals are averages × selected games. Shooting percentages divide total makes by total attempts, including current actual makes/attempts for rest-of-week forecasts. Rest-of-week adds only future production to actual matchup totals; already-started players retain their lineup slot. Live-game remainder uses the fraction of regulation time remaining (or the current overtime period). Final games add no projected production. Scores must be under 15 minutes old; started-game statuses must be under 90 seconds old. This approximation does not model rotations, blowouts, or independent feed delays.
 

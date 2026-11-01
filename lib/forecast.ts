@@ -1,11 +1,19 @@
 import { CATEGORIES, type ForecastSchedule, type Matchup, type Player, type Snapshot } from "./schema";
 import { nbaAbbrev, nbaDate, type TodayData } from "./nba";
 import { compareCategories, weekSides } from "./season";
+import { availabilityReason, isUncertain, type AvailabilityScenario } from "./availability";
 
 const COUNTS = ["PTS", "REB", "AST", "STL", "BLK", "3PM", "TO", "FGM", "FGA", "FTM", "FTA"] as const;
-const unavailable = new Set(["OUT", "INJURY_RESERVE", "SUSPENSION", "SUSPENDED"]);
+export type AvailabilityAssumption = { playerId: number; name: string; status: string; slot: string | null; reason: string };
+export type ProjectionOptions = { scenario?: AvailabilityScenario };
 export type ForecastWindow = ForecastSchedule["windows"][number];
 export type Projection = {
+  scenario: AvailabilityScenario;
+  availabilityAsOf: string;
+  assumptions: AvailabilityAssumption[];
+  activationPlayerIds: number[];
+  activationSlotsNeeded: number;
+  exclusions: { playerId: number; date: string; reason: string }[];
   side: Matchup["home"];
   games: number;
   liveGames: number;
@@ -47,21 +55,41 @@ export function scheduledOpponent(schedule: ForecastSchedule | null, period: num
   return matches[0].home === team ? matches[0].away : matches[0].home;
 }
 
-export function projectTeam(data: Snapshot, teamId: number, window: ForecastWindow, now: number, today?: TodayData): Projection {
+export function projectTeam(data: Snapshot, teamId: number, window: ForecastWindow, now: number, today?: TodayData, options: ProjectionOptions = {}): Projection {
   const roster = data.players.filter(p => p.teamId === teamId);
-  const excluded = roster.filter(p => p.slot === "IR" || unavailable.has(p.status));
+  const scenario = options.scenario ?? "conservative";
+  const affected = roster.filter(p => p.slot === "IR" || p.status !== "ACTIVE");
+  const excluded: Player[] = [];
+  const date = nbaDate(new Date(now));
+  const canPlay = (p: Player, day: string) => {
+    if (p.slot !== "IR" && p.status === "ACTIVE") return true;
+    if (scenario === "conservative") return false;
+    // A hypothetical return never overrides today's OUT status or IR placement.
+    return day > date || (p.slot !== "IR" && isUncertain(p));
+  };
   const result: Projection = {
     side: { teamId, wins: null, ties: null, stats: {}, performers: [], performanceComplete: false },
+    scenario, availabilityAsOf: data.syncedAt,
+    assumptions: affected.map(p => ({ playerId: p.id, name: p.name, status: p.status, slot: p.slot, reason: availabilityReason(p) })),
+    activationPlayerIds: [], activationSlotsNeeded: 0, exclusions: [],
     games: 0, liveGames: 0, benched: 0, excluded, missing: [], issue: null, players: [], days: [],
   };
-  const fail = (issue: string) => { result.issue = issue; result.side.stats = {}; return result; };
+  const fail = (issue: string) => {
+    result.issue = issue;
+    result.side.stats = {};
+    result.games = result.liveGames = result.benched = 0;
+    result.players = []; result.days = [];
+    return result;
+  };
   const schedule = data.forecastSchedule;
   if (!schedule) return fail("Schedule unavailable.");
-  const date = nbaDate(new Date(now));
   const current = window.period === data.league.matchupPeriod;
   if (date > window.end || (current && date < window.start) || (!current && date >= window.start)) return fail("Waiting for the next league sync.");
   if (current && Math.abs(now - Date.parse(data.matchupSyncedAt ?? data.syncedAt)) > 15 * 60_000) return fail("Waiting for fresh matchup totals.");
   if (current && schedule.lineupDate !== date) return fail("Waiting for today’s lineups.");
+  const activeCapacity = Object.entries(data.league.rosterSlots).filter(([slot]) => slot !== "IR").reduce((sum, [, n]) => sum + n, 0);
+  const activeCount = roster.filter(p => p.slot !== "IR").length;
+  if (activeCount > activeCapacity) return fail(`Roster needs ${activeCount - activeCapacity} non-IR roster slot(s) freed before projecting.`);
   const totals: Record<string, number | null> = Object.fromEntries(COUNTS.map(c => [c, 0]));
   if (current) {
     const actual = weekSides(data.matchups, window.period).get(teamId)?.stats;
@@ -82,11 +110,22 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
   for (const day of days) {
     const games = schedule.games.filter(g => g.date === day);
     const gameFor = (p: Player) => games.find(g => [nbaAbbrev(g.home), nbaAbbrev(g.away)].includes(nbaAbbrev(p.nbaTeam)));
+    const returning = roster.filter(p => p.slot === "IR" && canPlay(p, day) && gameFor(p));
+    for (const p of returning) if (!result.activationPlayerIds.includes(p.id)) result.activationPlayerIds.push(p.id);
+    // Once activated, a player keeps their roster place for this scenario.
+    result.activationSlotsNeeded = Math.max(0, activeCount + result.activationPlayerIds.length - activeCapacity);
+    if (result.activationSlotsNeeded) return fail(`IR return scenario needs ${result.activationSlotsNeeded} non-IR roster slot(s) freed. No drops assumed.`);
     const slots = [...schedule.slots];
     const candidates: Player[] = [];
-    for (const player of roster.filter(p => p.slot !== "IR")) {
+    for (const player of roster) {
       const game = gameFor(player);
       if (!game) continue;
+      const available = canPlay(player, day);
+      if (!available) {
+        if (!excluded.includes(player)) excluded.push(player);
+        result.exclusions.push({ playerId: player.id, date: day, reason: availabilityReason(player) });
+      }
+      if (player.slot === "IR" && !available) continue;
       const live = day === date ? today?.games.find(g => g.id === game.id) : undefined;
       if (live && ["postponed", "cancelled", "suspended"].includes(live.state)) continue;
       const started = day === date && (Date.parse(game.startsAt) <= now || (live && ["live", "final"].includes(live.state)));
@@ -99,8 +138,8 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
         slots.splice(slot, 1);
         const fresh = today?.status === "ready" && today.date === date && today.fetchedAt && Math.abs(now - Date.parse(today.fetchedAt)) < 90_000;
         if (!fresh || !live || live.remainingFraction == null) return fail("Live game status unavailable.");
-        if (live.state === "live" && !unavailable.has(player.status)) { result.liveGames++; add(player, live.remainingFraction); }
-      } else if (!excluded.includes(player)) {
+        if (live.state === "live" && available) { result.liveGames++; add(player, live.remainingFraction); }
+      } else if (available) {
         candidates.push(player);
       }
     }
@@ -130,4 +169,22 @@ export function closeCategories(home: Projection, away: Projection) {
     const a = home.side.stats[c], b = away.side.stats[c];
     return a != null && b != null && a !== b && (c.includes("%") ? Math.abs(a - b) <= .015 : Math.abs(a - b) / Math.max(a, b, 1) <= .05);
   });
+}
+
+/** Shared wire/UI summary: keep injury assumptions next to every projection. */
+export function projectionSummary(p: Projection) {
+  return { teamId: p.side.teamId, stats: p.side.stats, games: p.issue ? null : p.games,
+    liveGames: p.issue ? null : p.liveGames, benchedGames: p.issue ? null : p.benched,
+    issue: p.issue, scenario: p.scenario, availabilityAsOf: p.availabilityAsOf,
+    assumptions: p.assumptions, exclusions: p.exclusions, activationPlayerIds: p.activationPlayerIds,
+    activationSlotsNeeded: p.activationSlotsNeeded, excludedPlayerIds: p.excluded.map(p => p.id),
+    missingPlayerIds: p.missing.map(p => p.id),
+    players: p.issue ? [] : p.players.map(row => ({ playerId: row.player.id, games: row.games })) };
+}
+
+export function tradeProduction(data: Snapshot, teamId: number, before: Player[], after: Player[], now: number, scenario: AvailabilityScenario) {
+  const window = data.forecastSchedule?.windows.find(w => w.period === data.league.matchupPeriod + 1);
+  if (!window) return { window: null, issue: "Next-week schedule unavailable.", before: null, after: null };
+  const project = (roster: Player[]) => projectTeam({ ...data, players: roster.map(p => ({ ...p, teamId })) }, teamId, window, now, undefined, { scenario });
+  return { window, issue: null, before: project(before), after: project(after) };
 }

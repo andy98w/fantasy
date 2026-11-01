@@ -83,7 +83,7 @@ export function RankingHelp({ model }: { model: Snapshot["model"] }) {
         <p>
           Player power runs from 0–100. Team power tapers each roster category before
           adding them: extreme strengths and weaknesses count progressively less.
-          IR is excluded. The heatmap shows the original category values.
+          Bench and IR are included; injuries do not discount roster value. The heatmap shows the original category values.
         </p>
         <p>
           Ratings use season averages and require {model.minimumGames} games.

@@ -49,7 +49,7 @@ def rank_players(players: list[dict], pool_size: int) -> dict:
 
 def rank_teams(teams, players):
     for t in teams:
-        roster=[p for p in players if p.get('teamId')==t['id'] and p.get('slot')!='IR']
+        roster=[p for p in players if p.get('teamId')==t['id']]
         ranked=[p for p in roster if p.get('zTotal') is not None]
         t['rankedPlayers']=len(ranked)
         t['rosterSize']=len(roster)

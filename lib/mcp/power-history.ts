@@ -32,8 +32,8 @@ export function extractPowerHistory(raw: unknown[], current: Snapshot, request: 
       if (player) insert({ date: nbaDate(new Date(s.syncedAt)), capturedAt: s.syncedAt, power: player.power, model: modelOf(s) });
     } else if (s.teams.some(t => t.id === request.id)) {
       const roster = s.players.filter(p => p.teamId === request.id), rating = teamRating(roster);
-      insert({ date: nbaDate(new Date(s.syncedAt)), capturedAt: s.syncedAt, power: rating.score, model: { ...modelOf(s), teamFormula: "4*asinh(category/4); IR excluded" },
-        categories: rating.categories, provisional: rating.provisional, rosterIds: roster.filter(p => p.slot !== "IR").map(p => p.id) });
+      insert({ date: nbaDate(new Date(s.syncedAt)), capturedAt: s.syncedAt, power: rating.score, model: { ...modelOf(s), teamFormula: "4*asinh(category/4); full roster including IR; v2" },
+        categories: rating.categories, provisional: rating.provisional, rosterIds: roster.map(p => p.id) });
     }
   }
   return { source, points: [...points.values()].sort((a,b) => a.date.localeCompare(b.date)), skippedSnapshots };

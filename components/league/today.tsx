@@ -35,6 +35,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
   const [tab, setTab] = useState<"games" | "available">("games");
   const [category, setCategory] = useState<Category | "all">("all");
   const [notStarted, setNotStarted] = useState(false);
+  const [includeInjured, setIncludeInjured] = useState(false);
   const [now, setNow] = useState(() => data?.fetchedAt ? Date.parse(data.fetchedAt) : 0);
   useEffect(() => {
     setNow(Date.now());
@@ -42,7 +43,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
     return () => window.clearInterval(timer);
   }, []);
   const oldDate = data && now > 0 && data.date !== nbaDate(new Date(now));
-  const available = availableToday(players, data?.games ?? [], { category, notStarted, now });
+  const available = availableToday(players, data?.games ?? [], { category, notStarted, now, includeInjured });
   const dateLabel = data ? new Intl.DateTimeFormat("en-US", { timeZone: NBA_TIMEZONE, month: "short", day: "numeric" }).format(new Date(`${data.date}T12:00:00Z`)) : "";
   return (
     <Panel title="Today" className="today-panel" action={data && <span className="today-date">{dateLabel} · PT</span>}>
@@ -61,6 +62,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
               <Select label="Category strength" value={category} onChange={(value) => setCategory(value as Category | "all")}
                 options={[{ value: "all", label: "All categories" }, ...CATEGORIES.map((c) => ({ value: c, label: `${c} strength` }))]} />
               <label className="today-not-started"><input type="checkbox" checked={notStarted} onChange={(event) => setNotStarted(event.target.checked)} />Not started</label>
+              <label className="today-not-started"><input type="checkbox" checked={includeInjured} onChange={event => setIncludeInjured(event.target.checked)} />Include injured players</label>
             </div>
             <div className="today-results-count"><ResultCount count={available.length} singular="player" /></div>
             <div className="today-players" tabIndex={available.length ? 0 : undefined} role="region" aria-label="Available players playing today">

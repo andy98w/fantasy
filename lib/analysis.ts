@@ -16,7 +16,7 @@ const rounded = (value: number) =>
 export function rosterValue(
   roster: Player[],
   weights: Weights = DEFAULT_WEIGHTS,
-  { includeIR = false }: { includeIR?: boolean } = {},
+  { includeIR = true }: { includeIR?: boolean } = {},
 ) {
   const contributing = roster.filter((player) => includeIR || player.slot !== "IR");
   const rated = contributing.filter((player) => player.zTotal !== null);

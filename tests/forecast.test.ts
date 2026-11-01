@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { snapshotSchema, type Player, type ForecastSchedule } from "../lib/schema";
-import { dailyLineup, projectTeam, scheduledOpponent, forecastScore } from "../lib/forecast";
+import { dailyLineup, projectTeam, scheduledOpponent, forecastScore, tradeProduction, projectionSummary } from "../lib/forecast";
 import { Forecast } from "../components/league/forecast";
 import { normalizeScoreboard, type TodayData } from "../lib/nba";
 import demo from "../lib/demo.json";
@@ -106,4 +106,51 @@ test("optional malformed forecast metadata cannot hide an otherwise valid league
   assert.equal(p.issue, null);
   assert.deepEqual(p.days.map(day => day.openSlots), [["UTIL"], ["UTIL"]]);
   assert.deepEqual(p.days[0].selectedPlayerIds, [1]);
+});
+
+
+test("conservative and conditional availability distinguish uncertain players and future returns", () => {
+  const d=snapshot([player(1,{status:"DAY_TO_DAY"}),player(2,{status:"OUT"}),player(3,{slot:"IR",status:"OUT"}),player(4,{status:"UNKNOWN"}),player(5,{status:"SUSPENDED"})]);
+  const original=JSON.stringify(d);
+  const baseline=projectTeam(d,1,schedule.windows[1],now);
+  assert.equal(baseline.games,0); assert.equal(baseline.assumptions.length,5);
+  assert.equal(baseline.exclusions.length,10);
+  const possible=projectTeam(d,1,schedule.windows[1],now,undefined,{scenario:"if_available"});
+  assert.equal(possible.issue,null); assert.equal(possible.games,4);
+  assert.equal(possible.benched,6); assert.deepEqual(possible.activationPlayerIds,[3]);
+  assert.equal(possible.availabilityAsOf,d.syncedAt);
+  assert.equal(JSON.stringify(d),original);
+});
+
+test("conditional availability never overrides today's OUT, IR or suspension; credited stats remain", () => {
+  const d=snapshot([player(1,{status:"OUT"}),player(2,{slot:"IR",status:"ACTIVE"}),player(3,{status:"DAY_TO_DAY",slot:"BE"}),player(4,{status:"SUSPENSION",slot:"BE"})]);
+  d.syncedAt=new Date(now).toISOString();
+  d.matchups=[{id:1,period:2,result:"UNDECIDED",home:{teamId:1,wins:0,ties:0,stats:{...stats,PTS:100},performers:[],performanceComplete:false},away:{teamId:2,wins:0,ties:0,stats,performers:[],performanceComplete:false}}];
+  const baseline=projectTeam(d,1,schedule.windows[0],now);
+  const possible=projectTeam(d,1,schedule.windows[0],now,undefined,{scenario:"if_available"});
+  assert.equal(baseline.side.stats.PTS,100);
+  assert.equal(possible.side.stats.PTS,120);
+  assert.deepEqual(possible.players.map(p=>p.player.id),[3]);
+  assert.deepEqual(possible.excluded.map(p=>p.id),[1,2,4]);
+});
+
+test("IR returns require roster capacity and unavailable scenarios expose no partial stats", () => {
+  const d=snapshot([player(1),player(2,{slot:"BE"}),player(3,{slot:"IR",status:"OUT"})]);
+  d.league={...d.league,rosterSlots:{PG:1,BE:1,IR:1}};
+  const possible=projectTeam(d,1,schedule.windows[1],now,undefined,{scenario:"if_available"});
+  assert.equal(possible.activationSlotsNeeded,1); assert.match(possible.issue!,/No drops assumed/);
+  const summary=projectionSummary(possible);
+  assert.equal(summary.games,null); assert.deepEqual(summary.stats,{}); assert.deepEqual(summary.players,[]);
+  d.players=d.players.filter(p=>p.id!==2);
+  assert.equal(projectTeam(d,1,schedule.windows[1],now,undefined,{scenario:"if_available"}).issue,null);
+});
+
+test("trade production assigns incoming players to the receiving team without mutating ownership", () => {
+  const d=snapshot([player(1),player(2,{teamId:2,slot:"IR",status:"OUT"})]);
+  const before=JSON.stringify(d);
+  const baseline=tradeProduction(d,1,[d.players[0]],[d.players[1]],now,"conservative");
+  assert.equal(baseline.before!.side.stats.PTS,40); assert.equal(baseline.after!.games,0);
+  const possible=tradeProduction(d,1,[d.players[0]],[d.players[1]],now,"if_available");
+  assert.equal(possible.after!.side.stats.PTS,40);
+  assert.equal(JSON.stringify(d),before);
 });

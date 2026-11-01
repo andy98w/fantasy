@@ -23,6 +23,8 @@ import { teamOptions } from "./team-select";
 import { PlayerAvatar, TeamAvatar } from "./avatars";
 import { CategoryValue } from "./team-views";
 import { signedZ as signed, statusText, categorySearch } from "./format";
+import { tradeProduction } from "@/lib/forecast";
+import { stat } from "./format";
 import { CategoryMeter } from "../ui/category-meter";
 import { ValueFeedback } from "../ui/value-feedback";
 
@@ -121,6 +123,7 @@ function TradeRoster({
 }
 
 function TradeImpact({
+  data,
   team,
   beforeRoster,
   afterRoster,
@@ -131,6 +134,7 @@ function TradeImpact({
   capacity,
   active,
 }: {
+  data: Snapshot;
   team: Team;
   beforeRoster: Player[];
   afterRoster: Player[];
@@ -231,6 +235,22 @@ function TradeImpact({
                   "No notable category changes."}
         </p>
       </div>
+      {active && <details className="forecast-details"><summary>Next-week production impact</summary>
+        <p>Roster value includes IR. Production depends on availability and legal starting slots. Incoming IR placement is retained as an assumption; activation may require freeing roster space.</p>
+        {(["conservative", "if_available"] as const).map(scenario => {
+          const forecast = tradeProduction(data, team.id, beforeRoster, afterRoster, Date.now(), scenario);
+          const before = forecast.before, after = forecast.after;
+          const issue = forecast.issue ?? before?.issue ?? after?.issue;
+          return <div key={scenario}><h3>{scenario === "conservative" ? "Conservative availability" : "If available / IR activated"}</h3>
+            <p>{scenario === "conservative" ? "Only active players outside IR." : "Uncertain players play; OUT and IR players return after today. Conditional, not a predicted return date."}</p>
+            {issue || !before || !after ? <p>{issue}</p> : <>
+              <p>{before.games} → {after.games} playable games</p>
+              <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before</th><th>After</th></tr></thead><tbody>{CATEGORIES.map(category => <tr key={category}><td>{category}</td><td>{stat(before.side.stats[category], category)}</td><td>{stat(after.side.stats[category], category)}</td></tr>)}</tbody></table></div>
+            </>}
+            {after && after.assumptions.length > 0 && <p>Availability assumptions: {after.assumptions.map(p => `${p.name} (${p.reason})`).join(", ")}</p>}
+          </div>;
+        })}
+      </details>}
       <TableToolbar label={`Search ${team.name} categories`} query={control.query} onQuery={control.setQuery}>
         <Select label={`${team.name} priority filter`} value={priority} onChange={setPriority} options={[{value:"all",label:"All priorities"},{value:"0",label:"Punt"},{value:"1",label:"Normal"},{value:"2",label:"Priority"}]} />
       </TableToolbar>
@@ -379,6 +399,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
       {trade && (
         <div className="trade-grid trade-results">
           <TradeImpact
+            data={data}
             team={leftTeam}
             beforeRoster={trade.left.before}
             afterRoster={trade.left.after}
@@ -392,6 +413,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
             active={active}
           />
           <TradeImpact
+            data={data}
             team={rightTeam}
             beforeRoster={trade.right.before}
             afterRoster={trade.right.after}

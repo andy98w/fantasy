@@ -67,7 +67,7 @@ test("today candidates require league availability and a scheduled NBA team", ()
   const players = [player(1), player(3, { availability: "WAIVERS", status: "OUT" }), player(2, { teamId: 5 }),
     player(4, { availability: "UNKNOWN" }), player(5, { nbaTeam: "BOS" }), player(6, { nbaTeam: "NO", zTotal: null, power: null })];
   const copy = structuredClone(players);
-  const result = availableToday(players, games, { notStarted: false, category: "all", now: 0 });
+  const result = availableToday(players, games, { notStarted: false, category: "all", now: 0, includeInjured: true });
   assert.deepEqual(result.map((r) => r.player.id), [3, 1, 6]);
   assert.equal(result[0].player.availability, "WAIVERS");
   assert.equal(result[0].player.status, "OUT");
@@ -100,4 +100,13 @@ test("Today shows score failure separately from an empty schedule", () => {
   assert.doesNotMatch(render(data), /No NBA games/);
   assert.match(render({ ...data, status: "ready" }), /No NBA games today/);
   assert.match(render({ ...data, status: "stale", games }), /Scores may be out of date/);
+});
+
+
+test("streamers default to playable statuses and explicitly opt in to injury stashes", () => {
+  const games=normalizeScoreboard(fixture,"2026-10-29");
+  const players=[player(301,{status:"ACTIVE"}),player(302,{status:"OUT"}),player(303,{status:"DAY_TO_DAY"}),player(304,{status:"SUSPENDED"}),player(305,{status:"INJURY_RESERVE"})];
+  const options={notStarted:false,category:"all" as const,now:0};
+  assert.deepEqual(availableToday(players,games,options).map(r=>r.player.id).sort(),[301,303]);
+  assert.equal(availableToday(players,games,{...options,includeInjured:true}).length,5);
 });

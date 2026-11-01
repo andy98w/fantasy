@@ -73,7 +73,7 @@ Use your agent framework's MCP adapter if it already has one. `tools/list` suppl
 | Tool | Returns |
 | --- | --- |
 | `fantasy_get_league` | Settings, team IDs, standings, team power (sortable by power/name/category), available forecast periods |
-| `fantasy_get_team` | Current roster, category strengths, IR-aware power, roster news |
+| `fantasy_get_team` | Current roster, category strengths, full-roster power (including IR), roster news |
 | `fantasy_search_players` | Search/filter players; sort by power/name/category; paginated |
 | `fantasy_get_player` | Season per-game stats, category contributions, power trend, news |
 | `fantasy_get_matchups` | Actual weekly totals, results, optional credited player stats sorted by category |
@@ -98,14 +98,14 @@ Use your agent framework's MCP adapter if it already has one. `tools/list` suppl
 
 All date inputs are valid `YYYY-MM-DD` **Pacific calendar dates**, inclusive. `fantasy_find_streamers` accepts a single `date` within 31 days of today and uses current imported ownership even for past/future dates. `notStarted` defaults to true. A category filter selects positive category contributors and orders by category value. Missing/stale scoreboards are explicitly labeled.
 
-History uses the latest retained capture per day. Database retention limits availability; local file storage provides its embedded seven-day player history and the latest team observation only. Player history is the published power at capture time. Team history recomputes the current `4 * asinh(z / 4)` formula on each historical roster/category set, excluding that capture's IR players. It is not a historical win probability, and roster moves affect it. `change` spans the first/last returned observations, and is null when their model versions differ or either endpoint is unrated. Power can also shift as the reference player pool changes.
+History uses the latest retained capture per day. Database retention limits availability; local file storage provides its embedded seven-day player history and the latest team observation only. Player history is the published power at capture time. Team history recomputes the current `4 * asinh(z / 4)` formula on each historical roster/category set, including that capture's IR players; the returned team formula identifies this full-roster model. It is not a historical win probability, and roster moves affect it. `change` spans the first/last returned observations, and is null when their model versions differ or either endpoint is unrated. Power can also shift as the reference player pool changes.
 
 Opportunity `remainingScheduledGames` excludes games already underway; `inProgressGames` counts those separately, and each player's `remainingGameEquivalents` includes fractional live production. `openSlots` is one legal optimized assignment of lineup positions, **not roster vacancies**; multi-position players may allow other assignments. Forecast failures withhold opportunity counts rather than reporting misleading zeros. Closest categories use projected end-of-week stats, including actual totals for the current week.
 
 ## Data meaning and limits
 
-- Player power uses **season per-game averages**. Team power includes bench players, excludes IR and tapers each category using `4 * asinh(z / 4)`. Category values are untapered z-scores. Unknown player value contributes zero reference-average value; team results retain coverage and provisional flags.
-- Weekly matchup stats are **actual weekly totals**. Forecasts are **schedule-weighted estimates**, not probabilities. Projection issues produce an unavailable projected score, not invented stats. Trade simulations retain current IR slots and do not validate ESPN trade/roster legality.
+- Player power uses **season per-game averages**. Team power includes bench and IR players and tapers each category using `4 * asinh(z / 4)`. Category values are untapered z-scores. Unknown player value contributes zero reference-average value; team results retain coverage and provisional flags.
+- Weekly matchup stats are **actual weekly totals**. Forecasts are **schedule-weighted estimates**, not probabilities. Projection issues produce an unavailable projected score, not invented stats. Trade power includes IR. Separate next-week production scenarios retain current IR placement as an assumption and do not validate ESPN trade/roster legality.
 - Shooting stats use fractions: `0.5` means 50%. Raw TO sorts numerically; category strength already reverses turnovers so positive is beneficial. Set `descending: false` to find the lowest raw turnovers.
 - Each result includes league/season, demo/live mode and import timestamps. Public NBA results add their own timestamps and stale/partial status. No MCP call triggers an ESPN league import; the existing sync cadence still applies.
 - Before today's first game begins, daily performers may describe the last played day; inspect `performerDate` instead of assuming today.
@@ -114,3 +114,13 @@ Opportunity `remainingScheduledGames` excludes games already underway; `inProgre
 - There are no ESPN write tools, vote tools, auction mutation tools, arbitrary URL tools, SQL tools or file tools. Input schemas reject extra fields; HTTP bodies are limited to 32 KiB. Browser requests with a foreign Origin are rejected; server-to-server MCP clients normally send no Origin.
 
 The endpoint creates a fresh MCP server/transport per request, so Railway replicas and restarts need no session store or sticky routing. API data caches and database pools remain shared within each process. The official SDK client is exercised in unit tests and against the packaged production server in the smoke test.
+
+### Availability scenarios
+
+`fantasy_forecast_matchup` and `fantasy_get_matchup_opportunities` accept `scenario`: `conservative` (default) or `if_available`. Conservative includes only ACTIVE players outside IR. If available includes uncertain statuses and hypothetically returns OUT/suspended/IR players after today. Neither predicts return dates or injury probabilities. Daily legal slots and today’s lineup locks still apply. IR activations require non-IR roster capacity; insufficient space withholds the result instead of assuming drops.
+
+Each side exposes `scenario`, `availabilityAsOf`, player `assumptions`, dated `exclusions`, `activationPlayerIds` and `activationSlotsNeeded`. Current OUT does not prove a future game absence. Projection issues mean no complete estimate; do not use partial player/game counts. Credited weekly totals are never removed by current injury status.
+
+`fantasy_find_streamers` excludes OUT/injury-reserve/suspended players by default. Use `includeInjured: true` for stash searches. Day-to-day, questionable and unknown statuses remain explicit and require an availability check. `availabilityAsOf` describes injury/ownership data freshness, separately from the NBA scoreboard fetch time.
+
+`fantasy_analyze_trade` returns both availability scenarios under each side’s `upcomingProduction`, with before/after stats, games and assumptions for next week. Player and team power remain per-game roster value without injury discounts.

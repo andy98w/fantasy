@@ -105,30 +105,22 @@ test("punts and priorities change fit without changing category strengths", () =
   assert.equal(rosterValue([fewerTurnovers]).score, 2);
 });
 
-test("IR excludes positive, negative and unrated values from team power and coverage", () => {
-  const active = { ...p(1, 1, 2), slot: "BE", status: "OUT" };
-  const injured = { ...p(2, 1, 10), slot: "IR" };
-  const roster = [active, injured, { ...p(3, 1, -5), slot: "IR" }, { ...p(4, 1, null), slot: "IR" }];
+test("roster power includes IR values and is invariant to injury/slot placement", () => {
+  const roster = [p(1,1,2), {...p(2,1,10), slot:"IR", status:"OUT"}, {...p(3,1,-5),slot:"IR"}, {...p(4,1,null),slot:"IR"}];
   const value = rosterValue(roster);
-  assert.equal(value.score, 2);
-  assert.equal(value.categories.AST, 2);
-  assert.equal(value.size, 1);
-  assert.equal(value.rated, 1);
-  assert.equal(value.provisional, false);
-  assert.equal(rosterValue([injured]).score, null);
-  assert.equal(rosterValue([{ ...injured, slot: "BE" }]).score, 10);
-  assert.equal(rosterValue([injured], DEFAULT_WEIGHTS, { includeIR: true }).score, 10);
-  assert.equal(injured.zTotal, 10);
+  assert.equal(value.score,7); assert.equal(value.categories.AST,7);
+  assert.equal(value.size,4); assert.equal(value.rated,3); assert.equal(value.provisional,true);
+  assert.equal(teamRating(roster).score, teamRating(roster.map(p => ({...p,slot:"BE",status:"ACTIVE"}))).score);
+  assert.equal(rosterValue([roster[1]]).score,10);
 });
 
-test("trade team impact excludes IR while keeping those players on resulting rosters", () => {
-  const players = [p(1, 1, 2), { ...p(2, 1, 10), slot: "IR" }, p(3, 2, 3)];
-  const trade = exchangePlayers(players, 1, 2, [2], [3]);
-  assert.equal(rosterValue(trade.left.before).score, 2);
-  assert.equal(rosterValue(trade.left.after).score, 5);
-  assert.equal(rosterValue(trade.right.after).score, null);
-  assert.deepEqual(trade.right.after.map(p => p.id), [2]);
-  assert.equal(trade.right.after[0].slot, "IR");
+test("trading an IR player transfers their full underlying value without mutating placement", () => {
+  const players = [p(1,1,2), {...p(2,1,10),slot:"IR"},p(3,2,3)];
+  const trade = exchangePlayers(players,1,2,[2],[3]);
+  assert.equal(rosterValue(trade.left.before).score,12);
+  assert.equal(rosterValue(trade.left.after).score,5);
+  assert.equal(rosterValue(trade.right.after).score,10);
+  assert.equal(trade.right.after[0].slot,"IR");
 });
 
 test("same-team, duplicate and stale player selections are rejected", () => {
@@ -188,9 +180,9 @@ test("team rating rewards spread strength, tapers after aggregation, and leaves 
 test("tapered team fit respects IR, unknowns, punts and priorities", () => {
   const roster = [p(201,1,10), { ...p(202,1,100), slot: "IR" }, p(203,1,null)];
   const rating = teamRating(roster);
-  assert.equal(rating.score, teamRating([roster[0]]).score);
+  assert.equal(rating.score, teamRating(roster.slice(0,2)).score);
   assert.equal(rating.provisional, true);
-  assert.equal(teamRating([roster[1],roster[2]]).score, null);
+  assert.equal(teamRating([roster[1],roster[2]]).score, teamRating([roster[1]]).score);
   assert.equal(teamRating(roster, { ...DEFAULT_WEIGHTS, AST: 0 }).score, 0);
   const priority = teamRating(roster, { ...DEFAULT_WEIGHTS, AST: 2 });
   assert.ok(Math.abs(priority.score! - 2 * rating.score!) <= .001);

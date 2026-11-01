@@ -10,8 +10,9 @@ Updated November 1, 2026 (America/Los_Angeles). This is the starting point for a
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Latest application commit: `5ead4d7d69aff57f2ae15b9240798457fda10d44` — simplified MCP onboarding. This handoff is a subsequent documentation-only change.
-- That application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41347266465`; Railway GitHub deployment: `7478677082`.
+- Current follow-up: full-roster power including IR, explicit forecast availability scenarios, separate next-week trade production, and injury filtering for streamers. Use `git log -1` and exact-commit CI/deployment checks for its release state.
+- Previous application release: `5ead4d7d69aff57f2ae15b9240798457fda10d44` — simplified MCP onboarding.
+- That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41347266465`; Railway GitHub deployment: `7478677082`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
 
 Read `AGENTS.md` first. It requires reading the relevant bundled Next.js documentation under `node_modules/next/dist/docs/` before code changes. Do not assume familiar Next.js APIs match this installed version.
@@ -37,7 +38,7 @@ Fantasy is a public, shared, read-only interface over the league's ESPN data. ES
 | Tab | Current behavior |
 | --- | --- |
 | League | Current fantasy matchups; daily performers; roster news; Today games and available players. Clicking games opens NBA box scores. Clicking players opens profiles/game history. |
-| Teams | Team power, sortable category heatmap, rosters and news. IR does not contribute to power. No “Rated players” column. |
+| Teams | Team power, sortable category heatmap, rosters and news. IR contributes to full-roster power; availability affects production forecasts separately. No “Rated players” column. |
 | Players | Search/filter/sort player stats, power and seven-day risers/fallers when comparable history exists. |
 | Trades | Calculator, Battles (default), Auction House. History was replaced; completed transactions are in Records → Ledger. |
 | Forecast | Next-week/rest-of-week schedule-aware projections and What if (weekly all-play replay, not a forecast). |
@@ -84,10 +85,10 @@ Next.js / React / TypeScript frontend and server routes; Python ingestion; Postg
 ## Ratings: preserve these distinctions
 
 - Player power: season per-game nine-category z-scores, shooting impact weighted by attempts, turnovers inverted. Minimum stats coverage/games applies; unknown values stay unknown.
-- Team power: exclude IR, include bench; aggregate category z-values then sum `4 * asinh(category_z / 4)` across categories. Trade priority weights apply after this taper.
+- Team power: include the full roster, including IR and bench; aggregate category z-values then sum `4 * asinh(category_z / 4)` across categories. Trade priority weights apply after this taper.
 - Heatmaps show raw category z-totals, not tapered values. Positive TO category strength is good (fewer turnovers); raw turnover stats still mean lower is better.
-- Unrated active players contribute reference-average zero to the estimate, with provisional/coverage metadata retained. Fully unrated rosters stay unranked. Zero assumed value does not mean zero production.
-- Forecasts use season averages, actual schedule, legal lineup slots and injury exclusions. They are estimates, not win probabilities. Trade simulations do not execute trades or prove ESPN roster legality.
+- Unrated rostered players contribute reference-average zero to the estimate, with provisional/coverage metadata retained. Fully unrated rosters stay unranked. Zero assumed value does not mean zero production.
+- Forecasts use season averages, actual schedule, legal lineup slots and explicit conservative/if_available scenarios. Conservative excludes all non-ACTIVE statuses and IR. If available assumes uncertain players play and OUT/suspended/IR return after today; activation requires non-IR roster capacity. Scenarios are not return-date predictions. They are estimates, not win probabilities. Trade simulations do not execute trades or prove ESPN roster legality.
 - Community trade MMR is separate from player/team power. Elo starts at 1000, K=32; a battle compares team-sides of different trades. Under-voted entries are prioritized. Repeat votes are permitted. Vote counts count appearances, not unique people.
 - Shared standing ranks reflect equal win percentage; ESPN seeds can differ. Missing history must not be filled with invented category results.
 
@@ -209,6 +210,10 @@ Railway has web, sync and Postgres services. Web uses root `Dockerfile`; sync us
 - Back up persistent votes/listings/database history before destructive storage changes. No destructive change is authorized by this handoff.
 - Do not add ESPN mutation calls, login requirements, fake data, or speculative historical results.
 
+## Injury-handling follow-up validation
+
+Local validation: 114 web tests, 69 worker tests, typecheck, production build and standalone smoke passed. Browser checks covered forecast scenario switching, IR trade value, separate production tables, and desktop/mobile layout. Team power history recomputes full-roster values on retained historical captures and identifies the revised team formula. Forecasts report per-player assumptions, per-date exclusions, availability freshness and required activation slots; incomplete scenarios expose no partial production totals.
+
 ## Next chat
 
-There is no pending approved implementation after this handoff. MCP onboarding is completed and deployed. Wait for the user's next task. If they revisit trades, start with the pending/completed distinction above and current upstream evidence.
+The November 1 follow-up changes full-roster power to include IR, adds forecast availability scenarios and separate next-week trade production, and filters unavailable streamers by default. MCP and UI share the rules. Verify this change’s Git/CI/deployment state before claiming it is live. If they revisit trades, start with the pending/completed distinction above and current upstream evidence.

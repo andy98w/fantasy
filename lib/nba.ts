@@ -1,3 +1,4 @@
+import { isUnavailable } from "./availability";
 import { z } from "zod";
 import { CATEGORIES, type Category, type Player } from "./schema";
 
@@ -87,10 +88,11 @@ export function gameLabel(game: NbaGame): string {
   return ({ delayed: "Delayed", postponed: "Postponed", cancelled: "Cancelled", suspended: "Suspended", unknown: "Status unavailable" })[game.state];
 }
 
-export function availableToday(players: Player[], games: NbaGame[], options: { notStarted: boolean; category: Category | "all"; now: number }) {
+export function availableToday(players: Player[], games: NbaGame[], options: { notStarted: boolean; category: Category | "all"; now: number; includeInjured?: boolean }) {
   const playable = games.filter((game) => ["scheduled", "live", "final", "delayed"].includes(game.state) &&
     (!options.notStarted || (game.state === "scheduled" && Date.parse(game.startsAt) > options.now)));
   return players.flatMap((player) => {
+    if (!options.includeInjured && isUnavailable(player)) return [];
     if (player.teamId !== null || !["FREEAGENT", "WAIVERS"].includes(player.availability)) return [];
     if (options.category !== "all" && (player.zTotal === null || !(player.contributions[options.category] > 0))) return [];
     const team = nbaAbbrev(player.nbaTeam);

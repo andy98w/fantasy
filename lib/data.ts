@@ -96,3 +96,18 @@ export async function loadLeague(): Promise<DataResult> {
     };
   }
 }
+
+/** Read retained daily captures without exposing raw ESPN payloads. */
+export async function loadPowerHistory(current: Snapshot, request: import("./mcp/power-history").HistoryRequest) {
+  const { extractPowerHistory } = await import("./mcp/power-history");
+  if (current.mode === "demo") return extractPowerHistory([current], current, request, "demo");
+  if (!process.env.DATABASE_URL) {
+    const file = path.resolve(/* turbopackIgnore: true */ process.env.SNAPSHOT_PATH ?? "data/league.json");
+    const raw = JSON.parse(await readFile(/* turbopackIgnore: true */ file, "utf8"));
+    return extractPowerHistory([raw], current, request, "local");
+  }
+  const pool = globalDb.pool ??= createPool({ connectionString: process.env.DATABASE_URL, max: 3, connectionTimeoutMillis: 5000, statement_timeout: 5000 });
+  const { retainedPowerSnapshots } = await import("./mcp/history-store");
+  const rows = await retainedPowerSnapshots(pool, current.league.id, current.league.season, request.from, request.to);
+  return extractPowerHistory(rows.rows.map(row => row.payload), current, request, "database");
+}

@@ -48,13 +48,16 @@ try {
   try {
     await mcp.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
     const { tools } = await mcp.listTools();
-    assert.equal(tools.length, 13);
+    assert.equal(tools.length, 16);
     assert.ok(tools.every(tool => tool.annotations?.readOnlyHint === true));
     const league = await mcp.callTool({ name: 'fantasy_get_league', arguments: {} });
     assert.notEqual(league.isError, true);
     assert.equal(league.structuredContent.metadata.mode, 'demo');
     const players = await mcp.callTool({ name: 'fantasy_search_players', arguments: { limit: 2 } });
     assert.equal(players.structuredContent.items.length, 2);
+    const history = await mcp.callTool({ name: 'fantasy_get_power_history', arguments: { kind: 'team', id: league.structuredContent.teams[0].id } });
+    assert.notEqual(history.isError, true);
+    assert.equal(history.structuredContent.source, 'demo');
     const invalid = await mcp.callTool({ name: 'fantasy_search_players', arguments: { limit: 1000 } });
     assert.equal(invalid.isError, true);
   } finally { await mcp.close(); }

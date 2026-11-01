@@ -75,6 +75,8 @@ test("unstarted games can use only unlocked slots and postponed games are skippe
   const today:TodayData={date:"2026-10-29",fetchedAt:new Date(time).toISOString(),status:"ready",games:[{id:"1",startsAt:schedule.games[0].startsAt,state:"final",detail:"Final",remainingFraction:0,home:{id:"1",abbrev:"ATL",name:"A",score:0,logo:null},away:{id:"2",abbrev:"BOS",name:"B",score:0,logo:null}}]};
   const p=projectTeam(d,1,schedule.windows[0],time,today);
   assert.equal(p.games,0);assert.equal(p.benched,1);assert.equal(p.side.stats.PTS,20);
+  assert.equal(p.days[0].lockedSlots, 1); assert.deepEqual(p.days[0].openSlots, []);
+  assert.deepEqual(p.days[0].benchedPlayerIds, [2]);
   today.games[0].state="postponed";
   assert.equal(projectTeam(d,1,schedule.windows[0],time,today).games,1);
 });
@@ -96,4 +98,12 @@ test("forecast page labels projections and uses one collapsed assumptions sectio
 
 test("optional malformed forecast metadata cannot hide an otherwise valid league", () => {
   assert.equal(snapshotSchema.parse({...demo,forecastSchedule:{slots:[]}}).forecastSchedule,null);
+});
+
+ test("opportunities preserve usable slots with positional constraints", () => {
+  const d = snapshot([player(1, { eligibleSlots: ["PG"] })]);
+  const p = projectTeam(d, 1, schedule.windows[1], now);
+  assert.equal(p.issue, null);
+  assert.deepEqual(p.days.map(day => day.openSlots), [["UTIL"], ["UTIL"]]);
+  assert.deepEqual(p.days[0].selectedPlayerIds, [1]);
 });

@@ -65,3 +65,27 @@ test('PostgreSQL listings persist across instances and serialize simultaneous ed
     await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end();
   }
 });
+
+test('Power history selects daily Pacific captures, isolates leagues and retains latest embedded history', async () => {
+  const { retainedPowerSnapshots } = await import('../../lib/mcp/history-store');
+  const admin = new Pool({ connectionString: url });
+  const schema = `test_${randomUUID().replaceAll('-', '')}`;
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}` });
+  try {
+    await pool.query(await readFile('db/schema.sql', 'utf8'));
+    for (const [league, season, at, label] of [
+      [1,2027,'2026-11-01T06:59:00Z','Oct31'],
+      [1,2027,'2026-11-01T07:30:00Z','before-fallback'],
+      [1,2027,'2026-11-01T09:30:00Z','after-fallback'],
+      [1,2027,'2026-11-02T07:59:00Z','Nov1-latest'],
+      [1,2027,'2026-11-02T08:01:00Z','latest'],
+      [2,2027,'2026-11-01T22:00:00Z','other-league'],
+      [1,2026,'2026-11-01T22:00:00Z','other-season'],
+    ]) await pool.query('INSERT INTO league_snapshots(league_id,season,captured_at,payload,raw_payload) VALUES($1,$2,$3,$4,$5)', [league,season,at,{label},{}]);
+    const rows = await retainedPowerSnapshots(pool, 1, 2027, '2026-10-31', '2026-11-01');
+    assert.deepEqual(rows.rows.map(row => row.payload.label).sort(), ['Oct31','Nov1-latest','latest'].sort());
+  } finally {
+    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end();
+  }
+});

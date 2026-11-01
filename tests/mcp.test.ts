@@ -12,6 +12,8 @@ const fixture = () => snapshotSchema.parse(structuredClone(demo));
 function dependencies(snapshot = fixture()): FantasyMcpData {
   return {
     loadLeague: async () => ({ snapshot, syncFailure: null }),
+    loadPowerHistory: async () => ({ source: "demo", points: [], skippedSnapshots: 0 }),
+    loadScoreboard: async date => ({ date, fetchedAt: null, status: "error", games: [] }),
     loadToday: async () => ({ date: "2026-11-01", fetchedAt: null, status: "error", games: [] }),
     loadBoxscore: async () => { throw new Error("postgres://private-secret@database"); },
     loadPlayerGames: async () => ({ games: [], fetchedAt: "2026-11-01T19:00:00Z", stale: true }),
@@ -38,7 +40,7 @@ test("official Streamable HTTP clients initialize, discover read-only tools and 
   const first = await connect(deps), second = await connect(deps);
   try {
     const tools = (await first.listTools()).tools;
-    assert.equal(tools.length, 13);
+    assert.equal(tools.length, 16);
     assert.equal(reads, 0, "Discovery does not fetch private data or require an ESPN import");
     for (const tool of tools) {
       assert.equal(tool.annotations?.readOnlyHint, true);
@@ -162,10 +164,73 @@ test("forecast resolves scheduled opponents and daily results keep the prior sla
     assert.equal(result.away.teamId, away);
     assert.equal(result.home.issue, null);
     assert.ok(result.categoryScore);
+    const opportunities = await call(client, "fantasy_get_matchup_opportunities", { teamId: home, period });
+    assert.equal(opportunities.home.issue, null);
+    assert.equal(opportunities.home.remainingScheduledGames, result.home.games);
+    assert.equal(opportunities.home.days.length, 1);
+    s.forecastSchedule = null;
+    assert.equal((await client.callTool({ name: "fantasy_get_matchup_opportunities", arguments: { teamId: home } })).isError, true);
     const today = await call(client, "fantasy_get_today");
     assert.equal(today.date, "2026-11-01");
     assert.equal(today.performerDate, "2026-10-31");
     assert.equal(today.performerStatus, "stale");
     assert.equal(today.boxscoreStatus, "partial");
+  } finally { await client.close(); }
+});
+
+test("streamers filter availability, opponent, category and started games; errors never imply no candidates", async () => {
+  const s = fixture(); s.mode = "live";
+  const template = s.players[0];
+  s.players = [
+    { ...template, id: 100, teamId: null, nbaTeam: "ATL", availability: "FREEAGENT", zTotal: 2, contributions: { ...template.contributions, BLK: 3 } },
+    { ...template, id: 101, teamId: null, nbaTeam: "ATL", availability: "WAIVERS", zTotal: 3, contributions: { ...template.contributions, BLK: 4 } },
+    { ...template, id: 102, teamId: 1, nbaTeam: "ATL", availability: "ROSTERED" },
+  ];
+  const deps = dependencies(s);
+  const slate = { date: "2026-11-01", fetchedAt: "2026-11-01T19:00:00Z", status: "ready" as const, games: [{ id: "401234567", startsAt: "2026-11-02T01:00:00Z", state: "scheduled" as const, detail: "", home: { id: "1", name: "Atlanta", abbrev: "ATL", logo: null, score: null }, away: { id: "2", name: "Boston", abbrev: "BOS", logo: null, score: null } }] };
+  deps.loadToday = async () => slate;
+  const client = await connect(deps);
+  try {
+    const both = await call(client, "fantasy_find_streamers", { category: "BLK", opponent: "bos" });
+    assert.deepEqual(both.items.map((row: any) => row.player.id), [101,100]);
+    const free = await call(client, "fantasy_find_streamers", { availability: "free_agent" });
+    assert.equal(free.total, 1); assert.equal(free.items[0].player.id, 100);
+    deps.now = () => Date.parse("2026-11-02T02:00:00Z");
+    assert.equal((await call(client, "fantasy_find_streamers")).total, 0);
+    assert.equal((await call(client, "fantasy_find_streamers", { notStarted: false })).total, 2);
+    const unavailable = await call(client, "fantasy_find_streamers", { date: "2026-11-03" });
+    assert.equal(unavailable.available, false);
+    assert.equal((await client.callTool({ name: "fantasy_find_streamers", arguments: { date: "2026-02-30" } })).isError, true);
+  } finally { await client.close(); }
+});
+
+test("history tool exposes gaps/model changes and rejects excessively wide or reversed ranges", async () => {
+  const s = fixture(), deps = dependencies(s);
+  deps.loadPowerHistory = async () => ({ source: "database", skippedSnapshots: 0, points: [
+    { date: "2026-10-30", capturedAt: "2026-10-30T22:00:00Z", power: 40, model: { version: 1 } },
+    { date: "2026-11-01", capturedAt: "2026-11-01T22:00:00Z", power: 50, model: { version: 2 } },
+  ] });
+  const client = await connect(deps);
+  try {
+    const args = { kind: "player", id: s.players[0].id, from: "2026-10-30", to: "2026-11-01" };
+    const result = await call(client, "fantasy_get_power_history", args);
+    assert.deepEqual(result.missingDates, ["2026-10-31"]); assert.equal(result.comparable, false); assert.equal(result.change, null);
+    for (const from of ["2026-09-01", "2026-11-02"]) assert.equal((await client.callTool({ name: "fantasy_get_power_history", arguments: { ...args, from } })).isError, true);
+  } finally { await client.close(); }
+});
+
+test("game log dates filter before pagination; category sorting handles percentages, zero attempts and ties", async () => {
+  const s = fixture(); s.mode = "live";
+  const deps = dependencies(s);
+  const team = { id: "1", name: "Atlanta", abbrev: "ATL", logo: null, score: 100 };
+  deps.loadPlayerGames = async () => ({ fetchedAt: "2026-11-01T19:00:00Z", stale: false, games: [
+    ["1", "2026-11-01T06:30:00Z", "9-10"], ["2", "2026-11-01T07:30:00Z", "0-0"], ["3", "2026-11-01T10:00:00Z", "1-2"], ["4", "2026-11-02T02:00:00Z", "8-10"],
+  ].map(([id, startsAt, fg]) => ({ game: { id, startsAt, state: "final", detail: "Final", home: team, away: { ...team, id: "2" } }, opponent: "BOS", result: "W", stats: { "fieldGoalsMade-fieldGoalsAttempted": fg } })) });
+  const client = await connect(deps);
+  try {
+    const result = await call(client, "fantasy_get_player_games", { playerId: s.players[0].id, from: "2026-11-01", to: "2026-11-01", sortBy: "FG%", limit: 2 });
+    assert.equal(result.total, 3); assert.deepEqual(result.items.map((row: any) => row.game.id), ["4","3"]);
+    const ascending = await call(client, "fantasy_get_player_games", { playerId: s.players[0].id, from: "2026-11-01", sortBy: "FG%", descending: false });
+    assert.deepEqual(ascending.items.map((row: any) => row.game.id), ["3","4","2"]);
   } finally { await client.close(); }
 });

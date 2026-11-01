@@ -14,12 +14,13 @@ export type Projection = {
   missing: Player[];
   issue: string | null;
   players: { player: Player; games: number }[];
+  days: { date: string; lockedSlots: number; selectedPlayerIds: number[]; openSlots: string[]; benchedPlayerIds: number[] }[];
 };
 
 // Bipartite assignment, maximizing filled legal slots first, then player power.
 // Greedy selection fails when a multi-position player takes a specialist's slot.
-export function dailyLineup(players: Player[], slots: string[]): Player[] {
-  if (slots.length > 12) return [];
+export function dailyLineupPlan(players: Player[], slots: string[]) {
+  if (slots.length > 12) return { players: [] as Player[], openSlots: [] as string[] };
   type Choice = { score: number; players: Player[] };
   let states = new Map<number, Choice>([[0, { score: 0, players: [] }]]);
   for (const player of [...players].sort((a, b) => a.id - b.id)) {
@@ -32,7 +33,12 @@ export function dailyLineup(players: Player[], slots: string[]): Player[] {
     }
     states = next;
   }
-  return [...states.values()].sort((a, b) => b.players.length - a.players.length || b.score - a.score)[0].players;
+  const [mask, choice] = [...states.entries()].sort((a, b) => b[1].players.length - a[1].players.length || b[1].score - a[1].score)[0];
+  return { players: choice.players, openSlots: slots.filter((_, index) => !(mask & (1 << index))) };
+}
+
+export function dailyLineup(players: Player[], slots: string[]): Player[] {
+  return dailyLineupPlan(players, slots).players;
 }
 
 export function scheduledOpponent(schedule: ForecastSchedule | null, period: number, team: number): number | undefined {
@@ -46,7 +52,7 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
   const excluded = roster.filter(p => p.slot === "IR" || unavailable.has(p.status));
   const result: Projection = {
     side: { teamId, wins: null, ties: null, stats: {}, performers: [], performanceComplete: false },
-    games: 0, liveGames: 0, benched: 0, excluded, missing: [], issue: null, players: [],
+    games: 0, liveGames: 0, benched: 0, excluded, missing: [], issue: null, players: [], days: [],
   };
   const fail = (issue: string) => { result.issue = issue; result.side.stats = {}; return result; };
   const schedule = data.forecastSchedule;
@@ -98,7 +104,8 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
         candidates.push(player);
       }
     }
-    const selected = dailyLineup(candidates, slots);
+    const plan = dailyLineupPlan(candidates, slots), selected = plan.players;
+    result.days.push({ date: day, lockedSlots: schedule.slots.length - slots.length, selectedPlayerIds: selected.map(p => p.id), openSlots: plan.openSlots, benchedPlayerIds: candidates.filter(p => !selected.includes(p)).map(p => p.id) });
     result.games += selected.length;
     result.benched += candidates.length - selected.length;
     for (const player of selected) add(player, 1);

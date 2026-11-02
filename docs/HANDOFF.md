@@ -42,7 +42,7 @@ Fantasy is a public, shared, read-only interface over the league's ESPN data. ES
 | Players | Search/filter/sort player stats, power and seven-day risers/fallers when comparable history exists. |
 | Trades | Calculator, Battles (default), Auction House. History was replaced; completed transactions are in Records → Ledger. |
 | Forecast | Next-week/rest-of-week schedule-aware projections and What if (weekly all-play replay, not a forecast). |
-| Records | Standings default; historical comparisons, cumulative awards/records, transaction ledger. |
+| Records | Matchups default: week selector, all imported matchups/results, expandable category totals, scheduled future pairings. Also standings, current-week awards, head-to-head and transaction ledger. |
 | MCP | ChatGPT / Claude / Other setup instructions; hosted URL; fantasy-team selector and copyable starter prompt. |
 
 Daily performer tabs: Top performers, Shitters, Surprises, Letdowns; up to six cards ranked #1–#6. Top/worst measure actual daily contribution; surprises/letdowns compare against the season per-game baseline. Negative lists require a final game and at least 10 minutes. Before today's first actual tip-off, retain the latest played day's performers and show its date. Today sidebar remains on today's schedule. Do not fabricate rows when fewer players qualify.

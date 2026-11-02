@@ -37,34 +37,10 @@
 .category-switches button:active { transform: translate(2px,2px); box-shadow: none; }
 .category-switches button:disabled { cursor: default; }
 .what-if-table .identity-col { width: 50%; }
-.record-cabinet { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 3px solid var(--line); background: var(--surface-deep); gap: 3px; }
-.record-card { height: 100%; position: relative; background: var(--surface); padding: 28px 22px 22px; border-bottom: 8px solid var(--line); text-align: center; }
-.record-card::after { content: ""; position: absolute; inset: auto 0 -8px; height: 3px; background: var(--shadow); }
-.record-emblem { height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: end; gap: 8px; margin-bottom: 20px; }
-.record-emblem .award-trophy { color: var(--gold); filter: drop-shadow(4px 4px 0 var(--shadow)); }
-.trophy-plinth { width: 74px; height: 12px; background: var(--line); border-top: 3px solid var(--gold); box-shadow: 5px 5px var(--shadow); }
-.record-card h2 { font: 500 25px var(--pixel); color: var(--gold); margin: 0 0 12px; }
-.record-value { display: block; font-size: 38px; font-variant-numeric: tabular-nums; line-height: 1.2; }
-.record-unit { color: var(--muted); font-size: 12px; }
-.record-holders { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 20px; text-align: left; }
-.record-holder { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.record-holder:last-child { margin-bottom: 0; }
-.record-holder > span { min-width: 0; overflow-wrap: anywhere; }
-.record-holder small { color: var(--muted); font-size: 11px; display: block; }
-.record-holders summary { cursor: pointer; color: var(--muted); font-size: 12px; padding: 4px 0 12px; }
-.dubious-record h2, .dubious-record .award-trophy { color: var(--coral); }
-.dubious-record .trophy-plinth { border-color: var(--coral); }
-.record-new { position: absolute; right: 12px; top: 12px; padding: 4px 7px; background: var(--gold); color: var(--bg); font: 15px var(--pixel); }
-.record-broken { animation: record-break 1.8s ease-out; }
-.record-vacant { text-align: center; padding: 65px 24px; border: 2px solid var(--line); background: var(--surface-deep); }
-.record-vacant > svg { color: var(--line); }
-.record-vacant h2 { font: 500 30px var(--pixel); color: var(--gold); margin: 24px 0 0; }
-.record-vacant .empty-state { padding-bottom: 0; }
 @keyframes rival-enter-left { from { transform: translateX(-40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes rival-enter-right { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes vs-land { 0%,25% { transform: scale(1.6) rotate(-10deg); opacity: 0; } 65% { transform: scale(.92) rotate(2deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
-@keyframes record-break { 0%,100% { box-shadow: inset 0 0 0 0 transparent; } 30% { box-shadow: inset 0 0 0 4px var(--gold); } }
-@media (max-width: 900px) { .rivalry-history-grid { grid-template-columns: 1fr; } .record-cabinet { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 900px) { .rivalry-history-grid { grid-template-columns: 1fr; } }
 @media (max-width: 650px) {
   .rivalry-toolbar { flex-wrap: wrap; gap: 12px; }
   .rivalry-toolbar .tabs { flex: 1; }
@@ -82,14 +58,8 @@
   .what-if-heading h2 { font-size: 24px; }
   .category-switches { gap: 6px; }
   .category-switches button { min-width: 54px; padding: 9px 10px; font-size: 12px; }
-  .record-card { padding: 18px 12px; }
-  .record-card h2 { font-size: 21px; }
-  .record-value { font-size: 30px; }
-  .record-holder { font-size: 12px; }
-  .record-holder .avatar { width: 26px; height: 26px; }
-  .record-new { position: static; display: inline-block; margin-bottom: 8px; }
 }
-@media (prefers-reduced-motion: reduce) { .rivalry-fighter, .rivalry-vs > span, .record-broken { animation: none; } .category-switches button:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rivalry-fighter, .rivalry-vs > span { animation: none; } .category-switches button:active { transform: none; } }
 .closest-meeting { display: block; color: var(--gold); font-size: 10px; }
 @media (max-width: 650px) {
   .rivalry-toolbar .tabs { flex: 1 0 100%; }

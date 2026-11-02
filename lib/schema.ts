@@ -70,6 +70,9 @@ const side = z.object({
   stats,
   performers: z.array(performerSchema).default([]),
   performanceComplete: z.boolean().default(false),
+  statCorrections: z.array(z.object({
+    id: z.string(), date: z.string(), label: z.string(), stats: z.record(z.string(), numeric),
+  })).optional(),
 });
 export const matchupSchema = z.object({ id: numeric, period: numeric, home: side, away: side, result: z.enum(["HOME", "AWAY", "TIE", "UNDECIDED"]).default("UNDECIDED") });
 export type Matchup = z.infer<typeof matchupSchema>;

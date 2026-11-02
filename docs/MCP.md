@@ -124,3 +124,5 @@ Each side exposes `scenario`, `availabilityAsOf`, player `assumptions`, dated `e
 `fantasy_find_streamers` excludes OUT/injury-reserve/suspended players by default. Use `includeInjured: true` for stash searches. Day-to-day, questionable and unknown statuses remain explicit and require an availability check. `availabilityAsOf` describes injury/ownership data freshness, separately from the NBA scoreboard fetch time.
 
 `fantasy_analyze_trade` returns both availability scenarios under each side’s `upcomingProduction`, with before/after stats, games and assumptions for next week. Player and team power remain per-game roster value without injury discounts.
+
+User-confirmed missing weekly team totals appear as `statCorrections` on the affected matchup side, including date, label and exact additive stats. These are included in team totals and category scores but are not fabricated as player performances. `performanceComplete` is false when a team correction has no player allocation.

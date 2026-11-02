@@ -107,6 +107,10 @@ Next.js / React / TypeScript frontend and server routes; Python ingestion; Postg
 
 Team names can change. Resolve current IDs from the snapshot or MCP; do not infer them from position in a table.
 
+## Week 2 missing Monday totals
+
+User supplied Broke Young Boys (team 8) missing Monday, October 26 totals after the league reset. `lib/result-corrections.ts` adds **10/25 FG, 4/4 FT, 1 3PM, 15 REB, 3 AST, 3 STL, 1 BLK, 7 TO, 25 PTS** only to Week 2 matchup 7 (team 8 home vs team 7 away), for live league 1834203755 / season 2027. The overlay runs after the live-score merge, covers both current and historical matchups, recomputes shooting percentages/category scores, and adjusts completed standings only by the result difference. `statCorrections` provenance survives schema parsing and prevents repeat application. Original imports and player stats stay intact; player attribution is incomplete because only team totals were supplied. Missing base totals stay unknown. If ESPN later restores Monday upstream, verify that recovery and retire this additive correction; cumulative totals cannot detect it automatically.
+
 ## Latest trade investigation — important open finding
 
 User reported that Trae Young for Jalen Brunson was missing. Direct ESPN reads confirmed the following **as of November 1 investigation** (recheck; this is time-sensitive):

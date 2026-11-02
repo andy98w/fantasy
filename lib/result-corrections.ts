@@ -1,4 +1,5 @@
 import type { Matchup, Snapshot } from "./schema";
+import { compareCategories } from "./season";
 
 // Owner-confirmed Week 1 results, 2026-10-29. IDs/home-away pairings verified
 // against ESPN's schedule. Only outcomes were supplied, not category scores.
@@ -12,7 +13,7 @@ const weekOne = [
 ];
 
 /** Overlay durable corrections on reads; never modify ESPN or stored raw imports. */
-export function applyResultCorrections(snapshot: Snapshot): Snapshot {
+function applyWeekOneResults(snapshot: Snapshot): Snapshot {
   if (snapshot.mode !== "live" || snapshot.league.id !== 1834203755 ||
       snapshot.league.season !== 2027 || snapshot.league.matchupPeriod <= 1 ||
       snapshot.league.scoringType !== "H2H_MOST_CATEGORIES") return snapshot;
@@ -59,4 +60,71 @@ export function applyResultCorrections(snapshot: Snapshot): Snapshot {
     matchups: snapshot.matchups.map(m => corrections.get(m.id) ?? m),
     matchupHistory: [...history.values()].sort((a, b) => a.period - b.period || a.id - b.id),
   };
+}
+
+
+// User-confirmed missing Monday totals after the league reset, supplied Nov 1.
+// This is an additive correction to ESPN's reset totals, not a player stat line.
+// Keep it scoped to the verified Week 2 matchup (8 home vs 7 away). If ESPN ever
+// restores this day upstream, retire this correction after verifying that recovery;
+// cumulative totals alone cannot establish whether Monday has been restored.
+const missingMonday = {
+  id: "1834203755-2027-week2-team8-2026-10-26",
+  date: "2026-10-26",
+  label: "Restored Monday totals after league reset",
+  stats: { FGM: 10, FGA: 25, FTM: 4, FTA: 4, "3PM": 1, REB: 15, AST: 3, STL: 3, BLK: 1, TO: 7, PTS: 25 },
+};
+const isWeekTwoMatch = (m: Matchup) => m.id === 7 && m.period === 2 && m.home.teamId === 8 && m.away.teamId === 7;
+
+function restoreMonday(match: Matchup): Matchup {
+  if (!isWeekTwoMatch(match) || match.home.statCorrections?.some(c => c.id === missingMonday.id)) return match;
+  const stats = { ...match.home.stats };
+  for (const [category, delta] of Object.entries(missingMonday.stats)) {
+    const value = stats[category];
+    // A known missing day is not a substitute for an unknown remainder of the week.
+    stats[category] = value == null || !Number.isFinite(value) ? null : value + delta;
+  }
+  for (const [makes, attempts, rate] of [["FGM", "FGA", "FG%"], ["FTM", "FTA", "FT%"]]) {
+    stats[rate] = stats[makes] != null && stats[attempts] != null && stats[attempts]! > 0
+      ? stats[makes]! / stats[attempts]! : null;
+  }
+  const score = compareCategories(stats, match.away.stats);
+  const complete = score.missing === 0;
+  const home = { ...match.home, stats, wins: complete ? score.home : null, ties: complete ? score.ties : null,
+    // No player allocation was supplied; preserve imported lines, flag incomplete coverage.
+    performanceComplete: false,
+    statCorrections: [...(match.home.statCorrections ?? []), { ...missingMonday, stats: { ...missingMonday.stats } }] };
+  return { ...match, home,
+    away: { ...match.away, wins: complete ? score.away : null, ties: complete ? score.ties : null },
+    result: match.result === "UNDECIDED" || !complete ? match.result : score.home === score.away ? "TIE" : score.home > score.away ? "HOME" : "AWAY" };
+}
+
+function applyWeekTwoStats(snapshot: Snapshot): Snapshot {
+  if (snapshot.mode !== "live" || snapshot.league.id !== 1834203755 || snapshot.league.season !== 2027 ||
+      snapshot.league.matchupPeriod < 2 || snapshot.league.scoringType !== "H2H_MOST_CATEGORIES") return snapshot;
+  const existing = new Map([...snapshot.matchupHistory, ...snapshot.matchups].map(m => [m.id, m]));
+  const old = existing.get(7);
+  if (!old || !isWeekTwoMatch(old)) return snapshot;
+  const corrected = restoreMonday(old);
+  // Only a completed result can change standings. Account for the delta from
+  // ESPN's imported result, so each fresh import and repeated read stays stable.
+  const record = (match: Matchup, teamId: number) => {
+    const won = match.result === (match.home.teamId === teamId ? "HOME" : "AWAY");
+    return { wins: Number(won), losses: Number(match.result !== "UNDECIDED" && match.result !== "TIE" && !won), ties: Number(match.result === "TIE") };
+  };
+  return { ...snapshot,
+    matchups: snapshot.matchups.map(restoreMonday),
+    matchupHistory: snapshot.matchupHistory.map(restoreMonday),
+    teams: old.result === corrected.result ? snapshot.teams : snapshot.teams.map(team => {
+      if (team.id !== 8 && team.id !== 7) return team;
+      const before = record(old, team.id), after = record(corrected, team.id);
+      return { ...team, wins: team.wins + after.wins - before.wins,
+        losses: team.losses + after.losses - before.losses, ties: team.ties + after.ties - before.ties };
+    }),
+  };
+}
+
+/** Durable, idempotent overlays shared by dashboard, forecasts, records and MCP. */
+export function applyResultCorrections(snapshot: Snapshot): Snapshot {
+  return applyWeekTwoStats(applyWeekOneResults(snapshot));
 }

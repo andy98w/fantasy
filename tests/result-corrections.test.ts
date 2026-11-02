@@ -5,6 +5,10 @@ import { snapshotSchema } from "../lib/schema";
 import { applyResultCorrections } from "../lib/result-corrections";
 import { allPlay, leagueRecords, rivalry, seasonMatchups } from "../lib/season";
 import { CATEGORIES } from "../lib/schema";
+import { mergeLiveScores } from "../lib/live-scores";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { CategoryComparison } from "../components/league/category-comparison";
 
 function fixture() {
   const snapshot = snapshotSchema.parse(demo);
@@ -82,4 +86,96 @@ test("unrelated current scores stay current even if a stale copy exists in histo
   const current = { ...old, result: "UNDECIDED" as const };
   snapshot.matchups = [current];
   assert.equal(applyResultCorrections(snapshot).matchups[0], current);
+});
+
+function weekTwoFixture() {
+  const s = applyResultCorrections(fixture());
+  const homeStats = { TO:68, "3PM":79, AST:143, BLK:26, "FG%":226/489, FGA:489, FGM:226,
+    "FT%":133/163, FTA:163, FTM:133, PTS:664, REB:245, STL:40 };
+  const awayStats = { TO:102, "3PM":54, AST:168, BLK:27, "FG%":253/518, FGA:518, FGM:253,
+    "FT%":123/147, FTA:147, FTM:123, PTS:683, REB:212, STL:55 };
+  s.matchups = [{ id:7, period:2, result:"UNDECIDED", home:{teamId:8,wins:3,ties:0,stats:homeStats,
+    performers:[{playerId:123,name:"Existing credited player",stats:{PTS:20}}],performanceComplete:true},
+    away:{teamId:7,wins:6,ties:0,stats:awayStats,performers:[],performanceComplete:true} }];
+  return s;
+}
+
+test("missing Monday is appended only to Broke Young Boys Week 2 with pooled shooting rates", () => {
+  const source=weekTwoFixture(), original=structuredClone(source);
+  const result=applyResultCorrections(source), match=result.matchups[0];
+  assert.deepEqual(match.home.stats,{TO:75,"3PM":80,AST:146,BLK:27,"FG%":236/514,FGA:514,FGM:236,
+    "FT%":137/167,FTA:167,FTM:137,PTS:689,REB:260,STL:43});
+  assert.deepEqual(match.away.stats,source.matchups[0].away.stats);
+  assert.deepEqual([match.home.wins,match.away.wins,match.home.ties,match.away.ties],[4,4,1,1]);
+  assert.equal(match.result,"UNDECIDED");
+  assert.deepEqual(result.teams,source.teams); assert.deepEqual(result.players,source.players);
+  assert.deepEqual(result.matchupHistory,source.matchupHistory); assert.deepEqual(source,original);
+  assert.deepEqual(match.home.performers,source.matchups[0].home.performers);
+  assert.equal(match.home.performanceComplete,false); assert.equal(match.away.performanceComplete,true);
+  assert.equal(match.home.statCorrections?.[0].date,"2026-10-26");
+});
+
+test("Monday provenance survives serialization and prevents repeated additions", () => {
+  const source=weekTwoFixture(), corrected=applyResultCorrections(source);
+  assert.deepEqual(applyResultCorrections(corrected),corrected);
+  const restored=snapshotSchema.parse(JSON.parse(JSON.stringify(corrected)));
+  assert.deepEqual(applyResultCorrections(restored),restored);
+  assert.deepEqual(applyResultCorrections(source),corrected);
+  assert.equal(restored.matchups[0].home.statCorrections?.length,1);
+});
+
+test("Monday restoration remains in completed history and adjusts only the changed result", () => {
+  const s=weekTwoFixture();
+  s.league.matchupPeriod=3;
+  s.matchups[0].result="AWAY";
+  s.matchupHistory.push(structuredClone(s.matchups[0]));s.matchups=[];
+  s.teams.find(t=>t.id===8)!.losses++;
+  s.teams.find(t=>t.id===7)!.wins++;
+  const result=applyResultCorrections(s);
+  assert.equal(result.matchupHistory.find(m=>m.id===7)!.result,"TIE");
+  for(const id of [8,7]) {
+    const t=result.teams.find(t=>t.id===id)!;
+    assert.deepEqual([t.wins,t.losses,t.ties],[1,0,1]);
+  }
+  assert.deepEqual(result.teams.filter(t=>![7,8].includes(t.id)),s.teams.filter(t=>![7,8].includes(t.id)));
+  assert.deepEqual(applyResultCorrections(result),result);
+  assert.equal(rivalry(seasonMatchups(result),8,7).ties,1);
+  assert.equal(leagueRecords(seasonMatchups(result)).find(r=>r.id==="PTS")?.value,689);
+});
+
+test("Monday restoration refuses other leagues, seasons, weeks and pairings", () => {
+  for(const update of [
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.league.id++;},
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.league.season++;},
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.mode="demo";},
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.matchups[0].period=3;},
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.matchups[0].id=8;},
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.matchups[0].away.teamId=6;},
+    (s:ReturnType<typeof weekTwoFixture>)=>{s.matchups[0].home.teamId=6;},
+  ]) {
+    const source=weekTwoFixture();update(source);
+    assert.deepEqual(applyResultCorrections(source).matchups,source.matchups);
+  }
+});
+
+test("missing weekly base totals remain unknown despite known Monday deltas", () => {
+  const s=weekTwoFixture();s.matchups[0].home.stats.PTS=null;delete s.matchups[0].home.stats.FGA;
+  const match=applyResultCorrections(s).matchups[0];
+  assert.equal(match.home.stats.PTS,null);assert.equal(match.home.stats.FGA,null);assert.equal(match.home.stats["FG%"],null);
+  assert.equal(match.home.stats.FGM,236);assert.equal(match.home.wins,null);assert.equal(match.away.wins,null);
+});
+
+
+test("fresh live scores get the Monday addition once and the UI explains restored totals", () => {
+  const original=weekTwoFixture();
+  const now=Date.parse(original.syncedAt)+60_000;
+  const fresh=structuredClone(original.matchups);
+  fresh[0].home.stats.PTS=700;
+  const feed={leagueId:original.league.id,season:original.league.season,period:2,fetchedAt:new Date(now).toISOString(),matchups:fresh};
+  const corrected=applyResultCorrections(mergeLiveScores(applyResultCorrections(original),feed,now));
+  const match=corrected.matchups[0];
+  assert.equal(match.home.stats.PTS,725);
+  assert.equal(applyResultCorrections(corrected).matchups[0].home.stats.PTS,725);
+  const html=renderToStaticMarkup(createElement(CategoryComparison,{home:match.home,away:match.away,homeName:"Broke Young Boys",awayName:"sheeeeshhhh"}));
+  assert.match(html,/restored 2026-10-26 totals/);assert.match(html,/10\/25 FG/);assert.match(html,/not assigned to individual player rows/);
 });

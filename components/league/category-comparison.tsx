@@ -13,6 +13,11 @@ export function CategoryComparison({ home, away, homeName, awayName, finished = 
   });
   return (
     <div className="category-comparison-table">
+      {[{ side: home, name: homeName }, { side: away, name: awayName }].flatMap(({ side, name }) =>
+        (side.statCorrections ?? []).map(correction => <details className="forecast-details" key={`${side.teamId}:${correction.id}`}>
+          <summary>{name}: restored {correction.date} totals</summary>
+          <p>{correction.label}. Added {correction.stats.FGM}/{correction.stats.FGA} FG, {correction.stats.FTM}/{correction.stats.FTA} FT, {correction.stats["3PM"]} threes, {correction.stats.REB} rebounds, {correction.stats.AST} assists, {correction.stats.STL} steals, {correction.stats.BLK} blocks, {correction.stats.TO} turnovers and {correction.stats.PTS} points. Shooting percentages use combined makes and attempts. These team totals are not assigned to individual player rows.</p>
+        </details>))}
       <TableToolbar label="Search categories" query={control.query} onQuery={control.setQuery} />
       <table className="matchup-categories" aria-label="Category comparison">
         <thead>

@@ -126,3 +126,7 @@ Each side exposes `scenario`, `availabilityAsOf`, player `assumptions`, dated `e
 `fantasy_analyze_trade` returns both availability scenarios under each side’s `upcomingProduction`, with before/after stats, games and assumptions for next week. Player and team power remain per-game roster value without injury discounts.
 
 User-confirmed missing weekly team totals appear as `statCorrections` on the affected matchup side, including date, label and exact additive stats. These are included in team totals and category scores but are not fabricated as player performances. `performanceComplete` is false when a team correction has no player allocation.
+
+Forecasts expose `baselineEstimates` (player, season, games played) when zero-game players use previous-season actual averages. Forecast and opportunity tools accept `omittedPlayerIds` for hypothetical future roster exclusions, validated against the selected teams; ESPN is never changed and today's locked lineups remain. Player profiles expose `previousSeason` separately from actual current `stats`.
+
+`fantasy_get_today` exposes historical `calibration`, `worstCutoff`, individual `categoryContributions`, and `negatives`. Worst selects at most six negative performances below the historical 10th percentile; missing/insufficient/stale calibration yields no worst list. Letdown remains relative to the player's own current-season baseline.

@@ -247,6 +247,7 @@ function TradeImpact({
               <p>{before.games} → {after.games} playable games</p>
               <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before</th><th>After</th></tr></thead><tbody>{CATEGORIES.map(category => <tr key={category}><td>{category}</td><td>{stat(before.side.stats[category], category)}</td><td>{stat(after.side.stats[category], category)}</td></tr>)}</tbody></table></div>
             </>}
+            {[before, after].map((projection, index) => projection && projection.baselineEstimates.length > 0 && <p key={index}>{index ? "After" : "Before"} — previous-season estimates: {projection.baselineEstimates.map(p => `${p.name}: ${p.season - 1}–${String(p.season).slice(-2)}, ${p.gamesPlayed} games`).join("; ")}</p>)}
             {after && after.assumptions.length > 0 && <p>Availability assumptions: {after.assumptions.map(p => `${p.name} (${p.reason})`).join(", ")}</p>}
           </div>;
         })}

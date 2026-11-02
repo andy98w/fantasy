@@ -1,6 +1,6 @@
 # Fantasy — handoff
 
-Updated November 1, 2026 (America/Los_Angeles). This is the starting point for a new chat; verify the working tree and live state before making changes.
+Updated November 2, 2026 (America/Los_Angeles). This is the starting point for a new chat; verify the working tree and live state before making changes.
 
 ## Start here
 
@@ -221,3 +221,9 @@ Local validation: 114 web tests, 69 worker tests, typecheck, production build an
 ## Next chat
 
 The November 1 follow-up changes full-roster power to include IR, adds forecast availability scenarios and separate next-week trade production, and filters unavailable streamers by default. MCP and UI share the rules. Verify this change’s Git/CI/deployment state before claiming it is live. If they revisit trades, start with the pending/completed distinction above and current upstream evidence.
+
+## November 2 forecast and daily-performer update
+
+Zero-game forecasts use labeled immediately previous-season actuals from `player.previousSeason`; these never change actual stats or power. Missing baselines name the players. Numeric ESPN slot 13 is correctly excluded from non-IR capacity; the Forecast UI and MCP support explicit hypothetical roster exclusions to make room for returns, preserving today's locks.
+
+`worker/daily_calibration.py` builds a rolling historical 10th-percentile cutoff (28 days ending today minus 2, regular-season final games, 10+ minutes, current reference-pool players, minimum 300 samples/seven dates). Raw game samples are bounded in `data/daily-calibration-cache.json`, not duplicated in database snapshots or sent to clients. Snapshot `dailyCalibration` contains only derived metadata. Missing calibration hides only Shitters, never fabricates a threshold. UI and MCP expose scoring reasons; Letdowns remains personal-baseline-relative. See METHODOLOGY for cutoff details. Verify this commit's CI and deployed worker import before claiming these changes are live.

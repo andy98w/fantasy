@@ -21,6 +21,7 @@ from .activity import load_activity
 from .history import fetch_history, previous_history
 from .power_history import add_power_history
 from .retention import retention_days, prune_snapshots
+from .daily_calibration import load_calibration
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -97,6 +98,12 @@ def run(args):
                     transactions, activity_error = load_activity(client, previous, league_id, season)
                 snapshot=normalize(raw,league_id,season,team_id)
                 add_power_history(snapshot, previous)
+                try:
+                    snapshot['dailyCalibration'] = load_calibration(snapshot, path.parent / 'daily-calibration-cache.json')
+                except Exception:
+                    # Optional analytics must never prevent fresh roster/score imports.
+                    snapshot['dailyCalibration'] = None
+                    snapshot['warnings'].append('Daily performance calibration unavailable; worst-performance rankings withheld.')
                 snapshot['matchupHistory']=history
                 snapshot['historySyncError']=history_error
                 snapshot['trades']=trades

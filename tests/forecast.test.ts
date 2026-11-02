@@ -154,3 +154,65 @@ test("trade production assigns incoming players to the receiving team without mu
   assert.equal(possible.after!.side.stats.PTS,40);
   assert.equal(JSON.stringify(d),before);
 });
+
+test("zero-game forecasts use only complete immediately previous-season actuals and label the estimate", () => {
+  const p = player(1, { gamesPlayed: 0, stats: {}, previousSeason: { season: 2026, gamesPlayed: 60, stats } });
+  const data = snapshot([p]);
+  const projected = projectTeam(data, 1, schedule.windows[1], now);
+  assert.equal(projected.issue, null);
+  assert.equal(projected.side.stats.PTS, 40);
+  assert.deepEqual(projected.baselineEstimates, [{playerId:1,name:"Player 1",season:2026,gamesPlayed:60}]);
+  assert.deepEqual(projectionSummary(projected).baselineEstimates, projected.baselineEstimates);
+  assert.deepEqual(p.stats, {}); // forecasts never populate actual stats or power
+  p.gamesPlayed = 1; p.stats = {...stats, PTS: 7};
+  const current = projectTeam(data, 1, schedule.windows[1], now);
+  assert.equal(current.side.stats.PTS, 14);
+  assert.deepEqual(current.baselineEstimates, []);
+  p.stats = {}; // incomplete played-season stats must not silently mix seasons
+  assert.match(projectTeam(data, 1, schedule.windows[1], now).issue!, /Player 1/);
+});
+
+test("fallback refuses older, missing and partial season stats and honors unavailable status", () => {
+  for (const previousSeason of [undefined, {season:2025,gamesPlayed:60,stats}, {season:2026,gamesPlayed:60,stats:{PTS:20}}]) {
+    const data = snapshot([player(1, {gamesPlayed:0,stats:{},previousSeason})]);
+    assert.match(projectTeam(data,1,schedule.windows[1],now).issue!, /Missing season stats: Player 1/);
+  }
+  const data = snapshot([player(1,{gamesPlayed:0,stats:{},status:"OUT",previousSeason:{season:2026,gamesPlayed:60,stats}})]);
+  assert.deepEqual(projectTeam(data,1,schedule.windows[1],now).baselineEstimates, []);
+  assert.equal(projectTeam(data,1,schedule.windows[1],now,undefined,{scenario:"if_available"}).side.stats.PTS,40);
+});
+
+test("numeric ESPN IR capacity requires explicit hypothetical roster exclusions", () => {
+  const data = snapshot([player(1),player(2,{slot:"IR"})]);
+  data.league.rosterSlots = {"0":1,"13":1};
+  assert.match(projectTeam(data,1,schedule.windows[1],now,undefined,{scenario:"if_available"}).issue!, /1 non-IR roster slot/);
+  const result = projectTeam(data,1,schedule.windows[1],now,undefined,{scenario:"if_available",omittedPlayerIds:[1]});
+  assert.equal(result.issue,null);
+  assert.deepEqual(result.rosterExclusions,[{playerId:1,name:"Player 1"}]);
+  assert.deepEqual(result.activationPlayerIds,[2]);
+  assert.equal(data.players.length,2);
+});
+
+test("hypothetical omissions cannot reopen a started player's lineup slot", () => {
+  const data = snapshot([player(1),player(2,{slot:"BE"})]);
+  data.syncedAt=new Date(now).toISOString();
+  data.forecastSchedule!.slots=["PG"];
+  data.forecastSchedule!.games=[{id:"1",startsAt:"2026-10-29T21:00:00Z",date:"2026-10-29",home:"ATL",away:"BOS",scoringPeriod:10}];
+  data.matchups=[{id:1,period:2,result:"UNDECIDED",home:{teamId:1,wins:0,ties:0,stats:{...stats},performers:[],performanceComplete:false},away:{teamId:2,wins:0,ties:0,stats:{...stats},performers:[],performanceComplete:false}}];
+  const game={...normalizeScoreboard(board,"2026-10-29")[0],id:"1",state:"live" as const,remainingFraction:.5};
+  const today:TodayData={date:"2026-10-29",fetchedAt:new Date(now).toISOString(),status:"ready",games:[game]};
+  const result=projectTeam(data,1,schedule.windows[0],now,today,{scenario:"if_available",omittedPlayerIds:[1]});
+  assert.equal(result.issue,null);
+  assert.equal(result.days[0].lockedSlots,1);
+  assert.equal(result.side.stats.PTS,30); // actual 20 + locked player's remaining 10
+  assert.deepEqual(result.players.map(p=>p.player.id),[1]);
+});
+
+test("IR preflight reports capacity for every returning player across the whole window", () => {
+  const data=snapshot([player(1),player(2,{slot:"IR",nbaTeam:"ATL"}),player(3,{slot:"IR",nbaTeam:"TOR"})]);
+  data.league.rosterSlots={"0":1,"13":2};
+  data.forecastSchedule!.games.push({id:"4",startsAt:"2026-11-06T01:00:00Z",date:"2026-11-05",home:"TOR",away:"BOS",scoringPeriod:17});
+  const result=projectTeam(data,1,schedule.windows[1],now,undefined,{scenario:"if_available"});
+  assert.equal(result.activationSlotsNeeded,2);
+  assert.deepEqual(result.activationPlayerIds,[2,3]);
+});

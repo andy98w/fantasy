@@ -83,3 +83,21 @@ def test_team_logos_pass_through_without_unsafe_urls(logo, expected):
     data = normalize(raw, 123, 2027, 3)
     assert data['teams'][0]['logoUrl'] == expected
     assert data['teams'][1]['logoUrl'] is None
+
+
+def test_previous_season_actuals_are_separate_from_current_stats_and_projections():
+    raw = fixture()
+    p = raw['players'][0]['player']
+    p['stats'] = [
+        {'seasonId':2026,'statSourceId':0,'statSplitTypeId':0,'stats':{'42':60,'0':600,'13':240,'14':400,'15':120,'16':160}},
+        {'seasonId':2027,'statSourceId':1,'statSplitTypeId':0,'stats':{'42':80,'0':2400}},
+        {'seasonId':2025,'statSourceId':0,'statSplitTypeId':0,'stats':{'42':60,'0':1800}},
+    ]
+    result = normalize(raw,123,2027,3)['players'][0]
+    assert result['gamesPlayed'] == 0 and result['stats'] == {} and result['power'] is None
+    assert result['previousSeason']['season'] == 2026
+    assert result['previousSeason']['gamesPlayed'] == 60
+    assert result['previousSeason']['stats']['PTS'] == 10
+    assert result['previousSeason']['stats']['FG%'] == .6
+    p['stats'].append({'seasonId':2027,'statSourceId':0,'statSplitTypeId':0,'stats':{'42':1,'0':7}})
+    assert normalize(raw,123,2027,3)['players'][0]['stats']['PTS'] == 7

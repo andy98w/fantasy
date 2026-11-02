@@ -73,6 +73,19 @@ def normalize(raw, league_id, season, team_id):
         for makes,attempts,rate in [('FGM','FGA','FG%'),('FTM','FTA','FT%')]:
             if makes in stats and attempts in stats:
                 stats[rate]=stats[makes]/stats[attempts] if stats[attempts] else None
+        prior = next((s for s in splits if s.get('seasonId') == season - 1 and s.get('statSourceId') == 0 and s.get('statSplitTypeId') == 0), None)
+        prior_totals = (prior or {}).get('stats', {})
+        prior_games = prior_totals.get('42', 0)
+        prior_stats = {}
+        if prior_games and prior_games > 0:
+            for sid, name in STAT_IDS.items():
+                if name == 'GP': continue
+                if sid in (prior or {}).get('averageStats', {}): prior_stats[name] = prior['averageStats'][sid]
+                elif sid in prior_totals: prior_stats[name] = prior_totals[sid] if '%' in name else prior_totals[sid] / prior_games
+            for makes, attempts, rate in [('FGM','FGA','FG%'),('FTM','FTA','FT%')]:
+                if makes in prior_stats and attempts in prior_stats:
+                    prior_stats[rate] = prior_stats[makes] / prior_stats[attempts] if prior_stats[attempts] else None
+        previous_season = {'season': season - 1, 'gamesPlayed': prior_games, 'stats': prior_stats} if prior_stats else None
         nba=p.get('proTeamId',0)
         roster=roster_map.get(pid,{'teamId':None,'slot':None})
         # mRoster describes the day's lineup, which can stay locked after an
@@ -91,7 +104,7 @@ def normalize(raw, league_id, season, team_id):
             'eligibleSlots':[SLOTS.get(s,str(s)) for s in p.get('eligibleSlots',[])],
             **roster,'status':p.get('injuryStatus','UNKNOWN'),
             'availability':'ROSTERED' if roster['teamId'] is not None else e.get('status','UNKNOWN'),
-            'gamesPlayed':gp,'stats':stats})
+            'gamesPlayed':gp,'stats':stats,'previousSeason':previous_season})
     matchups=[]
     for m in raw['scores'].get('schedule',[]):
         if m.get('matchupPeriodId') != league['status']['currentMatchupPeriod']: continue

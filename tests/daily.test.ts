@@ -49,3 +49,32 @@ test("unfinished games and tiny-minute appearances are never shamed; surprise re
   assert.equal(selectPerformers([final],"letdown").length,1);
   assert.equal(selectPerformers([{...final,line:{...line,minutes:2}}],"worst").length,0);
 });
+
+test("worst requires the historical cutoff while letdowns still use personal expectations", () => {
+  const data = snapshotSchema.parse(demo), line = normalizeBoxscore(box,game)[0];
+  data.players.push({...data.players[0],id:line.playerId,teamId:1,slot:"PG"});
+  const row = {...dailyPerformers(data,[line],[game])[0],game:{...game,state:"final" as const},worstCutoff:-7};
+  assert.equal(selectPerformers([{...row,score:-6,delta:-20}],"worst").length,0);
+  assert.equal(selectPerformers([{...row,score:-6,delta:-20}],"letdown").length,1);
+  assert.equal(selectPerformers([{...row,score:-8,delta:1}],"worst").length,1);
+  assert.equal(selectPerformers([{...row,score:-8,delta:1}],"letdown").length,0);
+  assert.equal(selectPerformers([{...row,score:1,worstCutoff:2}],"worst").length,0);
+  assert.equal(selectPerformers([{...row,score:-30,worstCutoff:null}],"worst").length,0);
+  assert.equal(selectPerformers(Array.from({length:10},(_,i)=>({...row,score:-8-i})),"worst").length,6);
+});
+
+test("calibration excludes its own dates and expires; negative reasons reflect actual category impact", async () => {
+  const {calibrationCutoff,performanceNegatives}=await import("../lib/daily");
+  const calibration={version:"daily-history-v1" as const,from:"2026-10-20",to:"2026-10-31",sampleSize:1120,gameCount:88,dayCount:12,percentile:.1 as const,cutoff:-7,scoredAt:"2026-11-02T20:00:00Z",source:"ESPN final NBA box scores" as const};
+  assert.equal(calibrationCutoff(calibration,"2026-11-01"),-7);
+  assert.equal(calibrationCutoff(calibration,"2026-10-31"),null);
+  assert.equal(calibrationCutoff(calibration,"2026-11-05"),null);
+  const data=snapshotSchema.parse(demo),line=normalizeBoxscore(box,game)[0];
+  data.players.push({...data.players[0],id:line.playerId,teamId:1,slot:"PG"});
+  const row=dailyPerformers(data,[line],[game])[0];
+  row.line={...line,stats:{...line.stats,FGM:5,FGA:20,STL:0,BLK:0}};
+  row.categoryScores={"FG%":-5,"FT%":0,PTS:0,REB:0,AST:4,STL:-1,BLK:-1,"3PM":-.5,TO:-1};
+  assert.deepEqual(performanceNegatives(row,"worst"),["5/20 FG","0 stocks"]);
+  row.categoryDeltas={...row.categoryScores,"FG%":1,STL:0,BLK:0,AST:-5};
+  assert.equal(performanceNegatives(row,"letdown")[0],`${line.stats.AST} AST`);
+});

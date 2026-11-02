@@ -5,12 +5,13 @@ import { availabilityReason, isUncertain, type AvailabilityScenario } from "./av
 
 const COUNTS = ["PTS", "REB", "AST", "STL", "BLK", "3PM", "TO", "FGM", "FGA", "FTM", "FTA"] as const;
 export type AvailabilityAssumption = { playerId: number; name: string; status: string; slot: string | null; reason: string };
-export type ProjectionOptions = { scenario?: AvailabilityScenario };
+export type ProjectionOptions = { scenario?: AvailabilityScenario; omittedPlayerIds?: number[] };
 export type ForecastWindow = ForecastSchedule["windows"][number];
 export type Projection = {
   scenario: AvailabilityScenario;
   availabilityAsOf: string;
   assumptions: AvailabilityAssumption[];
+  rosterExclusions: { playerId: number; name: string }[];
   activationPlayerIds: number[];
   activationSlotsNeeded: number;
   exclusions: { playerId: number; date: string; reason: string }[];
@@ -20,6 +21,7 @@ export type Projection = {
   benched: number;
   excluded: Player[];
   missing: Player[];
+  baselineEstimates: { playerId: number; name: string; season: number; gamesPlayed: number }[];
   issue: string | null;
   players: { player: Player; games: number }[];
   days: { date: string; lockedSlots: number; selectedPlayerIds: number[]; openSlots: string[]; benchedPlayerIds: number[] }[];
@@ -56,7 +58,8 @@ export function scheduledOpponent(schedule: ForecastSchedule | null, period: num
 }
 
 export function projectTeam(data: Snapshot, teamId: number, window: ForecastWindow, now: number, today?: TodayData, options: ProjectionOptions = {}): Projection {
-  const roster = data.players.filter(p => p.teamId === teamId);
+  const fullRoster = data.players.filter(p => p.teamId === teamId);
+  const roster = fullRoster.filter(p => !options.omittedPlayerIds?.includes(p.id));
   const scenario = options.scenario ?? "conservative";
   const affected = roster.filter(p => p.slot === "IR" || p.status !== "ACTIVE");
   const excluded: Player[] = [];
@@ -71,8 +74,9 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
     side: { teamId, wins: null, ties: null, stats: {}, performers: [], performanceComplete: false },
     scenario, availabilityAsOf: data.syncedAt,
     assumptions: affected.map(p => ({ playerId: p.id, name: p.name, status: p.status, slot: p.slot, reason: availabilityReason(p) })),
+    rosterExclusions: fullRoster.filter(p => !roster.includes(p)).map(p => ({ playerId: p.id, name: p.name })),
     activationPlayerIds: [], activationSlotsNeeded: 0, exclusions: [],
-    games: 0, liveGames: 0, benched: 0, excluded, missing: [], issue: null, players: [], days: [],
+    games: 0, liveGames: 0, benched: 0, excluded, missing: [], baselineEstimates: [], issue: null, players: [], days: [],
   };
   const fail = (issue: string) => {
     result.issue = issue;
@@ -87,7 +91,7 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
   if (date > window.end || (current && date < window.start) || (!current && date >= window.start)) return fail("Waiting for the next league sync.");
   if (current && Math.abs(now - Date.parse(data.matchupSyncedAt ?? data.syncedAt)) > 15 * 60_000) return fail("Waiting for fresh matchup totals.");
   if (current && schedule.lineupDate !== date) return fail("Waiting for today’s lineups.");
-  const activeCapacity = Object.entries(data.league.rosterSlots).filter(([slot]) => slot !== "IR").reduce((sum, [, n]) => sum + n, 0);
+  const activeCapacity = Object.entries(data.league.rosterSlots).filter(([slot]) => slot !== "IR" && slot !== "13").reduce((sum, [, n]) => sum + n, 0);
   const activeCount = roster.filter(p => p.slot !== "IR").length;
   if (activeCount > activeCapacity) return fail(`Roster needs ${activeCount - activeCapacity} non-IR roster slot(s) freed before projecting.`);
   const totals: Record<string, number | null> = Object.fromEntries(COUNTS.map(c => [c, 0]));
@@ -101,25 +105,34 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
   const add = (player: Player, fraction: number) => {
     if (!(fraction > 0)) return;
     counts.set(player.id, (counts.get(player.id) ?? 0) + fraction);
-    const valid = player.gamesPlayed > 0 && COUNTS.every(c => player.stats[c] != null && Number.isFinite(player.stats[c]) && player.stats[c]! >= 0)
-      && player.stats.FGM! <= player.stats.FGA! && player.stats.FTM! <= player.stats.FTA!;
+    const prior = player.previousSeason;
+    const fallback = player.gamesPlayed === 0 && prior?.season === data.league.season - 1 && prior.gamesPlayed > 0 ? prior : null;
+    const stats = fallback?.stats ?? player.stats;
+    const valid = (fallback?.gamesPlayed ?? player.gamesPlayed) > 0 && COUNTS.every(c => stats[c] != null && Number.isFinite(stats[c]) && stats[c]! >= 0)
+      && stats.FGM! <= stats.FGA! && stats.FTM! <= stats.FTA!;
     if (!valid) { if (!result.missing.includes(player)) result.missing.push(player); return; }
-    for (const c of COUNTS) totals[c]! += player.stats[c]! * fraction;
+    if (fallback && !result.baselineEstimates.some(p => p.playerId === player.id))
+      result.baselineEstimates.push({ playerId: player.id, name: player.name, season: fallback.season, gamesPlayed: fallback.gamesPlayed });
+    for (const c of COUNTS) totals[c]! += stats[c]! * fraction;
   };
   const days = [...new Set(schedule.games.filter(g => g.date >= window.start && g.date <= window.end && (!current || g.date >= date)).map(g => g.date))].sort();
+  const returning = roster.filter(p => p.slot === "IR" && days.some(day => canPlay(p, day) && schedule.games.some(g =>
+    g.date === day && [nbaAbbrev(g.home), nbaAbbrev(g.away)].includes(nbaAbbrev(p.nbaTeam)))));
+  result.activationPlayerIds = returning.map(p => p.id);
+  result.activationSlotsNeeded = Math.max(0, activeCount + returning.length - activeCapacity);
+  if (result.activationSlotsNeeded) return fail(`IR return scenario needs ${result.activationSlotsNeeded} non-IR roster slot(s) freed. No drops assumed.`);
   for (const day of days) {
     const games = schedule.games.filter(g => g.date === day);
     const gameFor = (p: Player) => games.find(g => [nbaAbbrev(g.home), nbaAbbrev(g.away)].includes(nbaAbbrev(p.nbaTeam)));
-    const returning = roster.filter(p => p.slot === "IR" && canPlay(p, day) && gameFor(p));
-    for (const p of returning) if (!result.activationPlayerIds.includes(p.id)) result.activationPlayerIds.push(p.id);
-    // Once activated, a player keeps their roster place for this scenario.
-    result.activationSlotsNeeded = Math.max(0, activeCount + result.activationPlayerIds.length - activeCapacity);
-    if (result.activationSlotsNeeded) return fail(`IR return scenario needs ${result.activationSlotsNeeded} non-IR roster slot(s) freed. No drops assumed.`);
     const slots = [...schedule.slots];
     const candidates: Player[] = [];
-    for (const player of roster) {
+    for (const player of fullRoster) {
       const game = gameFor(player);
       if (!game) continue;
+      const liveState = day === date ? today?.games.find(g => g.id === game.id) : undefined;
+      const locked = current && day === date && (Date.parse(game.startsAt) <= now || (liveState && ["live", "final"].includes(liveState.state)));
+      // Hypothetical future exclusions cannot reopen already-locked lineup slots.
+      if (!roster.includes(player) && !locked) continue;
       const available = canPlay(player, day);
       if (!available) {
         if (!excluded.includes(player)) excluded.push(player);
@@ -149,9 +162,9 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
     result.benched += candidates.length - selected.length;
     for (const player of selected) add(player, 1);
   }
-  result.players = [...counts].map(([id, games]) => ({ player: roster.find(p => p.id === id)!, games })).sort((a, b) => b.games - a.games || a.player.id - b.player.id);
+  result.players = [...counts].map(([id, games]) => ({ player: fullRoster.find(p => p.id === id)!, games })).sort((a, b) => b.games - a.games || a.player.id - b.player.id);
   // Missing baselines must not look like zero production or a definitive winner.
-  if (result.missing.length) return fail("Some players need more stats.");
+  if (result.missing.length) return fail(`Missing season stats: ${result.missing.map(p => p.name).join(", ")}.`);
   totals["FG%"] = totals.FGA! > 0 ? totals.FGM! / totals.FGA! : null;
   totals["FT%"] = totals.FTA! > 0 ? totals.FTM! / totals.FTA! : null;
   // Compare the displayed precision, so visually identical projections tie.
@@ -176,9 +189,9 @@ export function projectionSummary(p: Projection) {
   return { teamId: p.side.teamId, stats: p.side.stats, games: p.issue ? null : p.games,
     liveGames: p.issue ? null : p.liveGames, benchedGames: p.issue ? null : p.benched,
     issue: p.issue, scenario: p.scenario, availabilityAsOf: p.availabilityAsOf,
-    assumptions: p.assumptions, exclusions: p.exclusions, activationPlayerIds: p.activationPlayerIds,
+    rosterExclusions: p.rosterExclusions, assumptions: p.assumptions, exclusions: p.exclusions, activationPlayerIds: p.activationPlayerIds,
     activationSlotsNeeded: p.activationSlotsNeeded, excludedPlayerIds: p.excluded.map(p => p.id),
-    missingPlayerIds: p.missing.map(p => p.id),
+    missingPlayerIds: p.missing.map(p => p.id), baselineEstimates: p.baselineEstimates,
     players: p.issue ? [] : p.players.map(row => ({ playerId: row.player.id, games: row.games })) };
 }
 

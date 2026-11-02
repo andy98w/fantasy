@@ -42,6 +42,7 @@ def test_sync_commit_failure_preserves_last_snapshot(monkeypatch, tmp_path):
             monkeypatch.setattr(sync, 'normalize', lambda *args: deepcopy(snapshot))
             monkeypatch.setattr(sync, 'fetch_history', lambda *args: [])
             monkeypatch.setattr(sync, 'fetch_trades', lambda *args: [])
+            monkeypatch.setattr(sync, 'load_calibration', lambda *args: None)
             monkeypatch.setattr(sync, 'cache_team_logos', lambda *args: [])
             monkeypatch.setattr(sync, 'collect_news', lambda *args: ([], []))
             args = Namespace(probe=False, news_only=False)

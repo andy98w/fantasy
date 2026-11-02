@@ -129,3 +129,5 @@ Team rankings, team-profile Power, and trade Team fit use the same rating: sum `
 ### MCP integration
 
 Agents can connect to the hosted read-only Streamable HTTP endpoint at `/mcp`. See [MCP setup and tool reference](docs/MCP.md) for the URL, client example and data semantics. No extra Railway service or ESPN credentials are needed for the agent.
+
+Forecasts can use labeled previous-season actual averages for players with zero current-season games. Missing data names the player, and hypothetical roster exclusions support IR-return scenarios without modifying ESPN. Daily Shitters requires a negative score below a rolling historical 10th-percentile cutoff, with at most six results and visible category reasons; Letdowns still compares against the player's own season average. See [methodology](docs/METHODOLOGY.md) for calibration, sample requirements and fallback limits.

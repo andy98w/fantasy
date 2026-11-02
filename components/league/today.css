@@ -69,3 +69,11 @@
 .daily-delta { display: block; margin-top: 12px; color: var(--teal); font-size: 12px; }
 .daily-negative .daily-delta { color: var(--coral); }
 @media (max-width: 600px) { .daily-performers > .tabs button { font: 500 12px/1.4 var(--body); padding: 10px; } }
+
+.daily-negatives { display: block; margin-top: 12px; color: var(--coral); font-size: 12px; }
+.daily-method { color: var(--muted); font-size: 12px; margin: 12px 0; }
+.daily-method summary { cursor: pointer; }
+.forecast-baseline { display: block; margin-top: 8px; color: var(--gold); font-size: 12px; }
+
+.forecast-roster-option { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-size: 13px; }
+.forecast-roster-option input { accent-color: var(--gold); }

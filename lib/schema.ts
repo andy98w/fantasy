@@ -25,6 +25,7 @@ export const playerSchema = z.object({
   availability: z.string(),
   gamesPlayed: numeric,
   stats,
+  previousSeason: z.object({ season: numeric, gamesPlayed: numeric, stats }).nullable().optional(),
   power: numeric.nullable(),
   powerChange7d: numeric.nullable().default(null),
   powerTrendStatus: z.enum(["measured", "new", "unavailable"]).default("unavailable"),
@@ -131,6 +132,12 @@ export const snapshotSchema = z.object({
   players: z.array(playerSchema),
   matchups: z.array(matchupSchema),
   forecastSchedule: forecastScheduleSchema.nullable().default(null).catch(null),
+  dailyCalibration: z.object({
+    version: z.literal("daily-history-v1"), from: z.iso.date(), to: z.iso.date(),
+    sampleSize: z.number().int().min(300), gameCount: z.number().int().positive(),
+    dayCount: z.number().int().min(7), percentile: z.literal(0.1), cutoff: numeric,
+    scoredAt: z.iso.datetime({ offset: true }), source: z.literal("ESPN final NBA box scores"),
+  }).nullable().optional(),
   matchupHistory: z.array(matchupSchema).default([]),
   historySyncError: z.string().nullable().default(null),
   news: z.array(

@@ -269,3 +269,29 @@ test("MCP exposes availability scenarios, activation constraints, and separate t
     assert.equal(trade.left.after.contributingPlayers,1);
   } finally {await client.close();}
 });
+
+test("MCP preserves forecast fallback provenance and validates hypothetical exclusions", async () => {
+  const s=fixture();s.mode="live";
+  const home=s.teams[0].id,away=s.teams[1].id,period=s.league.matchupPeriod+1;
+  const stats={PTS:12,REB:8,AST:1,STL:1,BLK:1,"3PM":0,TO:1,FGM:5,FGA:8,FTM:2,FTA:3};
+  const template=s.players[0];
+  s.players=[{...template,id:501,teamId:home,slot:"IR",status:"OUT",nbaTeam:"ATL",eligibleSlots:["UTIL"],gamesPlayed:0,stats:{},previousSeason:{season:s.league.season-1,gamesPlayed:60,stats}},
+    {...template,id:502,teamId:home,slot:"UTIL",status:"ACTIVE",nbaTeam:"ATL",eligibleSlots:["UTIL"],gamesPlayed:5,stats},
+    {...template,id:503,teamId:away,slot:"UTIL",status:"ACTIVE",nbaTeam:"ATL",eligibleSlots:["UTIL"],gamesPlayed:5,stats}];
+  s.league.rosterSlots={"11":1,"13":1};
+  s.forecastSchedule={lineupDate:"2026-11-01",slots:["UTIL"],pairs:[{period,home,away}],windows:[{period,start:"2026-11-02",end:"2026-11-08"}],games:[{id:"401234567",startsAt:"2026-11-03T01:00:00Z",date:"2026-11-02",home:"ATL",away:"BOS",scoringPeriod:11}]};
+  const client=await connect(dependencies(s));
+  try {
+    const blocked=await call(client,"fantasy_forecast_matchup",{teamId:home,scenario:"if_available"});
+    assert.match(blocked.home.issue,/non-IR roster slot/);
+    const projected=await call(client,"fantasy_forecast_matchup",{teamId:home,scenario:"if_available",omittedPlayerIds:[502]});
+    assert.equal(projected.home.issue,null);
+    assert.equal(projected.home.stats.PTS,12);
+    assert.equal(projected.home.baselineEstimates[0].season,s.league.season-1);
+    assert.equal(projected.home.rosterExclusions[0].playerId,502);
+    const opportunities=await call(client,"fantasy_get_matchup_opportunities",{teamId:home,period,scenario:"if_available",omittedPlayerIds:[502]});
+    assert.equal(opportunities.home.baselineEstimates[0].gamesPlayed,60);
+    const bad=await client.callTool({name:"fantasy_forecast_matchup",arguments:{teamId:home,omittedPlayerIds:[999]}});
+    assert.equal(bad.isError,true);
+  } finally {await client.close();}
+});

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CATEGORIES, type Player, type Snapshot, type Team } from "@/lib/schema";
-import { matchupPlayers, todayMatchupPlayers, matchupGameLabel } from "@/lib/matchup-players";
+import { matchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups, matchupLineupSlot } from "@/lib/matchup-players";
 import { gameLabel, nbaDate, type TodayData } from "@/lib/nba";
 import { PlayerAvatar } from "./avatars";
 import { PlayerStatus } from "./player-status";
@@ -26,10 +26,11 @@ export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
   const [category, setCategory] = useState("all");
   const control = useTableControls(source.filter(row => team === "all" || String(row.teamId) === team), {
     initialSort: { key: "PTS", descending: true },
-    search: row => `${row.name} ${row.game ? matchupGameLabel(row.game, stale) : ""} ${statusText(row.player?.status ?? "UNKNOWN")} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
+    search: row => `${row.name} ${daily ? matchupLineupSlot(row.player?.slot) : ""} ${row.game ? matchupGameLabel(row.game, stale) : ""} ${statusText(row.player?.status ?? "UNKNOWN")} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
     value: (row, key) => key === "name" ? row.name : key === "status" ? statusText(row.player?.status ?? "UNKNOWN") : key === "game" ? row.game ? matchupGameLabel(row.game, stale) : null : key === "team" ? teams.find(t => t.id === row.teamId)?.name : row.stats[key],
   });
   const rows = control.rows;
+  const groups = matchupPlayerGroups(rows, daily);
   const columns = [daily ? "MIN" : "GP", ...(category === "all" ? CATEGORIES : [category])];
   return <section className="matchup-players" aria-label="Matchup player statistics">
     <div className="section-heading"><h2>Players</h2><span>{daily ? "Today · NBA stats · PT" : `Week ${matchup.period} · Lineup totals`}</span></div>
@@ -46,15 +47,17 @@ export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
     <div className="table-scroll" tabIndex={0} role="region" aria-label={daily ? "Today player table" : "Weekly player table"}>
       <table className="data-table weekly-players-table">
         <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{daily && <SortableHeader column="game" sort={control.sort} onSort={control.onSort} descending={false}>Game</SortableHeader>}{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
-        <tbody>{rows.map(row => <tr key={`${row.teamId}:${row.playerId}:${row.game?.id ?? "week"}`}>
+        {groups.map(group => <tbody key={group.key}>
+          {group.label && <tr className="matchup-lineup-divider"><th scope="rowgroup" colSpan={columns.length + 4} title="Based on current fantasy roster slots. Bench and IR NBA stats are shown for reference.">{group.label}</th></tr>}
+          {group.rows.map(row => <tr key={`${row.teamId}:${row.playerId}:${row.game?.id ?? "week"}`}>
           <td className="identity-col"><button className="identity" disabled={!row.player} onClick={() => row.player && onPlayer(row.player)}>
-            <PlayerAvatar player={{ id: row.playerId, name: row.name }} /><span><strong>{row.name}</strong><small>{row.player ? `${row.player.nbaTeam} / ${row.player.position}` : ""}</small></span>
+            <PlayerAvatar player={{ id: row.playerId, name: row.name }} /><span><strong>{row.name}</strong><small>{row.player ? `${row.player.nbaTeam} / ${row.player.position}` : ""}{daily && ["bench", "ir"].includes(matchupLineupSlot(row.player?.slot)) && <span className="matchup-slot-label"> · {matchupLineupSlot(row.player?.slot) === "bench" ? "Bench" : "IR"}</span>}</small></span>
           </button></td>
           <td><PlayerStatus status={row.player?.status} /></td>
           <td title={teams.find(t => t.id === row.teamId)?.name}>{teams.find(t => t.id === row.teamId)?.abbrev}</td>
           {daily && <td>{row.game && <span className={`matchup-game-state ${row.game.state === "live" && !stale ? "live" : ""}`} title="NBA game status"><span>{matchupGameLabel(row.game, stale)}</span>{row.game.state === "live" && <small>{gameLabel(row.game)}</small>}</span>}</td>}
           {columns.map(key => <td key={key}>{stat(row.stats[key], key)}{(key === "FG%" || key === "FT%") && row.stats[key === "FG%" ? "FGA" : "FTA"] != null && <small className="weekly-shooting">{stat(row.stats[key === "FG%" ? "FGM" : "FTM"], "")}/{stat(row.stats[key === "FG%" ? "FGA" : "FTA"], "")}</small>}</td>)}
-        </tr>)}</tbody>
+        </tr>)}</tbody>)}
       </table>
       {!rows.length && <Empty>{daily ? unavailable ? "Today’s games are unavailable. Retrying automatically." : source.length ? "No players match these filters." : "No players from these teams have a game today." : "No players for this matchup."}</Empty>}
     </div>

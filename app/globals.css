@@ -1563,6 +1563,8 @@ input::placeholder {
 .matchup-players .filters { margin-bottom: 16px; }
 .weekly-players-table { min-width: 100%; }
 .weekly-players-table th, .weekly-players-table td { white-space: nowrap; }
+.weekly-players-table .matchup-lineup-divider th { text-align: left; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--surface-deep); color: var(--muted); font-size: 12px; font-weight: 500; }
+.matchup-slot-label { color: var(--gold); }
 .weekly-shooting { display: block; color: var(--muted); font-size: 11px; }
 @media (max-width: 600px) {
   .matchup-players { padding: 16px 8px; }

@@ -3,6 +3,22 @@ import { gameLabel, nbaAbbrev, nbaDate, type NbaGame, type TodayData } from "./n
 
 export type MatchupPlayer = WeeklyPlayer & { teamId: number; player?: Player; game?: NbaGame };
 
+export function matchupLineupSlot(slot: string | null | undefined): "active" | "bench" | "ir" | "unknown" {
+  if (slot === "BE" || slot === "12") return "bench";
+  if (slot === "IR" || slot === "13") return "ir";
+  return slot && ["PG", "SG", "SF", "PF", "C", "G", "F", "SG/SF", "G/F", "PF/C", "F/C", "UTIL", "Rookie"].includes(slot) ? "active" : "unknown";
+}
+
+/** Group after sorting so each section retains the selected stat order. */
+export function matchupPlayerGroups(rows: MatchupPlayer[], daily: boolean) {
+  if (!daily) return [{ key: "week", label: null, rows }];
+  return [
+    { key: "active", label: "Active lineup", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "active") },
+    { key: "inactive", label: "Bench / IR · Not in scoring lineup", rows: rows.filter(row => ["bench", "ir"].includes(matchupLineupSlot(row.player?.slot))) },
+    { key: "unknown", label: "Lineup slot unavailable", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "unknown") },
+  ].filter(group => group.rows.length);
+}
+
 /** Today's NBA production for the current rosters, not fantasy lineup credit. */
 export function todayMatchupPlayers(matchup: Snapshot["matchups"][number], players: Player[], today: TodayData | undefined, date: string): MatchupPlayer[] {
   if (!today || today.date !== date || today.status === "error") return [];

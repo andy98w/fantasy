@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
-import { matchupPlayers, sortMatchupPlayers, todayMatchupPlayers, matchupGameLabel } from "../lib/matchup-players";
+import { matchupPlayers, sortMatchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups } from "../lib/matchup-players";
 import type { TodayData, NbaGame } from "../lib/nba";
 import demo from "../lib/demo.json";
 
@@ -9,6 +9,25 @@ const date = "2026-11-02";
 const game: NbaGame = { id: "today", startsAt: "2026-11-03T00:00:00Z", state: "live", detail: "4:20 - 3rd",
   home: { id: "1", abbrev: "NYK", name: "Knicks", score: 70, logo: null },
   away: { id: "2", abbrev: "WAS", name: "Wizards", score: 68, logo: null } };
+
+test("Today separates fantasy bench/IR by slot without changing earned weekly totals or stat sort order", () => {
+  const player = snapshotSchema.parse(demo).players[0];
+  const rows = [
+    { slot: "BE", status: "ACTIVE", pts: 40 },
+    { slot: "PG", status: "OUT", pts: 30 },
+    { slot: "13", status: "ACTIVE", pts: 20 },
+    { slot: "UTIL", status: "ACTIVE", pts: 10 },
+    { slot: "12", status: "ACTIVE", pts: 5 },
+    { slot: null, status: "ACTIVE", pts: 3 },
+  ].map((entry, i) => ({ playerId: i, name: `Player ${i}`, teamId: 1, stats: { PTS: entry.pts }, player: { ...player, id: i, slot: entry.slot, status: entry.status } }));
+  const groups = matchupPlayerGroups(rows, true);
+  assert.deepEqual(groups.map(group => group.key), ["active", "inactive", "unknown"]);
+  assert.deepEqual(groups[0].rows.map(row => row.stats.PTS), [30, 10]);
+  assert.deepEqual(groups[1].rows.map(row => row.stats.PTS), [40, 20, 5]);
+  assert.deepEqual(groups[2].rows.map(row => row.stats.PTS), [3]);
+  assert.deepEqual(matchupPlayerGroups(rows, false), [{ key: "week", label: null, rows }]);
+  assert.deepEqual(matchupPlayerGroups([rows[0]], true).map(group => group.key), ["inactive"]);
+});
 
 test("today rows use only today's NBA stats and current ownership, including bench and IR", () => {
   const snapshot = snapshotSchema.parse(demo), matchup = snapshot.matchups[0];

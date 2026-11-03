@@ -5,6 +5,7 @@ import { PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText } from "./format";
 import { NewsFeed } from "./news-feed";
 import { Button } from "../ui/primitives";
+import { PlayerInjuryOutlook } from "./player-injury";
 import { PlayerRecentGames } from "./player-games";
 import { PixelIcon } from "../ui/pixel-icon";
 export function PlayerDialog({
@@ -62,6 +63,7 @@ export function PlayerDialog({
               reason={ratingReason(player, data.model.minimumGames)}
             />
           </div>
+          {data.mode === "live" && <PlayerInjuryOutlook key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} status={player.status} />}
           <div className="player-facts">
             <span>
               Rank{" "}

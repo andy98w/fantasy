@@ -1633,3 +1633,12 @@ th[aria-sort="ascending"] .sort-arrow, th[aria-sort="descending"] .sort-arrow { 
 
 .category-comparison-table thead th[aria-sort="ascending"], .category-comparison-table thead th[aria-sort="descending"] { color: var(--gold); }
 .matchup-categories td.table-empty { text-align: center; }
+
+.player-injury-outlook { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-left: 3px solid var(--gold); background: var(--surface); display: grid; gap: 9px; }
+.player-injury-outlook h3 { margin: 0; font: 500 22px var(--pixel); }
+.player-injury-outlook p { margin: 0; line-height: 1.6; }
+.injury-return-date { color: var(--gold); font-size: 16px; }
+.player-injury-outlook small, .injury-outlook-meta { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.injury-outlook-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+.injury-outlook-meta a, .player-injury-outlook summary { color: var(--gold); }
+.player-injury-outlook details p { margin-top: 8px; }

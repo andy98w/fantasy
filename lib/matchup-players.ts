@@ -1,5 +1,5 @@
 import type { Player, Snapshot, WeeklyPlayer } from "./schema";
-import { gameLabel, nbaAbbrev, nbaDate, type NbaGame, type TodayData } from "./nba";
+import { gameLabel, nbaAbbrev, nbaDate, type NbaGame, type TodayData, type PerformanceDay } from "./nba";
 
 export type MatchupPlayer = WeeklyPlayer & { teamId: number; player?: Player; game?: NbaGame };
 
@@ -10,17 +10,28 @@ export function matchupLineupSlot(slot: string | null | undefined): "active" | "
 }
 
 /** Group after sorting so each section retains the selected stat order. */
-export function matchupPlayerGroups(rows: MatchupPlayer[], daily: boolean) {
+export function matchupPlayerGroups(rows: MatchupPlayer[], daily: boolean, recap = false) {
   if (!daily) return [{ key: "week", label: null, rows }];
   return [
-    { key: "active", label: "Active lineup", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "active") },
-    { key: "inactive", label: "Bench / IR · Not in scoring lineup", rows: rows.filter(row => ["bench", "ir"].includes(matchupLineupSlot(row.player?.slot))) },
+    { key: "active", label: recap ? "Current active lineup" : "Active lineup", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "active") },
+    { key: "inactive", label: recap ? "Current bench / IR" : "Bench / IR · Not in scoring lineup", rows: rows.filter(row => ["bench", "ir"].includes(matchupLineupSlot(row.player?.slot))) },
     { key: "unknown", label: "Lineup slot unavailable", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "unknown") },
   ].filter(group => group.rows.length);
 }
 
-/** Today's NBA production for the current rosters, not fantasy lineup credit. */
-export function todayMatchupPlayers(matchup: Snapshot["matchups"][number], players: Player[], today: TodayData | undefined, date: string): MatchupPlayer[] {
+/** Keep the last played slate until any NBA game actually starts today. */
+export function matchupPlayerDay(today: TodayData | undefined, date: string): PerformanceDay | undefined {
+  if (!today || today.date !== date) return undefined;
+  const started = today.games.some(game => nbaDate(new Date(game.startsAt)) === date && ["live", "final", "suspended"].includes(game.state));
+  if (started || today.performerDay?.date === date) return today;
+  const previous = today.performerDay;
+  if (previous && previous.date < date && previous.status !== "error" && previous.games.some(game =>
+    nbaDate(new Date(game.startsAt)) === previous.date && ["live", "final", "suspended"].includes(game.state))) return previous;
+  return today;
+}
+
+/** One explicitly selected day's NBA stats for current rosters, not lineup credit. */
+export function todayMatchupPlayers(matchup: Snapshot["matchups"][number], players: Player[], today: PerformanceDay | undefined, date: string): MatchupPlayer[] {
   if (!today || today.date !== date || today.status === "error") return [];
   const games = today.games.filter(game => nbaDate(new Date(game.startsAt)) === date);
   return players.flatMap(player => {

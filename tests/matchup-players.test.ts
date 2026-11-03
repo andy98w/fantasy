@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
-import { matchupPlayers, sortMatchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups } from "../lib/matchup-players";
+import { matchupPlayers, sortMatchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups, matchupPlayerDay } from "../lib/matchup-players";
 import type { TodayData, NbaGame } from "../lib/nba";
 import demo from "../lib/demo.json";
 
@@ -9,6 +9,45 @@ const date = "2026-11-02";
 const game: NbaGame = { id: "today", startsAt: "2026-11-03T00:00:00Z", state: "live", detail: "4:20 - 3rd",
   home: { id: "1", abbrev: "NYK", name: "Knicks", score: 70, logo: null },
   away: { id: "2", abbrev: "WAS", name: "Wizards", score: 68, logo: null } };
+
+test("daily view keeps the last played slate through empty days and delayed tips, then switches globally", () => {
+  const snapshot = snapshotSchema.parse(demo), matchup = snapshot.matchups[0];
+  const player = { ...snapshot.players[0], teamId: matchup.home.teamId, nbaTeam: "NYK" };
+  const previous = { date: "2026-11-01", fetchedAt: null, status: "ready" as const,
+    games: [{ ...game, id: "previous", startsAt: "2026-11-02T01:00:00Z", state: "final" as const }],
+    performances: [{ playerId: player.id, gameId: "previous", minutes: 30, stats: { PTS: 25 } }] };
+  const morning: TodayData = { date, fetchedAt: null, status: "ready", games: [], performerDay: previous };
+  assert.equal(matchupPlayerDay(morning, date), previous);
+  const selected = matchupPlayerDay(morning, date)!;
+  assert.equal(todayMatchupPlayers(matchup, [player], selected, selected.date)[0].stats.PTS, 25);
+  for (const state of ["scheduled", "delayed", "postponed", "cancelled"] as const) {
+    assert.equal(matchupPlayerDay({ ...morning, games: [{ ...game, state }] }, date), previous);
+  }
+  for (const state of ["live", "final", "suspended"] as const) {
+    // The first game has neither fantasy team's players; still leave the recap.
+    const started = { ...morning, games: [{ ...game, state, home: { ...game.home, abbrev: "LAL" }, away: { ...game.away, abbrev: "BOS" } }], performances: [] };
+    assert.equal(matchupPlayerDay(started, date), started);
+    assert.deepEqual(todayMatchupPlayers(matchup, [player], matchupPlayerDay(started, date), date), []);
+  }
+  const recapRows = todayMatchupPlayers(matchup, [{ ...player, slot: "BE" }], selected, selected.date);
+  assert.equal(matchupPlayerGroups(recapRows, true, true)[0].label, "Current bench / IR");
+});
+
+test("recap selection respects Pacific date, failed feeds, and loader's started-day latch", () => {
+  const previous = { date: "2026-11-01", fetchedAt: null, status: "stale" as const,
+    games: [{ ...game, startsAt: "2026-11-02T01:00:00Z", state: "final" as const }] };
+  const morning: TodayData = { date, fetchedAt: null, status: "ready", games: [], performerDay: previous };
+  assert.equal(matchupPlayerDay(morning, date)?.status, "stale");
+  assert.equal(matchupPlayerDay({ ...morning, games: previous.games }, date), previous);
+  assert.equal(matchupPlayerDay({ ...morning, date: "2026-11-01" }, date), undefined);
+  assert.equal(matchupPlayerDay(undefined, date), undefined);
+  for (const bad of [{ ...previous, status: "error" as const }, { ...previous, date: "2026-11-04" }, { ...previous, games: [] }]) {
+    const current = { ...morning, performerDay: bad };
+    assert.equal(matchupPlayerDay(current, date), current);
+  }
+  const latched: TodayData = { ...morning, status: "error", performerDay: { ...morning, date } };
+  assert.equal(matchupPlayerDay(latched, date), latched);
+});
 
 test("Today separates fantasy bench/IR by slot without changing earned weekly totals or stat sort order", () => {
   const player = snapshotSchema.parse(demo).players[0];
@@ -53,7 +92,7 @@ test("today rows use only today's NBA stats and current ownership, including ben
   assert.equal(matchupGameLabel(game, true), "Last seen live");
 });
 
-test("today never substitutes the previous performer day or invented pregame stats", () => {
+test("daily row builder only uses the explicitly selected date and never invents pregame stats", () => {
   const snapshot = snapshotSchema.parse(demo), matchup = snapshot.matchups[0];
   const player = { ...snapshot.players[0], teamId: matchup.home.teamId, nbaTeam: "NYK" };
   const recap = { date: "2026-11-01", fetchedAt: null, status: "ready" as const, games: [game], performances: [{ playerId: player.id, gameId: game.id, minutes: 30, stats: { PTS: 50 } }] };

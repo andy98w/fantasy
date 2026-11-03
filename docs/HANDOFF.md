@@ -37,7 +37,7 @@ Fantasy is a public, shared, read-only interface over the league's ESPN data. ES
 
 | Tab | Current behavior |
 | --- | --- |
-| League | Current fantasy matchups; daily performers; roster news; Today games and available players. Clicking games opens NBA box scores. Clicking players opens profiles/game history. |
+| League | Current fantasy matchups; daily performers; roster news; Today games and available players. Matchup player tables have a Week / Today toggle: Week uses credited lineup totals; Today uses current-roster NBA box scores (including bench/IR), only Pacific-date games, minutes and game status/clock. Missing stats stay blank; no previous-day recap fallback. In progress means the NBA game is live, not on-court presence; stale feeds say Last seen live. Clicking games opens NBA box scores. Clicking players opens profiles/game history. |
 | Teams | Team power, sortable category heatmap, rosters and news. IR contributes to full-roster power; availability affects production forecasts separately. No “Rated players” column. |
 | Players | Search/filter/sort player stats, power and seven-day risers/fallers when comparable history exists. Player and team roster tables always show a sortable Status column beside the player name, independent of fantasy-team ownership. Weekly matchup players and NBA box scores also show sortable Current status columns from the latest snapshot (Unknown when absent), separate from historical DNP/participation; trade player lists show current-status badges. |
 | Trades | Calculator, Battles (default), Auction House. History was replaced; completed transactions are in Records → Ledger. |

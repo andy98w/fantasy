@@ -235,6 +235,7 @@ export default function Dashboard({
               </Button>
             </Toolbar>
             <MatchupBoard
+              today={today}
               players={data.players}
               onPlayer={(player) => setSelectedId(player.id)}
               matchup={

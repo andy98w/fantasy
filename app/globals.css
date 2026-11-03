@@ -1555,6 +1555,11 @@ input::placeholder {
 }
 
 .matchup-players { padding: 24px; min-width: 0; border-top: 1px solid var(--line); }
+.matchup-period { margin-bottom: 16px; }
+.matchup-game-state { display: inline-grid; gap: 3px; font-size: 12px; }
+.matchup-game-state small { color: var(--muted); font-size: 11px; }
+.matchup-game-state.live > span { color: var(--teal); }
+.matchup-game-state.live > span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; }
 .matchup-players .filters { margin-bottom: 16px; }
 .weekly-players-table { min-width: 100%; }
 .weekly-players-table th, .weekly-players-table td { white-space: nowrap; }

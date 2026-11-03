@@ -1,4 +1,5 @@
 import { type Snapshot, type Team, type Player } from "@/lib/schema";
+import type { TodayData } from "@/lib/nba";
 import { TeamAvatar } from "./avatars";
 import { CategoryComparison } from "./category-comparison";
 import { Button, Empty } from "../ui/primitives";
@@ -11,12 +12,14 @@ export function MatchupBoard({
   teams,
   onDetails,
   players,
+  today,
   onPlayer,
 }: {
   matchup?: Snapshot["matchups"][number];
   teams: Team[];
   onDetails?: () => void;
   players: Player[];
+  today?: TodayData;
   onPlayer: (player: Player) => void;
 }) {
   const home = teams.find((t) => t.id === matchup?.home.teamId),
@@ -72,7 +75,7 @@ export function MatchupBoard({
         </div>
       </div>
       <CategoryComparison home={matchup.home} away={matchup.away} homeName={home.name} awayName={away.name} finished={matchup.result !== "UNDECIDED"} />
-      <MatchupPlayers key={matchup.id} matchup={matchup} teams={[home, away]} players={players} onPlayer={onPlayer} />
+      <MatchupPlayers key={matchup.id} matchup={matchup} teams={[home, away]} players={players} today={today} onPlayer={onPlayer} />
     </section>
   );
 }

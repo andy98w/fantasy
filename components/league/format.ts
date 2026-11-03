@@ -20,6 +20,12 @@ export const statusText = (status: string) =>
     DAY_TO_DAY: "Day to day",
     OUT: "Out",
     INJURY_RESERVE: "Injured",
+    QUESTIONABLE: "Questionable",
+    DOUBTFUL: "Doubtful",
+    PROBABLE: "Probable",
+    SUSPENSION: "Suspended",
+    SUSPENDED: "Suspended",
+    UNKNOWN: "Unknown",
   })[status] ?? status.replaceAll("_", " ").toLowerCase();
 export const ratingReason = (player: Player, minimum: number) =>
   player.gamesPlayed < minimum

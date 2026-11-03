@@ -48,9 +48,10 @@ export function PlayerTable({
         <thead>
           <tr>
             <SortableHeader column="name" sort={sort} onSort={onSort} descending={false} className="identity-col">Player</SortableHeader>
+            <SortableHeader column="status" sort={sort} onSort={onSort} descending={false}>Status</SortableHeader>
             <SortableHeader column="rank" sort={sort} onSort={onSort} descending={false}>Rank</SortableHeader>
             {["power", ...(trends ? ["powerChange7d"] : []), ...categories].map(key => <SortableHeader key={key} column={key} sort={sort} onSort={onSort} descending={key !== "TO"}>{key === "power" ? "Power" : key === "powerChange7d" ? "7d change" : key}</SortableHeader>)}
-            <SortableHeader column={ownership ? "team" : "status"} sort={sort} onSort={onSort} descending={false}>{ownership ? "Team" : "Status"}</SortableHeader>
+            {ownership && <SortableHeader column="team" sort={sort} onSort={onSort} descending={false}>Team</SortableHeader>}
           </tr>
         </thead>
         <tbody>
@@ -72,6 +73,7 @@ export function PlayerTable({
                   </span>
                 </button>
               </td>
+              <td><span className={`status-label ${player.status === "ACTIVE" ? "" : "injured"}`}>{statusText(player.status)}</span></td>
               <td
                 className="rank-cell"
                 title={
@@ -92,28 +94,12 @@ export function PlayerTable({
               {categories.map((category) => (
                 <td key={category}>{stat(player.stats[category], category)}</td>
               ))}
-              <td>
-                {ownership ? (
-                  <span
-                    className={
-                      player.teamId === null ? "available-label" : "muted"
-                    }
-                  >
-                    {teams.find((t) => t.id === player.teamId)?.abbrev ??
-                      (player.availability === "WAIVERS"
-                        ? "Waivers"
-                        : player.availability === "FREEAGENT"
-                          ? "FA"
-                          : "—")}
-                  </span>
-                ) : (
-                  <span
-                    className={`status-label ${player.status === "ACTIVE" ? "" : "injured"}`}
-                  >
-                    {statusText(player.status)}
-                  </span>
-                )}
-              </td>
+              {ownership && <td>
+                <span className={player.teamId === null ? "available-label" : "muted"}>
+                  {teams.find((t) => t.id === player.teamId)?.abbrev ??
+                    (player.availability === "WAIVERS" ? "Waivers" : player.availability === "FREEAGENT" ? "FA" : "—")}
+                </span>
+              </td>}
             </tr>
           ))}
         </tbody>

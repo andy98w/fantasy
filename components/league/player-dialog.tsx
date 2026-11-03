@@ -81,7 +81,7 @@ export function PlayerDialog({
               Unrated: {ratingReason(player, data.model.minimumGames)}.
             </p>
           )}
-          <PlayerRecentGames key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} />
+          <PlayerRecentGames key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} players={data.players} />
           <div className="contribution-header">
             <h3>Category value</h3>
             <span>Per game / Value</span>

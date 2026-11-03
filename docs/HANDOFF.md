@@ -39,7 +39,7 @@ Fantasy is a public, shared, read-only interface over the league's ESPN data. ES
 | --- | --- |
 | League | Current fantasy matchups; daily performers; roster news; Today games and available players. Clicking games opens NBA box scores. Clicking players opens profiles/game history. |
 | Teams | Team power, sortable category heatmap, rosters and news. IR contributes to full-roster power; availability affects production forecasts separately. No “Rated players” column. |
-| Players | Search/filter/sort player stats, power and seven-day risers/fallers when comparable history exists. Player and team roster tables always show a sortable Status column beside the player name, independent of fantasy-team ownership. |
+| Players | Search/filter/sort player stats, power and seven-day risers/fallers when comparable history exists. Player and team roster tables always show a sortable Status column beside the player name, independent of fantasy-team ownership. Weekly matchup players and NBA box scores also show sortable Current status columns from the latest snapshot (Unknown when absent), separate from historical DNP/participation; trade player lists show current-status badges. |
 | Trades | Calculator, Battles (default), Auction House. History was replaced; completed transactions are in Records → Ledger. |
 | Forecast | Next-week/rest-of-week schedule-aware projections and What if (weekly all-play replay, not a forecast). |
 | Records | Matchups default: week selector, all imported matchups/results, expandable category totals, scheduled future pairings. Also standings, current-week awards and transaction ledger. Head-to-head was removed; all-play comparisons remain in Forecast → What if. |

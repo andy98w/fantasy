@@ -9,13 +9,19 @@ import { PixelIcon } from "../ui/pixel-icon";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { Select } from "../ui/select";
 import { statSortValue } from "@/lib/table";
+import type { Player } from "@/lib/schema";
+import { statusText } from "./format";
+import { PlayerStatus } from "./player-status";
 import { MotionNumber } from "../ui/motion";
 
-export function BoxscoreTable({ team, box }: { team: NbaTeam; box?: BoxTeam }) {
+type CurrentPlayers = Pick<Player, "id" | "status">[];
+
+export function BoxscoreTable({ team, box, players = [] }: { team: NbaTeam; box?: BoxTeam; players?: CurrentPlayers }) {
+  const statuses = new Map(players.map(player => [String(player.id), player.status]));
   const [role, setRole] = useState("all");
   const control = useTableControls((box?.players ?? []).filter(player => role === "all" || (role === "starters" ? player.starter : role === "bench" ? !player.starter : !player.didNotPlay)), {
-    search: player => `${player.name} ${player.didNotPlay ? "DNP " + player.reason : ""}`,
-    value: (player, key) => key === "name" ? player.name : player.didNotPlay ? null : statSortValue(player.stats[key]),
+    search: player => `${player.name} ${statusText(statuses.get(String(player.id)) ?? "UNKNOWN")} ${player.didNotPlay ? "DNP " + player.reason : ""}`,
+    value: (player, key) => key === "name" ? player.name : key === "status" ? statusText(statuses.get(String(player.id)) ?? "UNKNOWN") : player.didNotPlay ? null : statSortValue(player.stats[key]),
   });
   return <section className="boxscore-team" aria-label={`${team.name} box score`}>
     <h3><NbaAvatar team={team} />{team.name}</h3>
@@ -24,29 +30,30 @@ export function BoxscoreTable({ team, box }: { team: NbaTeam; box?: BoxTeam }) {
         <Select label={`${team.abbrev} lineup`} value={role} onChange={setRole} options={[{ value: "all", label: "All players" }, { value: "starters", label: "Starters" }, { value: "bench", label: "Bench" }, { value: "played", label: "Played" }]} />
       </TableToolbar><div className="table-scroll" tabIndex={0} role="region" aria-label={`${team.abbrev} player stats`}>
         <table className="data-table boxscore-table">
-          <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false}>Player</SortableHeader>{BOX_COLUMNS.map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
-          <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 1} /> : control.sort ? <BoxscoreGroup players={control.rows} /> : [true, false].map((starter) => {
+          <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false}>Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader>{BOX_COLUMNS.map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
+          <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 2} /> : control.sort ? <BoxscoreGroup players={control.rows} statuses={statuses} /> : [true, false].map((starter) => {
             const players = control.rows.filter((player) => player.starter === starter);
-            return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} label={starter ? "Starters" : "Bench"} />;
+            return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} statuses={statuses} label={starter ? "Starters" : "Bench"} />;
           })}</tbody>
-          {Object.keys(box.totals).length > 0 && <tfoot><tr><th scope="row">Team total</th>{BOX_COLUMNS.map(([key]) => <td key={key}>{box.totals[key] ?? "—"}</td>)}</tr></tfoot>}
+          {Object.keys(box.totals).length > 0 && <tfoot><tr><th scope="row">Team total</th><td />{BOX_COLUMNS.map(([key]) => <td key={key}>{box.totals[key] ?? "—"}</td>)}</tr></tfoot>}
         </table>
       </div></>}
   </section>;
 }
 
-function BoxscoreGroup({ players, label }: { players: BoxTeam["players"]; label?: string }) {
+function BoxscoreGroup({ players, statuses, label }: { players: BoxTeam["players"]; statuses: Map<string, string>; label?: string }) {
   return <>
-    {label && <tr className="boxscore-group"><th colSpan={BOX_COLUMNS.length + 1} scope="rowgroup">{label}</th></tr>}
+    {label && <tr className="boxscore-group"><th colSpan={BOX_COLUMNS.length + 2} scope="rowgroup">{label}</th></tr>}
     {players.map((player) => <tr key={player.id} className={player.didNotPlay ? "boxscore-dnp" : undefined}>
       <th scope="row"><span className="boxscore-player"><PlayerAvatar player={player} /><span>{player.name}</span></span></th>
+      <td><PlayerStatus status={statuses.get(String(player.id))} /></td>
       {player.didNotPlay ? <td colSpan={BOX_COLUMNS.length} className="boxscore-reason">DNP{player.reason ? ` · ${player.reason.toLowerCase()}` : ""}</td>
         : BOX_COLUMNS.map(([key]) => <td key={key}>{player.stats[key] ?? "—"}</td>)}
     </tr>)}
   </>;
 }
 
-export function GameDialog({ game: initialGame, onClose }: { game: NbaGame; onClose: () => void }) {
+export function GameDialog({ game: initialGame, players, onClose }: { game: NbaGame; players: CurrentPlayers; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [data, setData] = useState<GameBoxscore | null>(null);
   const [error, setError] = useState(false);
@@ -104,7 +111,7 @@ export function GameDialog({ game: initialGame, onClose }: { game: NbaGame; onCl
     </div>
     {error && <p className="today-stale" role="status">{data ? "Stats may be out of date. Reconnecting…" : "Box score unavailable. Retrying…"}</p>}
     {loading ? <Empty>Loading box score…</Empty>
-      : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} box={data?.teams.find((box) => box.id === team.id)} />)
+      : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} players={players} box={data?.teams.find((box) => box.id === team.id)} />)
       : !error && <Empty>{game.state === "scheduled" ? "Stats appear when the game starts." : game.state === "postponed" || game.state === "cancelled" ? gameLabel(game) : "Box score not available yet."}</Empty>}
   </dialog>;
 }

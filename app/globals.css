@@ -1641,4 +1641,4 @@ th[aria-sort="ascending"] .sort-arrow, th[aria-sort="descending"] .sort-arrow { 
 .injury-outlook-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
 .injury-outlook-meta a { color: var(--gold); }
 
-.players-table .status-label { font-size: 12px; white-space: nowrap; }
+.data-table .status-label { font-size: 12px; white-space: nowrap; }

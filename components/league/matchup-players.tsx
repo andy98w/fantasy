@@ -4,7 +4,8 @@ import { useState } from "react";
 import { CATEGORIES, type Player, type Snapshot, type Team } from "@/lib/schema";
 import { matchupPlayers } from "@/lib/matchup-players";
 import { PlayerAvatar } from "./avatars";
-import { stat } from "./format";
+import { PlayerStatus } from "./player-status";
+import { stat, statusText } from "./format";
 import { TeamSelect } from "./team-select";
 import { Select } from "../ui/select";
 import { SortableHeader, useTableControls } from "../ui/table-controls";
@@ -18,8 +19,8 @@ export function MatchupPlayers({ matchup, teams, players, onPlayer }: {
   const [category, setCategory] = useState("all");
   const control = useTableControls(matchupPlayers(matchup, players).filter(row => team === "all" || String(row.teamId) === team), {
     initialSort: { key: "PTS", descending: true },
-    search: row => `${row.name} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
-    value: (row, key) => key === "name" ? row.name : key === "team" ? teams.find(t => t.id === row.teamId)?.name : row.stats[key],
+    search: row => `${row.name} ${statusText(row.player?.status ?? "UNKNOWN")} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
+    value: (row, key) => key === "name" ? row.name : key === "status" ? statusText(row.player?.status ?? "UNKNOWN") : key === "team" ? teams.find(t => t.id === row.teamId)?.name : row.stats[key],
   });
   const rows = control.rows;
   const columns = ["GP", ...(category === "all" ? CATEGORIES : [category])];
@@ -35,11 +36,12 @@ export function MatchupPlayers({ matchup, teams, players, onPlayer }: {
     </Toolbar>
     <div className="table-scroll" tabIndex={0} role="region" aria-label="Weekly player table">
       <table className="data-table weekly-players-table">
-        <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
+        <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
         <tbody>{rows.map(row => <tr key={`${row.teamId}:${row.playerId}`}>
           <td className="identity-col"><button className="identity" disabled={!row.player} onClick={() => row.player && onPlayer(row.player)}>
             <PlayerAvatar player={{ id: row.playerId, name: row.name }} /><span><strong>{row.name}</strong><small>{row.player ? `${row.player.nbaTeam} / ${row.player.position}` : ""}</small></span>
           </button></td>
+          <td><PlayerStatus status={row.player?.status} /></td>
           <td title={teams.find(t => t.id === row.teamId)?.name}>{teams.find(t => t.id === row.teamId)?.abbrev}</td>
           {columns.map(key => <td key={key}>{stat(row.stats[key], key)}{(key === "FG%" || key === "FT%") && row.stats[key === "FG%" ? "FGA" : "FTA"] != null && <small className="weekly-shooting">{stat(row.stats[key === "FG%" ? "FGM" : "FTM"], "")}/{stat(row.stats[key === "FG%" ? "FGA" : "FTA"], "")}</small>}</td>)}
         </tr>)}</tbody>

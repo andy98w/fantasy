@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import type { Player } from "@/lib/schema";
 import type { PlayerGames } from "@/lib/player-games";
 import { BOX_COLUMNS } from "@/lib/game-boxscore";
 import { NBA_TIMEZONE, type NbaGame } from "@/lib/nba";
@@ -11,7 +12,7 @@ import { GameDialog } from "./game-dialog";
 
 const columns = BOX_COLUMNS.filter(([key]) => key !== "plusMinus");
 const dateFormat = new Intl.DateTimeFormat("en-US", { timeZone: NBA_TIMEZONE, month: "short", day: "numeric" });
-export function PlayerRecentGames({ playerId, season }: { playerId: number; season: number }) {
+export function PlayerRecentGames({ playerId, season, players }: { playerId: number; season: number; players: Player[] }) {
   const [data, setData] = useState<PlayerGames | null>(null);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NbaGame | null>(null);
@@ -53,6 +54,6 @@ export function PlayerRecentGames({ playerId, season }: { playerId: number; seas
       </div>
       {control.rows.length > limit && <Button variant="quiet" onClick={() => setLimit((value) => value + 10)}>Older games</Button>}
     </>}
-    {selected && <GameDialog key={selected.id} game={selected} onClose={() => setSelected(null)} />}
+    {selected && <GameDialog key={selected.id} game={selected} players={players} onClose={() => setSelected(null)} />}
   </section>;
 }

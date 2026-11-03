@@ -49,6 +49,24 @@ test("pregame and empty box scores are valid and do not show fictional zero scor
   assert.equal(result.game.state, "scheduled");
 });
 
+test("current status stays separate from historical participation, including unknown players", () => {
+  const result = normalizeGameBoxscore(fixture(), id, at);
+  const html = renderToStaticMarkup(createElement(BoxscoreTable, {
+    team: result.game.home, box: result.teams[0],
+    players: [{ id: 6583, status: "OUT" }, { id: 2581184, status: "ACTIVE" }],
+  }));
+  const rows = html.match(/<tr[^>]*>.*?<\/tr>/g)!;
+  const davis = rows.find(row => row.includes("Anthony Davis"))!;
+  const gill = rows.find(row => row.includes("Anthony Gill"))!;
+  assert.match(davis, />Out<.*8-18/);
+  assert.doesNotMatch(davis, /DNP/);
+  assert.match(gill, />Healthy<.*DNP.*coach/);
+  assert.match(html, /Current status/);
+  const unknown = renderToStaticMarkup(createElement(BoxscoreTable, { team: result.game.home, box: result.teams[0] }));
+  assert.equal((unknown.match(/>Unknown</g) ?? []).length, 2);
+  assert.doesNotMatch(unknown, />Healthy</);
+});
+
 test("rejects wrong game/team/player identities and malformed stats", () => {
   assert.throws(() => normalizeGameBoxscore(fixture(), "401000000", at));
   const wrong = fixture(); wrong.boxscore.players[0].team.id = "99";

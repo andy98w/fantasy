@@ -7,13 +7,14 @@ import { chooseBattle, rankEntries, tradeEntries, type BattleRating, type Battle
 import { AnimatedRows, MotionNumber, useReducedMotion } from "../ui/motion";
 import { Button, Empty, Panel } from "../ui/primitives";
 import { TeamAvatar } from "./avatars";
+import { PlayerStatus } from "./player-status";
 import { PlayerPreview } from "./player-preview";
 
 const date = (value: string) => new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }).format(new Date(value));
 function TradePlayers({ ids, data }: { ids: number[]; data: Snapshot }) {
   return <ul className="battle-players">{ids.map(id => {
     const player = data.players.find(p => p.id === id);
-    return <li key={id}>{player ? <PlayerPreview player={player} /> : <span>Player #{id}</span>}</li>;
+    return <li key={id}>{player ? <PlayerPreview player={player} /> : <span>Player #{id}</span>}<PlayerStatus status={player?.status} /></li>;
   })}</ul>;
 }
 export function TradeSide({ entry, data, children, className = "" }: { entry: TradeEntry; data: Snapshot; children?: React.ReactNode; className?: string }) {

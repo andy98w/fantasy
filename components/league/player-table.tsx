@@ -5,6 +5,7 @@ import { SortableHeader, TableToolbar } from "../ui/table-controls";
 import { CATEGORIES, type Player, type Team } from "@/lib/schema";
 import { PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText, type Sort } from "./format";
+import { PlayerStatus } from "./player-status";
 import { PowerChange } from "./power-movers";
 import { Empty } from "../ui/primitives";
 export function PlayerTable({
@@ -73,7 +74,7 @@ export function PlayerTable({
                   </span>
                 </button>
               </td>
-              <td><span className={`status-label ${player.status === "ACTIVE" ? "" : "injured"}`}>{statusText(player.status)}</span></td>
+              <td><PlayerStatus status={player.status} /></td>
               <td
                 className="rank-cell"
                 title={

@@ -88,7 +88,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
             </div>
           </>}
         </>}
-      {selectedGame && <GameDialog key={selectedGame.id} game={selectedGame} onClose={() => setSelectedGame(null)} />}
+      {selectedGame && <GameDialog key={selectedGame.id} game={selectedGame} players={players} onClose={() => setSelectedGame(null)} />}
     </Panel>
   );
 }

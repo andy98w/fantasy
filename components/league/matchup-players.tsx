@@ -16,7 +16,7 @@ import { Empty, Toolbar, Tabs } from "../ui/primitives";
 export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
   matchup: Snapshot["matchups"][number]; teams: Team[]; players: Player[]; today?: TodayData; onPlayer: (player: Player) => void;
 }) {
-  const [period, setPeriod] = useState<"week" | "today">("week");
+  const [period, setPeriod] = useState<"week" | "today">("today");
   const date = nbaDate(new Date());
   const daily = period === "today";
   const unavailable = !today || today.date !== date || today.status === "error";

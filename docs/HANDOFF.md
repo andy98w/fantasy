@@ -47,7 +47,7 @@ Fantasy is a public, shared, read-only interface over the league's ESPN data. ES
 
 Daily performer tabs: Top performers, Shitters, Surprises, Letdowns; up to six cards ranked #1–#6. Top/worst measure actual daily contribution; surprises/letdowns compare against the season per-game baseline. Negative lists require a final game and at least 10 minutes. Before today's first actual tip-off, retain the latest played day's performers and show its date. Today sidebar remains on today's schedule. Do not fabricate rows when fewer players qualify.
 
-Matchup Today tables group current roster slots into Active lineup, Bench / IR (not in scoring lineup), and unknown slots when needed. Sorting stays within each group; bench/IR NBA stats remain visible for reference. Injury status does not determine lineup membership. Week stays ungrouped because a currently benched player can have earned counting stats earlier in the week.
+Matchup player tables default to Today. Today tables group current roster slots into Active lineup, Bench / IR (not in scoring lineup), and unknown slots when needed. Sorting stays within each group; bench/IR NBA stats remain visible for reference. Injury status does not determine lineup membership. Week stays ungrouped because a currently benched player can have earned counting stats earlier in the week.
 
 Matchup player tables use actual credited weekly stats and support team filtering/category sorting. Missing weekly data remains missing, not season averages substituted as weekly totals.
 

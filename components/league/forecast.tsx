@@ -13,6 +13,9 @@ import { CategoryComparison } from "./category-comparison";
 import { Rivalries } from "./rivalries";
 import { MatchupClash } from "./matchup-clash";
 
+import { buildOutlook } from "@/lib/outlook";
+import { OutlookDetails } from "./outlook-details";
+
 const dayLabel = (date: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
 function Coverage({ projection }: { projection: Projection }) {
   return <span className="forecast-games">{projection.issue ? projection.issue : `${projection.games} games${projection.liveGames ? ` + ${projection.liveGames} live` : ""}`}{projection.baselineEstimates.map(p => <small className="forecast-baseline" key={p.playerId}>{p.name}: estimated from {p.season - 1}–{String(p.season).slice(-2)} ({p.gamesPlayed} games)</small>)}</span>;
@@ -30,10 +33,11 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
   const opponent = b ?? scheduledOpponent(schedule, period, home?.id);
   const away = data.teams.find(t => t.id === opponent && t.id !== home?.id) ?? data.teams.find(t => t.id !== home?.id);
   // The page refreshes automatically; tie projections to the same render instant.
+  const outlook = useMemo(() => buildOutlook(data), [data]);
   const projections = useMemo(() => {
     const now = Date.now();
-    return window && home && away ? [projectTeam(data, home.id, window, now, today, { scenario, omittedPlayerIds: scenario === "if_available" ? omitted : [] }), projectTeam(data, away.id, window, now, today, { scenario, omittedPlayerIds: scenario === "if_available" ? omitted : [] })] as const : null;
-  }, [data, today, window, home, away, scenario, omitted]);
+    return window && home && away ? [projectTeam(data, home.id, window, now, today, { scenario, outlook, omittedPlayerIds: scenario === "if_available" ? omitted : [] }), projectTeam(data, away.id, window, now, today, { scenario, outlook, omittedPlayerIds: scenario === "if_available" ? omitted : [] })] as const : null;
+  }, [data, today, window, home, away, scenario, omitted, outlook]);
   const views = <Tabs label="Forecast view" value={horizon} onChange={value => { setHorizon(value); setB(null); }} options={[{ value: "next", label: "Next week" }, { value: "remaining", label: "Rest of this week" }, { value: "whatif", label: "What if" }]} />;
   if (horizon === "whatif") return <div className="forecast-room"><div className="rivalry-toolbar">{views}</div><Rivalries data={data} mode="whatif" /></div>;
   if (!home || !away) return <Empty>Two teams are needed for a forecast.</Empty>;
@@ -50,7 +54,7 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
       <Select label="First team" value={String(home.id)} onChange={value => { setA(Number(value)); setB(null); setOmitted([]); }} options={teamOptions(data.teams)} />
       <Select label="Second team" value={String(away.id)} onChange={value => { setB(Number(value)); setOmitted([]); }} options={teamOptions(data.teams.filter(t => t.id !== home.id))} />
     </div>
-    <p className="forecast-games">{scenario === "conservative" ? "Only players marked active and outside IR contribute future production." : "Conditional: uncertain players play; OUT and IR players return after today. This does not predict a return date."}</p>
+    <p className="forecast-games">Balanced outlook · {scenario === "conservative" ? "Only players marked active and outside IR contribute future production." : "Conditional: uncertain players play; OUT and IR players return after today. This does not predict a return date."}</p>
     {scenario === "if_available" && <details className="forecast-details"><summary>Hypothetical roster exclusions{omitted.length ? ` (${omitted.length})` : ""}</summary>
       <p>Choose players to leave out of this forecast to make room for IR returns. This only changes future projections; today’s started lineups stay locked. ESPN rosters stay unchanged.</p>
       <div className="forecast-breakdowns">{[home, away].map(team => <div key={team.id}><h3>{team.name}</h3>{data.players.filter(p => p.teamId === team.id).map(p => <label className="forecast-roster-option" key={p.id}><input type="checkbox" checked={omitted.includes(p.id)} onChange={event => setOmitted(ids => event.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />Exclude {p.name}{p.slot === "IR" ? " (IR)" : ""}</label>)}</div>)}</div>
@@ -66,7 +70,7 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
         <CategoryComparison home={projections[0].side} away={projections[1].side} homeName={home.name} awayName={away.name} close={close} />
       </section>
       <details className="forecast-details"><summary>Forecast assumptions</summary>
-        <p>Season averages × playable games. Players with no current-season games use complete previous-season averages when available, labeled as estimates. Current-season averages take over after the first played game. Daily lineups fill legal slots, then favor player power. Conservative availability excludes IR and all non-active statuses, including day-to-day and unknown. If available assumes uncertain players play, and OUT, suspended and IR players become available after today. IR activation requires roster space; no drops are assumed. The current status does not establish an absence or return date for future games.</p>
+        <p>Balanced per-game outlook × playable games. Current production blends with the previous season; minutes use the current role and shooting uses attempt-based weights. Players without usable history use current stats only. Daily lineups fill legal slots, then favor outlook value. Historical validation is limited; role changes need review. Conservative availability excludes IR and all non-active statuses, including day-to-day and unknown. If available assumes uncertain players play, and OUT, suspended and IR players become available after today. IR activation requires roster space; no drops are assumed. The current status does not establish an absence or return date for future games.</p>
         {horizon === "remaining" && <p>Current scored totals plus remaining games. Players already started keep their lineup slots; live-game production is estimated from time remaining.</p>}
         <p>FG% and FT% use total makes and attempts. Close means within 5% for counting stats or 1.5 percentage points for shooting. This is a projection, not a win probability.</p>
         <div className="forecast-breakdowns">{projections.map((projection, index) => <div key={index}><h3>{index ? away.name : home.name}</h3>
@@ -76,6 +80,7 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
           {projection.exclusions.length > 0 && <p>Excluded games: {projection.exclusions.map(row => `${data.players.find(p => p.id === row.playerId)?.name ?? row.playerId} — ${dayLabel(row.date)} (${row.reason})`).join("; ")}</p>}
           {projection.activationPlayerIds.length > 0 && <p>Assumed IR activations: {projection.activationPlayerIds.map(id => data.players.find(p => p.id === id)?.name ?? id).join(", ")}. {projection.activationSlotsNeeded > 0 ? `${projection.activationSlotsNeeded} roster slot(s) must be freed.` : "Fits current non-IR roster capacity."}</p>}
           {projection.benched > 0 && <p>{projection.benched} player-games sit because lineup slots are full.</p>}
+          <details className="forecast-details"><summary>Player outlook inputs</summary>{projection.outlookEstimates.map(estimate => { const player = data.players.find(p => p.id === estimate.playerId); return player ? <OutlookDetails key={player.id} player={player} estimate={estimate} /> : null; })}</details>
           <ul>{(projection.issue ? [] : projection.players).map(({player, games}) => <li key={player.id}><span>{player.name}</span><span>{Number.isInteger(games) ? games : games.toFixed(1)} games</span></li>)}</ul>
         </div>)}</div>
       </details>

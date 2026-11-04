@@ -1,11 +1,12 @@
 import { CATEGORIES, type ForecastSchedule, type Matchup, type Player, type Snapshot } from "./schema";
 import { nbaAbbrev, nbaDate, type TodayData } from "./nba";
 import { compareCategories, weekSides } from "./season";
+import { buildOutlook, OUTLOOK_MODEL, type Outlook, type OutlookContext } from "./outlook";
 import { availabilityReason, isUncertain, type AvailabilityScenario } from "./availability";
 
 const COUNTS = ["PTS", "REB", "AST", "STL", "BLK", "3PM", "TO", "FGM", "FGA", "FTM", "FTA"] as const;
 export type AvailabilityAssumption = { playerId: number; name: string; status: string; slot: string | null; reason: string };
-export type ProjectionOptions = { scenario?: AvailabilityScenario; omittedPlayerIds?: number[] };
+export type ProjectionOptions = { scenario?: AvailabilityScenario; omittedPlayerIds?: number[]; outlook?: OutlookContext };
 export type ForecastWindow = ForecastSchedule["windows"][number];
 export type Projection = {
   scenario: AvailabilityScenario;
@@ -22,6 +23,7 @@ export type Projection = {
   excluded: Player[];
   missing: Player[];
   baselineEstimates: { playerId: number; name: string; season: number; gamesPlayed: number }[];
+  outlookEstimates: Outlook[];
   issue: string | null;
   players: { player: Player; games: number }[];
   days: { date: string; lockedSlots: number; selectedPlayerIds: number[]; openSlots: string[]; benchedPlayerIds: number[] }[];
@@ -29,7 +31,7 @@ export type Projection = {
 
 // Bipartite assignment, maximizing filled legal slots first, then player power.
 // Greedy selection fails when a multi-position player takes a specialist's slot.
-export function dailyLineupPlan(players: Player[], slots: string[]) {
+export function dailyLineupPlan(players: Player[], slots: string[], scoreFor = (p: Player) => p.zTotal ?? 0) {
   if (slots.length > 12) return { players: [] as Player[], openSlots: [] as string[] };
   type Choice = { score: number; players: Player[] };
   let states = new Map<number, Choice>([[0, { score: 0, players: [] }]]);
@@ -37,7 +39,7 @@ export function dailyLineupPlan(players: Player[], slots: string[]) {
     const next = new Map(states);
     for (const [mask, choice] of states) for (let i = 0; i < slots.length; i++) {
       if ((mask & (1 << i)) || !player.eligibleSlots.includes(slots[i])) continue;
-      const target = mask | (1 << i), score = choice.score + (player.zTotal ?? 0);
+      const target = mask | (1 << i), score = choice.score + scoreFor(player);
       if (!next.has(target) || score > next.get(target)!.score)
         next.set(target, { score, players: [...choice.players, player] });
     }
@@ -58,6 +60,8 @@ export function scheduledOpponent(schedule: ForecastSchedule | null, period: num
 }
 
 export function projectTeam(data: Snapshot, teamId: number, window: ForecastWindow, now: number, today?: TodayData, options: ProjectionOptions = {}): Projection {
+  const outlook = options.outlook ?? buildOutlook(data);
+  const outlookScores = new Map(outlook.players.map(p => [p.id, p.zTotal ?? 0]));
   const fullRoster = data.players.filter(p => p.teamId === teamId);
   const roster = fullRoster.filter(p => !options.omittedPlayerIds?.includes(p.id));
   const scenario = options.scenario ?? "conservative";
@@ -76,7 +80,7 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
     assumptions: affected.map(p => ({ playerId: p.id, name: p.name, status: p.status, slot: p.slot, reason: availabilityReason(p) })),
     rosterExclusions: fullRoster.filter(p => !roster.includes(p)).map(p => ({ playerId: p.id, name: p.name })),
     activationPlayerIds: [], activationSlotsNeeded: 0, exclusions: [],
-    games: 0, liveGames: 0, benched: 0, excluded, missing: [], baselineEstimates: [], issue: null, players: [], days: [],
+    games: 0, liveGames: 0, benched: 0, excluded, missing: [], baselineEstimates: [], outlookEstimates: [], issue: null, players: [], days: [],
   };
   const fail = (issue: string) => {
     result.issue = issue;
@@ -105,14 +109,12 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
   const add = (player: Player, fraction: number) => {
     if (!(fraction > 0)) return;
     counts.set(player.id, (counts.get(player.id) ?? 0) + fraction);
-    const prior = player.previousSeason;
-    const fallback = player.gamesPlayed === 0 && prior?.season === data.league.season - 1 && prior.gamesPlayed > 0 ? prior : null;
-    const stats = fallback?.stats ?? player.stats;
-    const valid = (fallback?.gamesPlayed ?? player.gamesPlayed) > 0 && COUNTS.every(c => stats[c] != null && Number.isFinite(stats[c]) && stats[c]! >= 0)
-      && stats.FGM! <= stats.FGA! && stats.FTM! <= stats.FTA!;
-    if (!valid) { if (!result.missing.includes(player)) result.missing.push(player); return; }
-    if (fallback && !result.baselineEstimates.some(p => p.playerId === player.id))
-      result.baselineEstimates.push({ playerId: player.id, name: player.name, season: fallback.season, gamesPlayed: fallback.gamesPlayed });
+    const estimate = outlook.estimates.get(player.id);
+    const stats = estimate?.stats;
+    if (!stats) { if (!result.missing.includes(player)) result.missing.push(player); return; }
+    if (!result.outlookEstimates.some(p => p.playerId === player.id)) result.outlookEstimates.push(estimate);
+    if (estimate.source === "previous_only" && !result.baselineEstimates.some(p => p.playerId === player.id))
+      result.baselineEstimates.push({ playerId: player.id, name: player.name, season: estimate.priorSeason!, gamesPlayed: estimate.priorGames });
     for (const c of COUNTS) totals[c]! += stats[c]! * fraction;
   };
   const days = [...new Set(schedule.games.filter(g => g.date >= window.start && g.date <= window.end && (!current || g.date >= date)).map(g => g.date))].sort();
@@ -156,7 +158,7 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
         candidates.push(player);
       }
     }
-    const plan = dailyLineupPlan(candidates, slots), selected = plan.players;
+    const plan = dailyLineupPlan(candidates, slots, p => outlookScores.get(p.id) ?? 0), selected = plan.players;
     result.days.push({ date: day, lockedSlots: schedule.slots.length - slots.length, selectedPlayerIds: selected.map(p => p.id), openSlots: plan.openSlots, benchedPlayerIds: candidates.filter(p => !selected.includes(p)).map(p => p.id) });
     result.games += selected.length;
     result.benched += candidates.length - selected.length;
@@ -188,16 +190,17 @@ export function closeCategories(home: Projection, away: Projection) {
 export function projectionSummary(p: Projection) {
   return { teamId: p.side.teamId, stats: p.side.stats, games: p.issue ? null : p.games,
     liveGames: p.issue ? null : p.liveGames, benchedGames: p.issue ? null : p.benched,
-    issue: p.issue, scenario: p.scenario, availabilityAsOf: p.availabilityAsOf,
+    outlookModel: OUTLOOK_MODEL, issue: p.issue, scenario: p.scenario, availabilityAsOf: p.availabilityAsOf,
     rosterExclusions: p.rosterExclusions, assumptions: p.assumptions, exclusions: p.exclusions, activationPlayerIds: p.activationPlayerIds,
     activationSlotsNeeded: p.activationSlotsNeeded, excludedPlayerIds: p.excluded.map(p => p.id),
-    missingPlayerIds: p.missing.map(p => p.id), baselineEstimates: p.baselineEstimates,
+    missingPlayerIds: p.missing.map(p => p.id), baselineEstimates: p.baselineEstimates, outlookEstimates: p.outlookEstimates,
     players: p.issue ? [] : p.players.map(row => ({ playerId: row.player.id, games: row.games })) };
 }
 
 export function tradeProduction(data: Snapshot, teamId: number, before: Player[], after: Player[], now: number, scenario: AvailabilityScenario) {
   const window = data.forecastSchedule?.windows.find(w => w.period === data.league.matchupPeriod + 1);
   if (!window) return { window: null, issue: "Next-week schedule unavailable.", before: null, after: null };
-  const project = (roster: Player[]) => projectTeam({ ...data, players: roster.map(p => ({ ...p, teamId })) }, teamId, window, now, undefined, { scenario });
+  const outlook = buildOutlook(data);
+  const project = (roster: Player[]) => projectTeam({ ...data, players: roster.map(p => ({ ...p, teamId })) }, teamId, window, now, undefined, { scenario, outlook });
   return { window, issue: null, before: project(before), after: project(after) };
 }

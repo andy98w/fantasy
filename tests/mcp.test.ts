@@ -88,7 +88,9 @@ test("team power and trade simulations reuse dashboard rules, include IR and nev
     const result = await call(client, "fantasy_analyze_trade", { leftTeamId: left, rightTeamId: right,
       leftPlayerIds: [leftPlayers[1].id], rightPlayerIds: [rightPlayers[1].id], punts: ["TO"] });
     assert.equal(result.simulated, true);
-    assert.equal(result.weights.TO, 0);
+    assert.equal(result.weights.left.TO, 0);
+    assert.equal(result.weights.right.TO, 0);
+    assert.equal(result.basis, "balanced");
     assert.equal(result.left.rosterCountBefore, result.left.rosterCountAfter);
     assert.equal(JSON.stringify(s), before);
     const invalid = await client.callTool({ name: "fantasy_analyze_trade", arguments: { leftTeamId: left, rightTeamId: right, leftPlayerIds: [rightPlayers[0].id], rightPlayerIds: [] } });
@@ -293,5 +295,26 @@ test("MCP preserves forecast fallback provenance and validates hypothetical excl
     assert.equal(opportunities.home.baselineEstimates[0].gamesPlayed,60);
     const bad=await client.callTool({name:"fantasy_forecast_matchup",arguments:{teamId:home,omittedPlayerIds:[999]}});
     assert.equal(bad.isError,true);
+  } finally {await client.close();}
+});
+
+
+test("trade outlook and observed comparisons share UI rules with independent preferences", async () => {
+  const s=fixture(), left=s.teams[0].id,right=s.teams[1].id;
+  const leftPlayers=s.players.filter(p=>p.teamId===left),rightPlayers=s.players.filter(p=>p.teamId===right);
+  leftPlayers[0].previousSeason={season:s.league.season-1,gamesPlayed:60,stats:{...leftPlayers[0].stats,STL:2}};
+  const client=await connect(dependencies(s));
+  try {
+    const args={leftTeamId:left,rightTeamId:right,leftPlayerIds:[leftPlayers[0].id],rightPlayerIds:[rightPlayers[0].id],leftPreferences:{punts:["TO"],priorities:["STL"]},rightPreferences:{punts:["FT%"],priorities:["PTS"]}};
+    const r=await call(client,"fantasy_analyze_trade",args);
+    assert.equal(r.left.weights.TO,0);assert.equal(r.right.weights.TO,1);assert.equal(r.right.weights['FT%'],0);assert.equal(r.left.weights['FT%'],1);
+    assert.equal(r.left.before.teamModel,"balanced-v1");assert.equal(r.left.currentSeason.before.power,teamRating(leftPlayers,r.left.weights).score);
+    assert.ok(r.left.outlookEstimates.some((o:any)=>o.source==='blended'));
+    const {buildOutlook,outlookRoster}=await import('../lib/outlook');const context=buildOutlook(s);
+    assert.equal(r.left.before.power,teamRating(outlookRoster(leftPlayers,context),r.left.weights).score);
+    const observed=await call(client,"fantasy_analyze_trade",{...args,basis:'current'});
+    assert.equal(observed.left.before.power,observed.left.currentSeason.before.power);
+    const invalid=await client.callTool({name:'fantasy_analyze_trade',arguments:{...args,rightPreferences:{punts:['FT%'],priorities:['FT%']}}});
+    assert.equal(invalid.isError,true);
   } finally {await client.close();}
 });

@@ -78,7 +78,7 @@ Use your agent framework's MCP adapter if it already has one. `tools/list` suppl
 | `fantasy_get_player` | Season per-game stats, category contributions, power trend, news |
 | `fantasy_get_matchups` | Actual weekly totals, results, optional credited player stats sorted by category |
 | `fantasy_forecast_matchup` | Next-week or rest-of-week projected totals, scheduled opponent, excluded/missing players |
-| `fantasy_analyze_trade` | Simulated before/after strengths and power, optional punts/priorities, roster counts |
+| `fantasy_analyze_trade` | Balanced outlook by default; observed comparison, independent side preferences, roster counts |
 | `fantasy_get_today` | Today's NBA games plus top/worst/surprise/letdown performers and their actual slate date |
 | `fantasy_get_game_boxscore` | Full NBA box score by game ID; optional category sorting within each NBA team |
 | `fantasy_get_player_games` | Current-season game log; inclusive date filters, date/category sorting, pagination |
@@ -130,3 +130,12 @@ User-confirmed missing weekly team totals appear as `statCorrections` on the aff
 Forecasts expose `baselineEstimates` (player, season, games played) when zero-game players use previous-season actual averages. Forecast and opportunity tools accept `omittedPlayerIds` for hypothetical future roster exclusions, validated against the selected teams; ESPN is never changed and today's locked lineups remain. Player profiles expose `previousSeason` separately from actual current `stats`.
 
 `fantasy_get_today` exposes historical `calibration`, `worstCutoff`, individual `categoryContributions`, and `negatives`. Worst selects at most six negative performances below the historical 10th percentile; missing/insufficient/stale calibration yields no worst list. Letdown remains relative to the player's own current-season baseline.
+
+
+## Balanced outlook (server 1.3.0)
+
+Trade analysis defaults to `basis: "balanced"`; `"current"` uses observed season contributions. `leftPreferences` and `rightPreferences` each accept `punts` and `priorities`. A supplied side object replaces legacy shared `punts`/`priorities` for that side; legacy inputs still apply when it is omitted. Contradictory priorities are rejected. Returned `weights.left` / `weights.right` and each side's weights make the distinction explicit.
+
+`before`/`after` and `fitChange` use the selected basis. Existing `power`/`powerChange` names remain compatibility aliases for fit; read `basis` and `teamModel`. `currentSeason` always provides the observed comparison. Sent/received players have separately labeled `currentZTotal` and `outlookZTotal`. The fixed global pool is retained for all swaps. Full-roster value includes IR; next-week production always uses balanced outlook plus the explicit availability scenarios, regardless of the descriptive comparison basis.
+
+Player search/profile and team responses include per-player `outlook`. Forecast summaries expose `outlookModel` and `outlookEstimates`; zero-game previous-only estimates also retain `baselineEstimates`. Current actual `stats` and observed Power remain separate. Read source, current/prior game counts, current weights and warnings; current-only rookies are not historically grounded estimates. Shooting weights use attempts, counts use per-minute rates when available, and current minutes respond immediately. See METHODOLOGY and OUTLOOK_VALIDATION for formulas and limited historical evidence. Reconnect clients to refresh tool schemas and server instructions.

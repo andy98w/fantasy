@@ -164,9 +164,12 @@ test("zero-game forecasts use only complete immediately previous-season actuals 
   assert.deepEqual(projected.baselineEstimates, [{playerId:1,name:"Player 1",season:2026,gamesPlayed:60}]);
   assert.deepEqual(projectionSummary(projected).baselineEstimates, projected.baselineEstimates);
   assert.deepEqual(p.stats, {}); // forecasts never populate actual stats or power
-  p.gamesPlayed = 1; p.stats = {...stats, PTS: 7};
+  p.gamesPlayed = 1; p.stats = {...stats, PTS: 7, FGM: 2, "3PM": 1, FTM: 2};
   const current = projectTeam(data, 1, schedule.windows[1], now);
-  assert.equal(current.side.stats.PTS, 14);
+  assert.equal(current.side.stats.PTS, Math.round(20 * (404 / 41 + 21 / 11 + 202 / 51)) / 10);
+  assert.equal(p.stats.PTS, 7); // actual performance remains separate
+  assert.equal(current.outlookEstimates[0].source, "blended");
+  assert.ok(current.outlookEstimates[0].currentWeights.REB < .1);
   assert.deepEqual(current.baselineEstimates, []);
   p.stats = {}; // incomplete played-season stats must not silently mix seasons
   assert.match(projectTeam(data, 1, schedule.windows[1], now).issue!, /Player 1/);
@@ -215,4 +218,17 @@ test("IR preflight reports capacity for every returning player across the whole 
   const result=projectTeam(data,1,schedule.windows[1],now,undefined,{scenario:"if_available"});
   assert.equal(result.activationSlotsNeeded,2);
   assert.deepEqual(result.activationPlayerIds,[2,3]);
+});
+
+
+test("forecast lineup selects outlook strength and trades retain the original reference context", () => {
+  const weak=player(1,{zTotal:100,stats:{...stats,PTS:4,REB:1,AST:1,STL:0,BLK:0,"3PM":0,TO:5,FGM:2,FTM:0,FTA:0}});
+  const strong=player(2,{zTotal:-100});
+  const d=snapshot([weak,strong]);d.model={...d.model,poolIds:[1,2]};d.forecastSchedule.slots=["PG"];
+  const p=projectTeam(d,1,schedule.windows[1],now);
+  assert.deepEqual(p.days[0].selectedPlayerIds,[2]);assert.equal(p.side.stats.PTS,40);
+  const moved={...strong,teamId:2};
+  const trade=tradeProduction({...d,players:[weak,moved]},1,[weak],[weak,moved],now,"conservative");
+  assert.deepEqual(trade.after!.days[0].selectedPlayerIds,[2]);
+  assert.equal(moved.teamId,2);
 });

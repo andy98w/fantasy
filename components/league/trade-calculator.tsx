@@ -1,7 +1,7 @@
 "use client";
 
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CATEGORIES,
   type Category,
@@ -27,6 +27,9 @@ import { tradeProduction } from "@/lib/forecast";
 import { stat } from "./format";
 import { CategoryMeter } from "../ui/category-meter";
 import { ValueFeedback } from "../ui/value-feedback";
+
+import { buildOutlook, outlookRoster, OUTLOOK_MODEL, type OutlookContext } from "@/lib/outlook";
+import { OutlookDetails } from "./outlook-details";
 
 const score = (value: number | null) => (value === null ? "—" : signed(value));
 
@@ -133,6 +136,8 @@ function TradeImpact({
   onWeight,
   capacity,
   active,
+  outlook,
+  basis,
 }: {
   data: Snapshot;
   team: Team;
@@ -144,9 +149,11 @@ function TradeImpact({
   onWeight: (category: Category, value: number) => void;
   capacity: number;
   active: boolean;
+  outlook: OutlookContext;
+  basis: "balanced" | "current";
 }) {
-  const before = teamRating(beforeRoster, weights),
-    after = teamRating(afterRoster, weights);
+  const before = teamRating(basis === "balanced" ? outlookRoster(beforeRoster, outlook) : beforeRoster, weights),
+    after = teamRating(basis === "balanced" ? outlookRoster(afterRoster, outlook) : afterRoster, weights);
   const hasData = before.rated > 0 && after.rated > 0;
   const delta = (category: Category) =>
     after.categories[category] - before.categories[category];
@@ -235,7 +242,10 @@ function TradeImpact({
                   "No notable category changes."}
         </p>
       </div>
-      {active && <details className="forecast-details"><summary>Next-week production impact</summary>
+      {active && basis === "balanced" && <details className="forecast-details"><summary>Outlook inputs</summary>
+        {[...sent, ...received].map(player => <OutlookDetails key={player.id} player={player} estimate={outlook.estimates.get(player.id)!} />)}
+      </details>}
+      {active && <details className="forecast-details"><summary>Next-week production impact · Balanced outlook</summary>
         <p>Roster value includes IR. Production depends on availability and legal starting slots. Incoming IR placement is retained as an assumption; activation may require freeing roster space.</p>
         {(["conservative", "if_available"] as const).map(scenario => {
           const forecast = tradeProduction(data, team.id, beforeRoster, afterRoster, Date.now(), scenario);
@@ -308,6 +318,8 @@ function TradeImpact({
 }
 
 export function TradeCalculator({ data }: { data: Snapshot }) {
+  const outlook = useMemo(() => buildOutlook(data), [data]);
+  const [basis, setBasis] = useState<"balanced" | "current">("balanced");
   const [leftId, setLeftId] = useState(data.teams[0]?.id);
   const [rightId, setRightId] = useState(data.teams[1]?.id);
   const [leftSelected, setLeftSelected] = useState<number[]>([]);
@@ -351,10 +363,12 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
   return (
     <>
       <Toolbar>
+        <Select label="Trade valuation basis" value={basis} onChange={value => setBasis(value as "balanced" | "current")} options={[{ value: "balanced", label: "Balanced outlook" }, { value: "current", label: "Season so far" }]} />
         <Button variant="quiet" onClick={reset}>
           Reset trade
         </Button>
       </Toolbar>
+      <details className="forecast-details"><summary>Valuation details</summary><p>{basis === "balanced" ? "Current production blended with the previous season; shooting uses attempt-based weights. Full-roster value includes bench and IR. Check availability separately." : "Observed current-season production. Small samples can overstate hot starts and slumps."}</p><p>{OUTLOOK_MODEL.validation}. Category values are relative strengths: positive TO means fewer turnovers. Team fit tapers category totals, then applies each team’s priorities. Missing ratings make totals provisional. Outlook inputs show the data and weights for selected players.</p></details>
       {error && (
         <Notice
           warning
@@ -373,7 +387,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
           teamId={leftId}
           otherId={rightId}
           teams={data.teams}
-          players={data.players}
+          players={basis === "balanced" ? outlook.players : data.players}
           selected={leftSelected}
           onTeam={(id) => {
             setLeftId(id);
@@ -387,7 +401,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
           teamId={rightId}
           otherId={leftId}
           teams={data.teams}
-          players={data.players}
+          players={basis === "balanced" ? outlook.players : data.players}
           selected={rightSelected}
           onTeam={(id) => {
             setRightId(id);
@@ -412,6 +426,8 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
             }
             capacity={capacity}
             active={active}
+            outlook={outlook}
+            basis={basis}
           />
           <TradeImpact
             data={data}
@@ -426,6 +442,8 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
             }
             capacity={capacity}
             active={active}
+            outlook={outlook}
+            basis={basis}
           />
         </div>
       )}

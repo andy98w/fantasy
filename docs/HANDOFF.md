@@ -1,6 +1,6 @@
 # Fantasy — handoff
 
-Updated November 2, 2026 (America/Los_Angeles). This is the starting point for a new chat; verify the working tree and live state before making changes.
+Updated November 3, 2026 (America/Los_Angeles). This is the starting point for a new chat; verify the working tree and live state before making changes.
 
 ## Start here
 
@@ -10,7 +10,7 @@ Updated November 2, 2026 (America/Los_Angeles). This is the starting point for a
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Current follow-up: full-roster power including IR, explicit forecast availability scenarios, separate next-week trade production, and injury filtering for streamers. Use `git log -1` and exact-commit CI/deployment checks for its release state.
+- Current follow-up: balanced historical/current outlook shared by trade UI, forecasts and MCP, with independent side preferences and a limited historical holdout evaluation. Use `git log -1` and exact-commit CI/deployment checks for its release state.
 - Previous application release: `5ead4d7d69aff57f2ae15b9240798457fda10d44` — simplified MCP onboarding.
 - That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41347266465`; Railway GitHub deployment: `7478677082`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
@@ -90,7 +90,7 @@ Next.js / React / TypeScript frontend and server routes; Python ingestion; Postg
 - Team power: include the full roster, including IR and bench; aggregate category z-values then sum `4 * asinh(category_z / 4)` across categories. Trade priority weights apply after this taper.
 - Heatmaps show raw category z-totals, not tapered values. Positive TO category strength is good (fewer turnovers); raw turnover stats still mean lower is better.
 - Unrated rostered players contribute reference-average zero to the estimate, with provisional/coverage metadata retained. Fully unrated rosters stay unranked. Zero assumed value does not mean zero production.
-- Forecasts use season averages, actual schedule, legal lineup slots and explicit conservative/if_available scenarios. Conservative excludes all non-ACTIVE statuses and IR. If available assumes uncertain players play and OUT/suspended/IR return after today; activation requires non-IR roster capacity. Scenarios are not return-date predictions. They are estimates, not win probabilities. Trade simulations do not execute trades or prove ESPN roster legality.
+- Forecasts use balanced outlooks, actual schedule, legal lineup slots and explicit conservative/if_available scenarios. Conservative excludes all non-ACTIVE statuses and IR. If available assumes uncertain players play and OUT/suspended/IR return after today; activation requires non-IR roster capacity. Scenarios are not return-date predictions. They are estimates, not win probabilities. Trade simulations do not execute trades or prove ESPN roster legality.
 - Community trade MMR is separate from player/team power. Elo starts at 1000, K=32; a battle compares team-sides of different trades. Under-voted entries are prioritized. Repeat votes are permitted. Vote counts count appearances, not unique people.
 - Shared standing ranks reflect equal win percentage; ESPN seeds can differ. Missing history must not be filled with invented category results.
 
@@ -233,3 +233,10 @@ Zero-game forecasts use labeled immediately previous-season actuals from `player
 ## Player injury / return outlook
 
 Clicking a player opens a profile with an injury / return outlook above the stats. `lib/player-injury.ts` reads ESPN's public NBA injury feed on demand through `/api/players/[id]/injury?season=2027`; the shared feed cache refreshes after five minutes and coalesces requests. Player identity comes from canonical ESPN athlete links, not injury IDs. Shows a compact status/body-part line, estimated return, short report and dated source link. The source report preserves reevaluation wording without added explanatory paragraphs; dates in the past are labeled as past estimates. Unknown dates stay unknown, failed requests offer Retry, and saved data is flagged and expires after 24 hours. Current-season feed only; no demo fetches. This display does not alter forecast availability or roster status.
+
+
+## November 3 balanced outlook
+
+`lib/outlook.ts` adds balanced-v1, leaving actual stats/results and observed Power untouched. Trades default to Balanced outlook, with Season so far as a comparison. Forecasts use the same estimate. Current/prior/estimated stats and weights are collapsed under Outlook inputs. MCP 1.3.0 adds per-player outlooks, independent left/right trade preferences and observed comparisons. No-history/rookie players stay current-only and explicitly flagged; injured-player availability scenarios are unchanged.
+
+Historical tuning selected counting-rate prior caps of 10 games (20 steals/blocks), current minutes with no shrinkage, 400 FG and 250 FT prior-attempt caps. All are capped by actual historical coverage. Evaluation: 30 training / 13 held-out veterans, 2024–25 prior and 2025–26 target logs, next-ten-game averages at 1/3/5/10/15/25 games. Limited evidence with selection bias; do not claim calibrated probabilities or reliable injury-return/rookie predictions. Read `docs/OUTLOOK_VALIDATION.md`, `docs/outlook-validation.json` and `scripts/backtest-outlook.ts`. Verify exact-commit CI and Railway before reporting release state.

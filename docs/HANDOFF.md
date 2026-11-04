@@ -10,7 +10,7 @@ Updated November 3, 2026 (America/Los_Angeles). This is the starting point for a
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Current follow-up: balanced historical/current outlook shared by trade UI, forecasts and MCP, with independent side preferences and a limited historical holdout evaluation. Use `git log -1` and exact-commit CI/deployment checks for its release state.
+- Current follow-up: bounded league-relative Power /9 and trade fit, including historical opponent comparisons, layered on the balanced outlook. Use `git log -1` and exact-commit CI/deployment checks for its release state.
 - Previous application release: `5ead4d7d69aff57f2ae15b9240798457fda10d44` — simplified MCP onboarding.
 - That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41347266465`; Railway GitHub deployment: `7478677082`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
@@ -87,8 +87,8 @@ Next.js / React / TypeScript frontend and server routes; Python ingestion; Postg
 ## Ratings: preserve these distinctions
 
 - Player power: season per-game nine-category z-scores, shooting impact weighted by attempts, turnovers inverted. Minimum stats coverage/games applies; unknown values stay unknown.
-- Team power: include the full roster, including IR and bench; aggregate category z-values then sum `4 * asinh(category_z / 4)` across categories. Trade priority weights apply after this taper.
-- Heatmaps show raw category z-totals, not tapered values. Positive TO category strength is good (fewer turnovers); raw turnover stats still mean lower is better.
+- Team power: 0–9 average category leads against other rated league rosters; each lead=1, tie=0.5, loss=0. Full roster includes IR and bench. Trade fit applies independent category weights to these edges and normalizes to 0–9. See league-categories-v1 below.
+- Heatmaps show raw category z-totals, separate from bounded team Power. Positive TO category strength is good (fewer turnovers); raw turnover stats still mean lower is better.
 - Unrated rostered players contribute reference-average zero to the estimate, with provisional/coverage metadata retained. Fully unrated rosters stay unranked. Zero assumed value does not mean zero production.
 - Forecasts use balanced outlooks, actual schedule, legal lineup slots and explicit conservative/if_available scenarios. Conservative excludes all non-ACTIVE statuses and IR. If available assumes uncertain players play and OUT/suspended/IR return after today; activation requires non-IR roster capacity. Scenarios are not return-date predictions. They are estimates, not win probabilities. Trade simulations do not execute trades or prove ESPN roster legality.
 - Community trade MMR is separate from player/team power. Elo starts at 1000, K=32; a battle compares team-sides of different trades. Under-voted entries are prioritized. Repeat votes are permitted. Vote counts count appearances, not unique people.
@@ -240,3 +240,10 @@ Clicking a player opens a profile with an injury / return outlook above the stat
 `lib/outlook.ts` adds balanced-v1, leaving actual stats/results and observed Power untouched. Trades default to Balanced outlook, with Season so far as a comparison. Forecasts use the same estimate. Current/prior/estimated stats and weights are collapsed under Outlook inputs. MCP 1.3.0 adds per-player outlooks, independent left/right trade preferences and observed comparisons. No-history/rookie players stay current-only and explicitly flagged; injured-player availability scenarios are unchanged.
 
 Historical tuning selected counting-rate prior caps of 10 games (20 steals/blocks), current minutes with no shrinkage, 400 FG and 250 FT prior-attempt caps. All are capped by actual historical coverage. Evaluation: 30 training / 13 held-out veterans, 2024–25 prior and 2025–26 target logs, next-ten-game averages at 1/3/5/10/15/25 games. Limited evidence with selection bias; do not claim calibrated probabilities or reliable injury-return/rookie predictions. Read `docs/OUTLOOK_VALIDATION.md`, `docs/outlook-validation.json` and `scripts/backtest-outlook.ts`. Verify exact-commit CI and Railway before reporting release state.
+
+
+## November 3 bounded team Power
+
+`leagueRating` (`lib/analysis.ts`) replaces the unbounded taper in team rankings, profiles, trade fit and MCP. Power /9 is the average number of raw roster category strengths leading other rated teams; ties count half. More extreme margins have no further influence after all peers are passed. Raw columns remain unchanged. Trade fit uses the same rule on balanced or observed inputs with each side's own normalized weights, updating both traded rosters together. MCP 1.4.0 exposes `categoryEdges`, opponent comparisons/coverage and `fitModel` (`league-categories-v1`). Missing coverage propagates provisional flags; no rated peers means no score. History recomputes each saved league with its own historical opponents, never today's roster.
+
+This is a descriptive all-play comparison of roster strengths, not actual weekly wins or a calibrated probability. Small changes near peer boundaries can change the score; raw values remain available. The previous outlook calibration is unrelated to validation of this aggregation. Legacy taper helpers remain only for offline comparison. Use exact-commit CI/deployment verification for release status.

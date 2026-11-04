@@ -8,7 +8,7 @@ import {
   type Snapshot,
   type Team,
 } from "@/lib/schema";
-import { recordRanks, rosterValue, teamRating, teamPower } from "@/lib/analysis";
+import { recordRanks, rosterValue, leagueRating, teamPower } from "@/lib/analysis";
 import { TeamAvatar } from "./avatars";
 import { Panel } from "../ui/primitives";
 import { signedZ } from "./format";
@@ -81,15 +81,14 @@ export function RankingHelp({ model }: { model: Snapshot["model"] }) {
           fewer is better. Category scores are relative values, not stat totals.
         </p>
         <p>
-          Player power runs from 0–100. Team power tapers each roster category before
-          adding them: extreme strengths and weaknesses count progressively less.
+          Player power runs from 0–100. Team power runs from 0–9: average category leads
+          against the other rated teams. A lead counts one, a tie half, and a loss zero. Bigger margins earn no extra credit.
           Bench and IR are included; injuries do not discount roster value. The heatmap shows the original category values.
         </p>
         <p>
-          Ratings use season averages and require {model.minimumGames} games.
+          Observed player ratings use season averages and require {model.minimumGames} games.
           Team power is a rating, not a win probability. Estimated scores treat
-          unrated players as average. Trade priorities
-          adjust team fit: Punt ignores a category; Priority counts it twice.
+          unrated players as average. Trade priorities adjust category fit: Punt ignores a category; Priority doubles its weight. Weighted fit is normalized to 0–9. Small changes can cross an opponent; margins and raw category values remain visible.
         </p>
       </div>
     </details>
@@ -131,6 +130,7 @@ export function TeamRankings({
   const sortHeader = (key: string, label = key) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["name", "rank"].includes(key)} className={key === "name" ? "identity-col" : undefined}>{label}</SortableHeader>;
   return (
     <Panel title="Team power">
+      <p className="panel-note">Average category leads vs league · ties count ½ · raw strengths below</p>
       <TableToolbar label="Search team power" query={control.query} onQuery={control.setQuery} />
       <div
         className="table-scroll"
@@ -143,7 +143,7 @@ export function TeamRankings({
             <tr>
               {sortHeader("rank", "Rank")}
               {sortHeader("name", "Team")}
-              {sortHeader("power", "Power")}
+              {sortHeader("power", "Power /9")}
               {CATEGORIES.map(category => sortHeader(category))}
             </tr>
           </thead>
@@ -162,7 +162,7 @@ export function TeamRankings({
                     <strong>{value.team.name}</strong>
                   </button>
                 </td>
-                <td><MotionNumber>{value.score?.toFixed(1) ?? "—"}</MotionNumber></td>
+                <td title={`${value.opponentsCompared}/${value.opponentsExpected} opponents compared${value.provisional ? "; incomplete ratings — estimated" : ""}`}><MotionNumber>{value.score?.toFixed(2) ?? "—"}</MotionNumber>{value.provisional ? " *" : ""}</td>
                 {CATEGORIES.map((category) => (
                   <td key={category}>
                     <CategoryValue
@@ -176,6 +176,7 @@ export function TeamRankings({
           </AnimatedRows>
         </table>
       </div>
+      {values.some(value => value.provisional) && <p className="panel-note">* Estimated: some player ratings in this league are missing.</p>}
     </Panel>
   );
 }
@@ -183,6 +184,7 @@ export function TeamRankings({
 export function CategoryValue({ value }: { value: number | null }) {
   return (
     <span
+      title={value === null ? "Missing category strength" : `Raw category strength: ${value.toFixed(3)}`}
       className={`heat-cell ${value === null ? "" : value > 0 ? "positive" : value < 0 ? "negative" : ""}`}
     >
       {value === null ? "—" : signedZ(value)}
@@ -212,12 +214,14 @@ export function TeamProfile({
   team,
   teams,
   roster,
+  players,
 }: {
   team: Team;
   teams: Team[];
   roster: Player[];
+  players: Player[];
 }) {
-  const value = teamRating(roster);
+  const value = leagueRating(team.id, teams, players);
   return (
     <>
       <div className="team-profile">
@@ -237,8 +241,8 @@ export function TeamProfile({
           <strong>{team.standing === null ? "—" : `#${team.standing}`}</strong>
         </div>
         <div>
-          <span>Power{value.provisional ? " (est.)" : ""}</span>
-          <strong>{value.score?.toFixed(1) ?? "—"}</strong>
+          <span title={`${value.opponentsCompared}/${value.opponentsExpected} opponents compared${value.provisional ? "; incomplete player ratings in this league" : ""}`}>Power /9{value.provisional ? " (est.)" : ""}</span>
+          <strong>{value.score?.toFixed(2) ?? "—"}</strong>
         </div>
         <div>
           <span>Rated players</span>

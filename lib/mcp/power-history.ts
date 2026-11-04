@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { snapshotSchema, type Snapshot } from "../schema";
-import { teamRating } from "../analysis";
+import { leagueRating, LEAGUE_POWER_MODEL } from "../analysis";
 import { nbaDate } from "../nba";
 import { dateInput } from "./queries";
 
@@ -31,8 +31,8 @@ export function extractPowerHistory(raw: unknown[], current: Snapshot, request: 
       const player = s.players.find(p => p.id === request.id);
       if (player) insert({ date: nbaDate(new Date(s.syncedAt)), capturedAt: s.syncedAt, power: player.power, model: modelOf(s) });
     } else if (s.teams.some(t => t.id === request.id)) {
-      const roster = s.players.filter(p => p.teamId === request.id), rating = teamRating(roster);
-      insert({ date: nbaDate(new Date(s.syncedAt)), capturedAt: s.syncedAt, power: rating.score, model: { ...modelOf(s), teamFormula: "4*asinh(category/4); full roster including IR; v2" },
+      const roster = s.players.filter(p => p.teamId === request.id), rating = leagueRating(request.id, s.teams, s.players);
+      insert({ date: nbaDate(new Date(s.syncedAt)), capturedAt: s.syncedAt, power: rating.score, model: { ...modelOf(s), teamFormula: LEAGUE_POWER_MODEL.formula, teamModel: LEAGUE_POWER_MODEL.version, opponentIds: rating.comparisons.map(p => p.teamId).sort((a,b) => a-b) },
         categories: rating.categories, provisional: rating.provisional, rosterIds: roster.map(p => p.id) });
     }
   }

@@ -10,13 +10,14 @@ import {
   teamRating,
   taperCategory,
   teamPower,
+  leagueRating,
 } from "../lib/analysis";
 import demo from "../lib/demo.json";
 const data = snapshotSchema.parse(demo);
-test("team leaderboard uses the same tapered rating as team profiles and trade fit", () => {
+test("team leaderboard uses the same league rating as profiles and trade fit", () => {
   for (const value of teamPower(data.teams, data.players)) {
     const roster = data.players.filter(p => p.teamId === value.team.id);
-    assert.equal(value.score, teamRating(roster).score);
+    assert.equal(value.score, leagueRating(value.team.id,data.teams,data.players).score);
     assert.deepEqual(value.categories, rosterValue(roster).categories);
   }
 });
@@ -61,7 +62,7 @@ test("incomplete teams are provisional, equal scores tie, and unmeasured teams r
   assert.equal(partial.provisional, true);
   assert.equal(partial.rated, 1);
   assert.equal(partial.size, 2);
-  assert.equal(partial.score, teamRating([players[0]]).score);
+  assert.equal(partial.score, 4.5); // tied with the one rated opponent in every category
   assert.equal(players[1].zTotal, null);
   assert.equal(power[2].score, null);
 });
@@ -187,4 +188,50 @@ test("tapered team fit respects IR, unknowns, punts and priorities", () => {
   const priority = teamRating(roster, { ...DEFAULT_WEIGHTS, AST: 2 });
   assert.ok(Math.abs(priority.score! - 2 * rating.score!) <= .001);
   assert.deepEqual(priority.categories, rating.categories);
+});
+
+
+test("category influence is bounded and margins beyond all peers cannot inflate power", () => {
+  const teams=data.teams.slice(0,3),ids=teams.map(t=>t.id);
+  const roster=[p(501,ids[0],100),p(502,ids[1],1),p(503,ids[2],0)];
+  const original=JSON.stringify(roster);
+  const a=leagueRating(ids[0],teams,roster);
+  assert.equal(a.categoryEdges.AST,1);assert.equal(a.score,5); // eight ties plus one lead
+  assert.equal(leagueRating(ids[0],teams,roster.map(r=>r.id===501?{...r,contributions:{...r.contributions,AST:1000000}}:r)).score,5);
+  const losing=leagueRating(ids[0],teams,roster.map(r=>r.id===501?{...r,contributions:{...r.contributions,AST:-1000000}}:r));
+  assert.equal(losing.score,4);assert.equal(a.score!-losing.score!,1);
+  assert.equal(JSON.stringify(roster),original);
+});
+test("league edges compare actual opponents, exclude self, preserve ties and sum to 4.5 league-wide",()=>{
+  const teams=data.teams.slice(0,3),players=teams.map((t,i)=>p(600+i,t.id,i));
+  const rows=teamPower(teams,players);
+  assert.deepEqual(rows.map(r=>r.score),[5,4.5,4]);
+  for(const row of rows){assert.equal(row.opponentsCompared,2);assert.ok(row.comparisons.every(c=>c.teamId!==row.team.id));}
+  assert.equal(rows.reduce((sum,r)=>sum+r.score!,0)/3,4.5);
+  const profile=leagueRating(teams[1].id,teams,players);assert.equal(profile.categoryEdges.AST,.5);
+  assert.deepEqual(profile.categories,rosterValue([players[1]]).categories);
+  assert.deepEqual(teamPower(teams.slice().reverse(),players.slice().reverse()).map(r=>[r.team.id,r.score]),rows.map(r=>[r.team.id,r.score]));
+});
+test("league fit weights are bounded, scale invariant, and all-punted or peerless comparisons are unavailable",()=>{
+  const teams=data.teams.slice(0,2),players=[p(700,teams[0].id,4),p(701,teams[1].id,0)],id=teams[0].id;
+  const normal=leagueRating(id,teams,players),punt=leagueRating(id,teams,players,{...DEFAULT_WEIGHTS,AST:0});
+  assert.equal(normal.score,5);assert.equal(punt.score,4.5);
+  assert.deepEqual(normal.categoryEdges,punt.categoryEdges);
+  const double=Object.fromEntries(CATEGORIES.map(c=>[c,2])) as typeof DEFAULT_WEIGHTS;
+  assert.equal(leagueRating(id,teams,players,double).score,normal.score);
+  assert.equal(leagueRating(id,teams,players,Object.fromEntries(CATEGORIES.map(c=>[c,0])) as typeof DEFAULT_WEIGHTS).score,null);
+  assert.equal(leagueRating(id,[teams[0]],players).score,null);
+  const missing=leagueRating(id,teams,[players[0],{...players[1],zTotal:null}]);
+  assert.equal(missing.score,null);assert.equal(missing.provisional,true);assert.deepEqual(missing.missingOpponentIds,[teams[1].id]);
+  assert.throws(()=>leagueRating(id,teams,players,{...DEFAULT_WEIGHTS,AST:-1}),/Invalid category weight/);
+});
+test("trade comparisons update both rosters and count the receiving team's incoming IR player",()=>{
+  const teams=data.teams.slice(0,3),[a,b,c]=teams.map(t=>t.id);
+  const players=[{...p(801,a,3),slot:'IR'},p(802,b,1),p(803,c,2)];
+  const trade=exchangePlayers(players,a,b,[801],[802]);
+  const overrides={[a]:trade.left.after,[b]:trade.right.after};
+  const before=leagueRating(a,teams,players),after=leagueRating(a,teams,players,DEFAULT_WEIGHTS,overrides);
+  assert.equal(before.categoryEdges.AST,1);assert.equal(after.categoryEdges.AST,0);
+  assert.equal(leagueRating(b,teams,players,DEFAULT_WEIGHTS,overrides).categoryEdges.AST,1);
+  assert.equal(trade.right.after[0].slot,'IR');assert.equal(players[0].teamId,a);
 });

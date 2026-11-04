@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { handleMcpRequest } from "../lib/mcp/http";
 import type { FantasyMcpData } from "../lib/mcp/server";
 import { snapshotSchema } from "../lib/schema";
-import { teamRating } from "../lib/analysis";
+import { leagueRating } from "../lib/analysis";
 import demo from "../lib/demo.json";
 
 const fixture = () => snapshotSchema.parse(structuredClone(demo));
@@ -83,7 +83,7 @@ test("team power and trade simulations reuse dashboard rules, include IR and nev
   const client = await connect(dependencies(s));
   try {
     const team = await call(client, "fantasy_get_team", { teamId: left });
-    assert.equal(team.power, teamRating(leftPlayers).score);
+    assert.equal(team.power, leagueRating(left,s.teams,s.players).score);
     assert.equal(team.contributingPlayers, leftPlayers.length);
     const result = await call(client, "fantasy_analyze_trade", { leftTeamId: left, rightTeamId: right,
       leftPlayerIds: [leftPlayers[1].id], rightPlayerIds: [rightPlayers[1].id], punts: ["TO"] });
@@ -308,10 +308,17 @@ test("trade outlook and observed comparisons share UI rules with independent pre
     const args={leftTeamId:left,rightTeamId:right,leftPlayerIds:[leftPlayers[0].id],rightPlayerIds:[rightPlayers[0].id],leftPreferences:{punts:["TO"],priorities:["STL"]},rightPreferences:{punts:["FT%"],priorities:["PTS"]}};
     const r=await call(client,"fantasy_analyze_trade",args);
     assert.equal(r.left.weights.TO,0);assert.equal(r.right.weights.TO,1);assert.equal(r.right.weights['FT%'],0);assert.equal(r.left.weights['FT%'],1);
-    assert.equal(r.left.before.teamModel,"balanced-v1");assert.equal(r.left.currentSeason.before.power,teamRating(leftPlayers,r.left.weights).score);
+    assert.equal(r.left.before.teamModel,"league-categories-v1");assert.equal(r.left.currentSeason.before.power,leagueRating(left,s.teams,s.players,r.left.weights).score);
     assert.ok(r.left.outlookEstimates.some((o:any)=>o.source==='blended'));
-    const {buildOutlook,outlookRoster}=await import('../lib/outlook');const context=buildOutlook(s);
-    assert.equal(r.left.before.power,teamRating(outlookRoster(leftPlayers,context),r.left.weights).score);
+    const {buildOutlook}=await import('../lib/outlook');const context=buildOutlook(s);
+    assert.equal(r.left.before.power,leagueRating(left,s.teams,context.players,r.left.weights).score);
+    assert.ok(r.left.before.power>=0 && r.left.before.power<=9);
+    assert.equal(r.fitModel.version,'league-categories-v1');
+    const {exchangePlayers}=await import('../lib/analysis');
+    const swap=exchangePlayers(context.players,left,right,args.leftPlayerIds,args.rightPlayerIds);
+    const overrides={[left]:swap.left.after,[right]:swap.right.after};
+    assert.equal(r.left.after.power,leagueRating(left,s.teams,context.players,r.left.weights,overrides).score);
+    assert.equal(r.right.after.power,leagueRating(right,s.teams,context.players,r.right.weights,overrides).score);
     const observed=await call(client,"fantasy_analyze_trade",{...args,basis:'current'});
     assert.equal(observed.left.before.power,observed.left.currentSeason.before.power);
     const invalid=await client.callTool({name:'fantasy_analyze_trade',arguments:{...args,rightPreferences:{punts:['FT%'],priorities:['FT%']}}});

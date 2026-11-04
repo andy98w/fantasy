@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
-import { teamRating } from "../lib/analysis";
+import { leagueRating } from "../lib/analysis";
 import { extractPowerHistory } from "../lib/mcp/power-history";
 import { dateInput, gameStat, inDateRange } from "../lib/mcp/queries";
 import { createScoreboardLoader } from "../lib/mcp/scoreboard-loader";
@@ -19,8 +19,8 @@ test("history uses historical rosters, includes IR and never fills absent dates 
   const history = extractPowerHistory([old, current, wrongLeague, {}], current, request, "database");
   assert.equal(history.skippedSnapshots, 2);
   assert.deepEqual(history.points.map(p => p.date), ["2026-10-30", "2026-11-01"]);
-  assert.equal(history.points[0].power, teamRating(old.players.filter(p => p.teamId === id)).score);
-  assert.equal(history.points[1].power, teamRating(current.players.filter(p => p.teamId === id)).score);
+  assert.equal(history.points[0].power, leagueRating(id,old.teams,old.players).score);
+  assert.equal(history.points[1].power, leagueRating(id,current.teams,current.players).score);
   assert.ok(history.points[1].rosterIds!.includes(player.id));
   assert.equal(history.points[0].power, history.points[1].power);
   const previous = { ...old, powerHistory: [{ date: "2026-10-29", capturedAt: "2026-10-30T01:00:00Z", ratings: { [player.id]: 45 }, model: { version: "old" } }] };
@@ -51,4 +51,17 @@ test("dated scoreboard coalesces, deduplicates adjacent feeds, and marks stale/e
   const stale = await loader("2026-10-29"); assert.equal(stale.status, "stale"); assert.equal(stale.fetchedAt, a.fetchedAt);
   now += 901000; assert.equal((await loader("2026-10-29")).status, "error");
   await assert.rejects(loader("2026-02-30"));
+});
+
+
+test("historical team power uses that day's opponents and declares the new formula",()=>{
+  const old=snapshotSchema.parse(structuredClone(demo));old.syncedAt="2026-10-30T22:00:00Z";
+  const current=structuredClone(old);current.syncedAt="2026-11-01T19:00:00Z";
+  const id=old.teams[0].id;
+  for(const p of current.players)if(p.teamId!==id&&p.teamId!==null&&p.zTotal!==null)p.contributions.AST=1000;
+  const history=extractPowerHistory([old,current],current,{kind:'team',id,from:'2026-10-30',to:'2026-11-01'},'database');
+  assert.equal(history.points[0].power,leagueRating(id,old.teams,old.players).score);
+  assert.equal(history.points[1].power,leagueRating(id,current.teams,current.players).score);
+  assert.notEqual(history.points[0].power,history.points[1].power);
+  assert.equal(history.points[0].model.teamModel,'league-categories-v1');
 });

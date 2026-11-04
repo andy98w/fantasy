@@ -264,7 +264,7 @@ export default function Dashboard({
             </Toolbar>
             {team ? (
               <>
-                <TeamProfile team={team} teams={data.teams} roster={roster} />
+                <TeamProfile team={team} teams={data.teams} roster={roster} players={data.players} />
                 <Panel>
                   <PlayerTable
                     players={sortPlayers(roster, sort, data.teams)}

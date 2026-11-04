@@ -49,6 +49,7 @@ export function rosterValue(
   };
 }
 
+// Legacy v2 helpers retained for historical formula comparisons, not used by UI/MCP ratings.
 // Smooth, symmetric logarithmic taper. Near zero its slope is one; beyond
 // roughly four category z-points, extra strength has progressively less weight.
 // This is a scoring preference, not a fitted weekly win-probability model.
@@ -65,6 +66,36 @@ export function teamRating(roster: Player[], weights: Weights = DEFAULT_WEIGHTS)
     score: value.score === null ? null : rounded(CATEGORIES.reduce(
       (sum, category) => sum + taperCategory(value.categories[category]) * weights[category], 0,
     )),
+  };
+}
+
+export const LEAGUE_POWER_MODEL = {
+  version: "league-categories-v1",
+  formula: "Mean category leads against other rated league rosters; win=1, tie=0.5, loss=0; sum over 9 categories",
+  units: "Category leads per opponent (0–9); preference-weighted fit is normalized to the same scale",
+  validation: "Descriptive comparison of roster category strength, not calibrated weekly win probability",
+};
+export type RosterOverrides = Record<number, Player[]>;
+
+/** Opponents and target always come from the same league state, including both sides of a trade. */
+export function leagueRating(teamId: number, teams: Team[], players: Player[], weights: Weights = DEFAULT_WEIGHTS, overrides: RosterOverrides = {}) {
+  const values = teams.map(team => ({teamId: team.id, ...rosterValue(overrides[team.id] ?? players.filter(p => p.teamId === team.id))}));
+  const value = values.find(row => row.teamId === teamId);
+  if (!value) throw new Error("Unknown team ID");
+  const peers = values.filter(row => row.teamId !== teamId), ratedPeers = peers.filter(row => row.rated > 0);
+  const weightTotal = CATEGORIES.reduce((sum, c) => sum + weights[c], 0);
+  if (CATEGORIES.some(c => !Number.isFinite(weights[c]) || weights[c] < 0)) throw new Error("Invalid category weight");
+  const available = value.rated > 0 && ratedPeers.length > 0;
+  const comparisons = available ? ratedPeers.map(peer => ({ teamId: peer.teamId,
+    categories: Object.fromEntries(CATEGORIES.map(c => [c, value.categories[c] > peer.categories[c] ? 1 : value.categories[c] < peer.categories[c] ? 0 : .5])) as Record<Category, number>,
+  })) : [];
+  const categoryEdges = Object.fromEntries(CATEGORIES.map(c => [c, available ? comparisons.reduce((sum, peer) => sum + peer.categories[c], 0) / ratedPeers.length : null])) as Record<Category, number | null>;
+  return { ...value, score: available && weightTotal > 0 ? rounded(9 * CATEGORIES.reduce((sum,c) => sum + categoryEdges[c]! * weights[c], 0) / weightTotal) : null,
+    categoryEdges, comparisons, weights, weightTotal, model: LEAGUE_POWER_MODEL,
+    opponentsCompared: ratedPeers.length, opponentsExpected: peers.length,
+    missingOpponentIds: peers.filter(p => !p.rated).map(p => p.teamId),
+    provisionalOpponentIds: peers.filter(p => p.provisional).map(p => p.teamId),
+    provisional: value.provisional || peers.some(p => p.provisional || !p.rated),
   };
 }
 
@@ -93,7 +124,7 @@ export function recordRanks(teams: Team[]): Map<number, number> {
 export function teamPower(teams: Team[], players: Player[]) {
   const values = teams.map((team) => ({
     team,
-    ...teamRating(players.filter((player) => player.teamId === team.id)),
+    ...leagueRating(team.id, teams, players),
     rank: null as number | null,
   }));
   values.sort((a, b) =>

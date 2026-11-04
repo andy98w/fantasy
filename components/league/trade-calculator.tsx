@@ -13,7 +13,8 @@ import {
   DEFAULT_WEIGHTS,
   exchangePlayers,
   rosterValue,
-  teamRating,
+  leagueRating,
+  type RosterOverrides,
   type Weights,
 } from "@/lib/analysis";
 import { Button, Empty, Notice, Panel, Toolbar } from "../ui/primitives";
@@ -105,7 +106,7 @@ function TradeRoster({
                   {player.slot === "IR" ? " · IR" : ""}
                 </small>
               </span>
-              <span title="Player value">
+              <span title="Raw player category sum; team fit is bounded separately">
                 {score(player.zTotal)}
               </span>
             </label>
@@ -117,7 +118,7 @@ function TradeRoster({
       <div className="trade-outgoing">
         <strong><ValueFeedback>{`${outgoing.length} outgoing`}</ValueFeedback></strong>
         <span>
-          Value: {outgoing.length ? score(value.score) : "0.0"}
+          Raw value: {outgoing.length ? score(value.score) : "0.0"}
           {value.provisional ? " (est.)" : ""}
         </span>
       </div>
@@ -138,6 +139,7 @@ function TradeImpact({
   active,
   outlook,
   basis,
+  afterRosters,
 }: {
   data: Snapshot;
   team: Team;
@@ -151,10 +153,13 @@ function TradeImpact({
   active: boolean;
   outlook: OutlookContext;
   basis: "balanced" | "current";
+  afterRosters: RosterOverrides;
 }) {
-  const before = teamRating(basis === "balanced" ? outlookRoster(beforeRoster, outlook) : beforeRoster, weights),
-    after = teamRating(basis === "balanced" ? outlookRoster(afterRoster, outlook) : afterRoster, weights);
-  const hasData = before.rated > 0 && after.rated > 0;
+  const players = basis === "balanced" ? outlook.players : data.players;
+  const overrides = Object.fromEntries(Object.entries(afterRosters).map(([id, roster]) => [id, basis === "balanced" ? outlookRoster(roster, outlook) : roster]));
+  const before = leagueRating(team.id, data.teams, players, weights),
+    after = leagueRating(team.id, data.teams, players, weights, overrides);
+  const hasData = before.score !== null && after.score !== null;
   const delta = (category: Category) =>
     after.categories[category] - before.categories[category];
   const gains = CATEGORIES.filter((c) => weights[c] > 0 && delta(c) >= 0.05);
@@ -197,11 +202,11 @@ function TradeImpact({
           </div>
           <div>
             <span>
-              Team fit
+              Category fit /9
               {before.provisional || after.provisional ? " (est.)" : ""}
             </span>
             <strong>
-              {score(before.score)} → {score(after.score)}
+              {before.score?.toFixed(2) ?? "—"} → {after.score?.toFixed(2) ?? "—"}
             </strong>
           </div>
           <div>
@@ -218,7 +223,7 @@ function TradeImpact({
               <ValueFeedback>{allPunted
                 ? "No categories"
                 : hasData
-                  ? signed(after.score! - before.score!)
+                  ? `${after.score! >= before.score! ? "+" : ""}${(after.score! - before.score!).toFixed(2)}`
                   : "—"}</ValueFeedback>
             </strong>
           </div>
@@ -229,10 +234,10 @@ function TradeImpact({
           </p>
         )}
         <p className="trade-verdict" aria-live="polite" hidden={!active}>
-          {!hasData
-              ? "Not enough stats to compare."
-              : allPunted
-                ? "Select at least one category."
+          {allPunted
+              ? "Select at least one category."
+              : !hasData
+                ? "Not enough league ratings to compare."
                 : [
                     gains.length ? `Improves ${gains.join(", ")}.` : "",
                     losses.length ? `Weakens ${losses.join(", ")}.` : "",
@@ -242,6 +247,9 @@ function TradeImpact({
                   "No notable category changes."}
         </p>
       </div>
+      {active && <details className="forecast-details"><summary>League category edges</summary><p>{before.opponentsCompared} → {after.opponentsCompared} opponents compared. Both traded rosters are updated. Ties count half; these are roster-strength comparisons, not weekly forecasts.{before.provisional || after.provisional ? " Incomplete roster ratings; comparison is provisional." : ""}</p>
+        <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before (% led)</th><th>After (% led)</th></tr></thead><tbody>{CATEGORIES.map(c => <tr key={c}><td>{c}</td><td>{before.categoryEdges[c] == null ? "—" : `${Math.round(before.categoryEdges[c]! * 100)}%`}</td><td>{after.categoryEdges[c] == null ? "—" : `${Math.round(after.categoryEdges[c]! * 100)}%`}</td></tr>)}</tbody></table></div>
+      </details>}
       {active && basis === "balanced" && <details className="forecast-details"><summary>Outlook inputs</summary>
         {[...sent, ...received].map(player => <OutlookDetails key={player.id} player={player} estimate={outlook.estimates.get(player.id)!} />)}
       </details>}
@@ -368,7 +376,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
           Reset trade
         </Button>
       </Toolbar>
-      <details className="forecast-details"><summary>Valuation details</summary><p>{basis === "balanced" ? "Current production blended with the previous season; shooting uses attempt-based weights. Full-roster value includes bench and IR. Check availability separately." : "Observed current-season production. Small samples can overstate hot starts and slumps."}</p><p>{OUTLOOK_MODEL.validation}. Category values are relative strengths: positive TO means fewer turnovers. Team fit tapers category totals, then applies each team’s priorities. Missing ratings make totals provisional. Outlook inputs show the data and weights for selected players.</p></details>
+      <details className="forecast-details"><summary>Valuation details</summary><p>{basis === "balanced" ? "Current production blended with the previous season; shooting uses attempt-based weights. Full-roster value includes bench and IR. Check availability separately." : "Observed current-season production. Small samples can overstate hot starts and slumps."}</p><p>{OUTLOOK_MODEL.validation}. Category values are relative strengths: positive TO means fewer turnovers. Category fit compares strengths against the other teams, with each category bounded between a loss and a lead. Priorities are normalized to a 0–9 score; it is not a win probability. Missing ratings make totals provisional. Outlook inputs show the data and weights for selected players.</p></details>
       {error && (
         <Notice
           warning
@@ -428,6 +436,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
             active={active}
             outlook={outlook}
             basis={basis}
+            afterRosters={{[leftId]: trade.left.after, [rightId]: trade.right.after}}
           />
           <TradeImpact
             data={data}
@@ -444,6 +453,7 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
             active={active}
             outlook={outlook}
             basis={basis}
+            afterRosters={{[leftId]: trade.left.after, [rightId]: trade.right.after}}
           />
         </div>
       )}

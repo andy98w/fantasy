@@ -1649,3 +1649,13 @@ th[aria-sort="ascending"] .sort-arrow, th[aria-sort="descending"] .sort-arrow { 
 .injury-outlook-meta a { color: var(--gold); }
 
 .data-table .status-label { font-size: 12px; white-space: nowrap; }
+
+/* Player comparison pins share the sticky identity column. */
+.player-row-identity { display: flex; align-items: center; gap: 10px; }
+.player-pin { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; color: var(--muted); border: 1px solid var(--line); }
+.player-pin:hover, .player-pin[aria-pressed="true"] { color: var(--gold); background: var(--surface-deep); border-color: var(--gold); }
+.players-table.pinnable .identity-col { min-width: 260px; }
+.player-pins-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: 12px; border-bottom: 1px solid var(--line); }
+.players-table .player-pinned td { background: #292c3d; }
+.players-table .player-pinned .identity-col { box-shadow: inset 3px 0 var(--gold); }
+.players-table .player-pins-divider th { text-align: left; padding: 10px 20px; border-top: 1px solid var(--gold); }

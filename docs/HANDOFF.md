@@ -1,6 +1,6 @@
 # Fantasy — handoff
 
-Updated November 3, 2026 (America/Los_Angeles). This is the starting point for a new chat; verify the working tree and live state before making changes.
+Updated November 5, 2026 (Pacific/Honolulu). This is the starting point for a new chat; verify the working tree and live state before making changes.
 
 ## Start here
 
@@ -10,9 +10,9 @@ Updated November 3, 2026 (America/Los_Angeles). This is the starting point for a
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Current follow-up: bounded league-relative Power /9 and trade fit, including historical opponent comparisons, layered on the balanced outlook. Use `git log -1` and exact-commit CI/deployment checks for its release state.
-- Previous application release: `5ead4d7d69aff57f2ae15b9240798457fda10d44` — simplified MCP onboarding.
-- That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41347266465`; Railway GitHub deployment: `7478677082`.
+- Current follow-up: multiple player comparison pins on the Players tab. Use `git log -1` and exact-commit CI/deployment checks for release state.
+- Previous application release: `006a4de5122e834e472dbd69d43713de6b4ea7ec` — bounded team Power /9.
+- That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41746722680`; Railway GitHub deployment: `7534356861`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
 
 Read `AGENTS.md` first. It requires reading the relevant bundled Next.js documentation under `node_modules/next/dist/docs/` before code changes. Do not assume familiar Next.js APIs match this installed version.
@@ -247,3 +247,10 @@ Historical tuning selected counting-rate prior caps of 10 games (20 steals/block
 `leagueRating` (`lib/analysis.ts`) replaces the unbounded taper in team rankings, profiles, trade fit and MCP. Power /9 is the average number of raw roster category strengths leading other rated teams; ties count half. More extreme margins have no further influence after all peers are passed. Raw columns remain unchanged. Trade fit uses the same rule on balanced or observed inputs with each side's own normalized weights, updating both traded rosters together. MCP 1.4.0 exposes `categoryEdges`, opponent comparisons/coverage and `fitModel` (`league-categories-v1`). Missing coverage propagates provisional flags; no rated peers means no score. History recomputes each saved league with its own historical opponents, never today's roster.
 
 This is a descriptive all-play comparison of roster strengths, not actual weekly wins or a calibrated probability. Small changes near peer boundaries can change the score; raw values remain available. The previous outlook calibration is unrelated to validation of this aggregation. Legacy taper helpers remain only for offline comparison. Use exact-commit CI/deployment verification for release status.
+
+
+## November 5 player comparison pins
+
+Players has a pin toggle beside every name, supports multiple pins, and a Clear pins control. Pinned rows stay above search results even when excluded by search, position or availability filters; each player appears only once. Current sorting applies within pinned and unpinned groups. Pin IDs live in Dashboard React state: survive navigation between tabs and automatic data refresh, reset on a full page reload. Player stats are resolved from the latest snapshot, never copied into pin state. Other player tables are unchanged.
+
+Validation: 159 web tests, typecheck, build and standalone smoke passed. Browser checks covered multiple pins, sorting, search/position filters, empty results, individual unpin, Clear pins, tab navigation and full-reload reset. Verify exact-commit CI and deployment before claiming release success.

@@ -49,6 +49,7 @@ export default function Dashboard({
   const [position, setPosition] = useState("all");
   const [availability, setAvailability] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
+  const [pinnedIds, setPinnedIds] = useState<Player["id"][]>([]);
   const [selectedId, setSelectedId] = useState<Player["id"] | null>(null);
   const selected =
     data.players.find((player) => player.id === selectedId) ?? null;
@@ -126,6 +127,13 @@ export default function Dashboard({
         sort, data.teams,
       ),
     [data.players, data.teams, query, position, availability, sort],
+  );
+  const pinnedPlayers = useMemo(
+    () => sortPlayers(data.players.filter(player => pinnedIds.includes(player.id)), sort, data.teams),
+    [data.players, data.teams, pinnedIds, sort],
+  );
+  const togglePin = (id: Player["id"]) => setPinnedIds(current =>
+    current.includes(id) ? current.filter(pinnedId => pinnedId !== id) : [...current, id],
   );
   const news = useMemo(
     () => relevantNews(data.news, data.players),
@@ -305,7 +313,8 @@ export default function Dashboard({
             />
             <PowerMovers players={visiblePlayers} teams={data.teams} baselineAt={data.powerBaselineAt} onSelect={tableProps.onSelect} />
             <Panel>
-              <PlayerTable searchable={false} players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt} />
+              <PlayerTable searchable={false} players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt}
+                pinning={{ players: pinnedPlayers, onToggle: togglePin, onClear: () => setPinnedIds([]) }} />
             </Panel>
           </>
         )}

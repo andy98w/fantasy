@@ -4,7 +4,6 @@ import type { Snapshot } from "@/lib/schema";
 import type { TodayData } from "@/lib/nba";
 import { closeCategories, forecastScore, projectTeam, scheduledOpponent, type Projection } from "@/lib/forecast";
 import type { AvailabilityScenario } from "@/lib/availability";
-import { statusText } from "./format";
 import { Select } from "../ui/select";
 import { Empty, Tabs } from "../ui/primitives";
 import { TeamAvatar } from "./avatars";
@@ -14,7 +13,7 @@ import { Rivalries } from "./rivalries";
 import { MatchupClash } from "./matchup-clash";
 
 import { buildOutlook } from "@/lib/outlook";
-import { OutlookDetails } from "./outlook-details";
+import { ForecastDetails } from "./forecast-details";
 
 const dayLabel = (date: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
 function Coverage({ projection }: { projection: Projection }) {
@@ -69,21 +68,7 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
         </div>
         <CategoryComparison home={projections[0].side} away={projections[1].side} homeName={home.name} awayName={away.name} close={close} />
       </section>
-      <details className="forecast-details"><summary>Forecast assumptions</summary>
-        <p>Balanced per-game outlook × playable games. Current production blends with the previous season; minutes use the current role and shooting uses attempt-based weights. Players without usable history use current stats only. Daily lineups fill legal slots, then favor outlook value. Historical validation is limited; role changes need review. Conservative availability excludes IR and all non-active statuses, including day-to-day and unknown. If available assumes uncertain players play, and OUT, suspended and IR players become available after today. IR activation requires roster space; no drops are assumed. The current status does not establish an absence or return date for future games.</p>
-        {horizon === "remaining" && <p>Current scored totals plus remaining games. Players already started keep their lineup slots; live-game production is estimated from time remaining.</p>}
-        <p>FG% and FT% use total makes and attempts. Close means within 5% for counting stats or 1.5 percentage points for shooting. This is a projection, not a win probability.</p>
-        <div className="forecast-breakdowns">{projections.map((projection, index) => <div key={index}><h3>{index ? away.name : home.name}</h3>
-          {projection.rosterExclusions.length > 0 && <p>Hypothetically excluded: {projection.rosterExclusions.map(p => p.name).join(", ")}</p>}
-          {projection.missing.length > 0 && <p>Missing stats: {projection.missing.map(p => p.name).join(", ")}</p>}
-          {projection.assumptions.length > 0 && <p>Availability as of {new Date(projection.availabilityAsOf).toLocaleString("en-US", {timeZone:"America/Los_Angeles"})} PT: {projection.assumptions.map(p => `${p.name} (${statusText(p.status)}${p.slot === "IR" ? ", IR" : ""})`).join(", ")}</p>}
-          {projection.exclusions.length > 0 && <p>Excluded games: {projection.exclusions.map(row => `${data.players.find(p => p.id === row.playerId)?.name ?? row.playerId} — ${dayLabel(row.date)} (${row.reason})`).join("; ")}</p>}
-          {projection.activationPlayerIds.length > 0 && <p>Assumed IR activations: {projection.activationPlayerIds.map(id => data.players.find(p => p.id === id)?.name ?? id).join(", ")}. {projection.activationSlotsNeeded > 0 ? `${projection.activationSlotsNeeded} roster slot(s) must be freed.` : "Fits current non-IR roster capacity."}</p>}
-          {projection.benched > 0 && <p>{projection.benched} player-games sit because lineup slots are full.</p>}
-          <details className="forecast-details"><summary>Player outlook inputs</summary>{projection.outlookEstimates.map(estimate => { const player = data.players.find(p => p.id === estimate.playerId); return player ? <OutlookDetails key={player.id} player={player} estimate={estimate} /> : null; })}</details>
-          <ul>{(projection.issue ? [] : projection.players).map(({player, games}) => <li key={player.id}><span>{player.name}</span><span>{Number.isInteger(games) ? games : games.toFixed(1)} games</span></li>)}</ul>
-        </div>)}</div>
-      </details>
+      <ForecastDetails data={data} teams={[home, away]} projections={projections} remaining={horizon === "remaining"} />
     </>}
   </div>;
 }

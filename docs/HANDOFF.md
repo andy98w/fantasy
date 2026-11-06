@@ -10,7 +10,7 @@ Updated November 5, 2026 (Pacific/Honolulu). This is the starting point for a ne
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Current follow-up: multiple player comparison pins on the Players tab. Use `git log -1` and exact-commit CI/deployment checks for release state.
+- Current follow-up: polished Forecast assumptions with grouped availability and playable-game panels. Use `git log -1` and exact-commit CI/deployment checks for release state.
 - Previous application release: `006a4de5122e834e472dbd69d43713de6b4ea7ec` — bounded team Power /9.
 - That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41746722680`; Railway GitHub deployment: `7534356861`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
@@ -18,6 +18,12 @@ Updated November 5, 2026 (Pacific/Honolulu). This is the starting point for a ne
 Read `AGENTS.md` first. It requires reading the relevant bundled Next.js documentation under `node_modules/next/dist/docs/` before code changes. Do not assume familiar Next.js APIs match this installed version.
 
 Some README and deployment-guide paragraphs predate the live release: references to six navigation tabs, Trades → History, Matchup MVP, Rivalries, and “not yet deployed” are stale. Prefer this handoff and current implementation for those details; setup and operational sections are still useful.
+
+## Latest forecast presentation update
+
+Forecast assumptions now contains matching teal/pink team panels, compact status rows, exclusions grouped by player and reason with deduplicated dates, and aligned playable-game lists. Player outlook inputs and methodology remain expandable. Missing stats, IR activation space, hypothetical exclusions and projection issues are preserved; projection calculations are unchanged. Implementation: `components/league/forecast-details.tsx` and scoped `forecast.css` styles.
+
+Validated with typecheck, production build, 159 tests and standalone smoke. Browser checks covered desktop and 390px mobile, nested disclosures, conditional availability and required IR roster space. Local visual checks used a disposable schedule fixture under the chat's `work/` directory; it is not production data or committed. Verify the exact release commit's CI and Railway deployment before claiming it is live.
 
 ## Product and user preferences
 

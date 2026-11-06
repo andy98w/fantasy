@@ -22,7 +22,7 @@ import { McpConnect } from "./league/mcp-connect";
 import { Connection } from "./league/connection";
 import { DailyPerformers } from "./league/daily-performers";
 import { Today } from "./league/today";
-import type { TodayData } from "@/lib/nba";
+import { nbaAbbrev, type TodayData } from "@/lib/nba";
 import { NewsFeed } from "./league/news-feed";
 import { sortPlayers, type Sort } from "./league/format";
 import {
@@ -47,6 +47,7 @@ export default function Dashboard({
   const [teamId, setTeamId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState("all");
+  const [nbaTeam, setNbaTeam] = useState("all");
   const [availability, setAvailability] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
   const [pinnedIds, setPinnedIds] = useState<Player["id"][]>([]);
@@ -110,6 +111,10 @@ export default function Dashboard({
   const roster = team
     ? data.players.filter((player) => player.teamId === team.id)
     : [];
+  const nbaTeams = useMemo(
+    () => [...new Set(data.players.map(player => nbaAbbrev(player.nbaTeam)).filter(Boolean))],
+    [data.players],
+  );
   const visiblePlayers = useMemo(
     () =>
       sortPlayers(
@@ -117,6 +122,7 @@ export default function Dashboard({
           (player) =>
             player.name.toLowerCase().includes(query.toLowerCase()) &&
             (position === "all" || player.eligibleSlots.includes(position)) &&
+            (nbaTeam === "all" || nbaAbbrev(player.nbaTeam) === nbaTeam) &&
             (availability === "all" ||
               (availability === "rostered" && player.teamId !== null) ||
               (availability.startsWith("team:") &&
@@ -126,7 +132,7 @@ export default function Dashboard({
         ),
         sort, data.teams,
       ),
-    [data.players, data.teams, query, position, availability, sort],
+    [data.players, data.teams, query, position, nbaTeam, availability, sort],
   );
   const pinnedPlayers = useMemo(
     () => sortPlayers(data.players.filter(player => pinnedIds.includes(player.id)), sort, data.teams),
@@ -302,12 +308,16 @@ export default function Dashboard({
               onQuery={setQuery}
               position={position}
               onPosition={setPosition}
+              nbaTeam={nbaTeam}
+              nbaTeams={nbaTeams}
+              onNbaTeam={setNbaTeam}
               availability={availability}
               onAvailability={setAvailability}
               count={visiblePlayers.length}
               onReset={() => {
                 setQuery("");
                 setPosition("all");
+                setNbaTeam("all");
                 setAvailability("all");
               }}
             />

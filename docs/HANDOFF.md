@@ -254,3 +254,8 @@ This is a descriptive all-play comparison of roster strengths, not actual weekly
 Players has a pin toggle beside every name, supports multiple pins, and a Clear pins control. Pinned rows stay above search results even when excluded by search, position or availability filters; each player appears only once. Current sorting applies within pinned and unpinned groups. Pin IDs live in Dashboard React state: survive navigation between tabs and automatic data refresh, reset on a full page reload. Player stats are resolved from the latest snapshot, never copied into pin state. Other player tables are unchanged.
 
 Validation: 159 web tests, typecheck, build and standalone smoke passed. Browser checks covered multiple pins, sorting, search/position filters, empty results, individual unpin, Clear pins, tab navigation and full-reload reset. Verify exact-commit CI and deployment before claiming release success.
+
+
+## November 5 NBA team filter
+
+Players has a separate All NBA teams dropdown (full NBA franchise names), independent of fantasy ownership/roster and position filters. Options come from all snapshot players, with NBA abbreviation aliases normalized consistently for options and matching. Clear filters resets NBA team too; pinned comparison rows remain visible across team changes. The existing roster dropdown group is explicitly labeled Fantasy teams. Browser checks covered Celtics, Knicks, combined name/position filtering, and clearing while retaining a pin. Local typecheck, 159 tests, build and standalone smoke passed.

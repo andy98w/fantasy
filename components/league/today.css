@@ -18,7 +18,7 @@
 .today-not-started { display: flex; gap: 8px; align-items: center; font-size: 12px; cursor: pointer; width: fit-content; }
 .today-not-started input { accent-color: var(--gold); width: 16px; height: 16px; margin: 0; }
 .today-results-count { padding: 8px 14px; color: var(--muted); font-size: 11px; }
-.today-players { max-height: 540px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line) var(--surface-deep); }
+.today-players { max-height: 540px; overflow-y: auto; overscroll-behavior: contain; }
 .today-player { display: grid; gap: 7px; width: 100%; padding: 14px; text-align: left; border-top: 1px solid var(--line-soft); transition: background-color 140ms ease, box-shadow 140ms ease; }
 .today-player:is(:hover, :focus-visible) { background: var(--surface-raised); box-shadow: inset 3px 0 var(--gold); }
 .today-player-heading { display: flex; align-items: center; gap: 9px; min-width: 0; }

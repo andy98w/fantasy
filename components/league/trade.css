@@ -69,7 +69,6 @@
   max-height: 320px;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--line) var(--surface-deep);
 }
 .trade-player {
   display: flex;

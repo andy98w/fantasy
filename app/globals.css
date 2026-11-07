@@ -34,6 +34,13 @@
 }
 * {
   box-sizing: border-box;
+  scrollbar-width: none;
+}
+/* Hide scrollbar chrome without disabling scrolling or keyboard access. */
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 body {
   margin: 0;
@@ -611,8 +618,6 @@ h2 {
 }
 .table-scroll {
   overflow-x: auto;
-  scrollbar-color: var(--line) var(--surface-deep);
-  scrollbar-width: thin;
 }
 .data-table {
   width: 100%;

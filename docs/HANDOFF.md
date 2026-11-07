@@ -19,6 +19,10 @@ Read `AGENTS.md` first. It requires reading the relevant bundled Next.js documen
 
 Some README and deployment-guide paragraphs predate the live release: references to six navigation tabs, Trades → History, Matchup MVP, Rivalries, and “not yet deployed” are stale. Prefer this handoff and current implementation for those details; setup and operational sections are still useful.
 
+## Scrollbar presentation
+
+Native scrollbars are hidden globally with `scrollbar-width: none` and a WebKit scrollbar fallback. Scroll containers retain their existing overflow and keyboard behavior, including tables, menus, dialogs and the document. Dropdown scroll arrows remain usable controls.
+
 ## Shared supporting-detail presentation
 
 The shared `components/ui/disclosure.tsx` / `disclosure.css` now styles all explanatory disclosures: power help, daily performer methodology, forecast roster exclusions, player outlooks, trade valuation/edges/production, stat corrections and MCP help. Native keyboard behavior remains intact. Structured matchup and battle summaries retain their purpose-built layouts and visible focus states. Power/valuation/daily explanations use short titled groups; correction totals and trade availability use aligned facts instead of long lists in prose.

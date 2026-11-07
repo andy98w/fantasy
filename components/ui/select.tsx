@@ -87,7 +87,6 @@ export function Select({
           sideOffset={6}
           collisionPadding={12}
         >
-          <div className="select-menu-label" aria-hidden="true">{label}</div>
           <SelectPrimitive.ScrollUpButton className="select-scroll select-scroll-up">
             <PixelIcon name="chevron" size={12} />
           </SelectPrimitive.ScrollUpButton>

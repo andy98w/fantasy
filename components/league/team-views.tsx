@@ -119,7 +119,6 @@ export function TeamRankings({
   const sortHeader = (key: string, label = key) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["name", "rank"].includes(key)} className={key === "name" ? "identity-col" : undefined}>{label}</SortableHeader>;
   return (
     <Panel title="Team power">
-      <p className="panel-note">Average category leads vs league · ties count ½ · raw strengths below</p>
       <TableToolbar label="Search team power" query={control.query} onQuery={control.setQuery} />
       <div
         className="table-scroll"

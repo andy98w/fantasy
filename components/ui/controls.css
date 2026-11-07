@@ -146,6 +146,5 @@
   transform: rotate(180deg);
 }
 
-.select-menu-label { padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .select-trigger:disabled { opacity: .5; cursor: not-allowed; }
 .select-viewport { max-height: min(320px, calc(var(--radix-select-content-available-height) - 70px)); }

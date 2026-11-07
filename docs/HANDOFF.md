@@ -19,6 +19,10 @@ Read `AGENTS.md` first. It requires reading the relevant bundled Next.js documen
 
 Some README and deployment-guide paragraphs predate the live release: references to six navigation tabs, Trades → History, Matchup MVP, Rivalries, and “not yet deployed” are stale. Prefer this handoff and current implementation for those details; setup and operational sections are still useful.
 
+## Copy restraint
+
+Removed the always-visible Team power explanation (methodology remains in How power works), redundant dropdown menu titles, Forecast assumptions subtitle and per-team Projected labels. The default forecast explanation lives in the expandable methodology; conditional-return mode still shows a short reminder that returns are assumed. MCP access copy is shorter. Keep dates, units, missing/stale-data warnings and meaningful scenario limitations.
+
 ## Scrollbar presentation
 
 Native scrollbars are hidden globally with `scrollbar-width: none` and a WebKit scrollbar fallback. Scroll containers retain their existing overflow and keyboard behavior, including tables, menus, dialogs and the document. Dropdown scroll arrows remain usable controls.

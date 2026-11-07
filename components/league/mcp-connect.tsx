@@ -41,7 +41,7 @@ Start by reviewing my team and this week's matchup. If the Fantasy tools aren't 
           <li>Name it <strong>Fantasy</strong> and paste the URL above. Transport: <strong>Streamable HTTP</strong>. Authentication: <strong>None</strong>.</li>
           <li>Save, then reconnect or refresh the tool list.</li>
         </ol>}
-        <p className="mcp-access">Read-only. No Fantasy login, API key or skill file needed.</p>
+        <p className="mcp-access">Read-only. No Fantasy login required.</p>
         <Disclosure className="mcp-details" title="Need help connecting?">
           <p>Connect first; pasting a prompt alone won’t give your app access to the league. If the option is missing, check your app’s workspace permissions.</p>
           {app === "chatgpt" && <p><a href="https://developers.openai.com/api/docs/guides/custom-mcp-server" target="_blank" rel="noreferrer">ChatGPT setup guide</a></p>}

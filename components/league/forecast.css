@@ -21,7 +21,6 @@
 
 .forecast-audit { border: 2px solid var(--line); background: var(--surface-deep); }
 .forecast-audit > summary { padding: 18px 20px; color: var(--gold); cursor: pointer; font-family: var(--pixel); font-size: 20px; }
-.forecast-audit > summary > span { float: right; color: var(--muted); font: 12px/28px var(--body); }
 .forecast-audit[open] > summary { border-bottom: 1px solid var(--line); }
 .forecast-audit-body { padding: 20px; }
 .forecast-team-panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
@@ -63,7 +62,6 @@
 .forecast-method-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .forecast-method p { max-width: 65ch; margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 @media (max-width: 760px) {
-  .forecast-audit > summary > span { display: none; }
   .forecast-audit-body { padding: 12px; }
   .forecast-team-panels, .forecast-method-grid { grid-template-columns: 1fr; gap: 16px; }
   .forecast-team-heading, .forecast-team-section { padding: 14px; }

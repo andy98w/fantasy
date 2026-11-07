@@ -44,7 +44,7 @@ function TeamBreakdown({ team, projection, data, side }: {
       {projection.missing.length > 0 && <div className="forecast-detail-note warning"><strong>Missing stats</strong><p>{projection.missing.map(player => player.name).join(", ")}</p></div>}
     </div>
     <div className="forecast-team-section">
-      <div className="forecast-section-heading"><h4>Playable games</h4><span>Projected</span></div>
+      <div className="forecast-section-heading"><h4>Playable games</h4></div>
       {projection.issue ? <p className="forecast-detail-note warning">{projection.issue}</p> : projection.players.length ? <ul className="forecast-games-list">{projection.players.map(({ player, games }) => <li key={player.id}><span>{player.name}</span><span className="forecast-player-games">{gamesLabel(games)}</span></li>)}</ul> : <p className="forecast-quiet">No playable games in this window.</p>}
       {projection.benched > 0 && <p className="forecast-quiet">{projection.benched} player-games benched · lineup slots full</p>}
     </div>
@@ -59,7 +59,7 @@ export function ForecastDetails({ data, teams, projections, remaining }: {
   data: Snapshot; teams: [Team, Team]; projections: readonly [Projection, Projection]; remaining: boolean;
 }) {
   return <details className="forecast-audit">
-    <summary>Forecast assumptions<span>Availability & playable games</span></summary>
+    <summary>Forecast assumptions</summary>
     <div className="forecast-audit-body">
       <div className="forecast-team-panels">{projections.map((projection, index) => <TeamBreakdown key={teams[index].id} team={teams[index]} projection={projection} data={data} side={index ? "away" : "home"} />)}</div>
       <details className="forecast-method"><summary>How this forecast is calculated</summary>

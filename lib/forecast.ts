@@ -105,13 +105,24 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
       return fail("Current matchup totals unavailable.");
     for (const c of COUNTS) totals[c] = actual[c]!;
   }
+  const dailyRoster = current ? schedule.lineups?.find(lineup => lineup.teamId === teamId) : undefined;
+  const dailySlots = new Map(dailyRoster?.entries.map(entry => [entry.playerId, entry.slot]));
+  if (dailyRoster && dailySlots.size !== dailyRoster.entries.length) return fail("Today’s lineup contains duplicate players.");
+  const playerById = new Map(data.players.map(player => [player.id, player]));
+  const dailyPlayers: Player[] = [];
+  for (const entry of dailyRoster?.entries ?? []) {
+    const player = playerById.get(entry.playerId);
+    if (!player) return fail(`Today’s lineup player ${entry.playerId} is unavailable.`);
+    dailyPlayers.push(player);
+  }
+  const lineupPool = [...new Map([...fullRoster, ...dailyPlayers].map(player => [player.id, player])).values()];
   const counts = new Map<number, number>();
   const add = (player: Player, fraction: number) => {
     if (!(fraction > 0)) return;
     counts.set(player.id, (counts.get(player.id) ?? 0) + fraction);
     const estimate = outlook.estimates.get(player.id);
     const stats = estimate?.stats;
-    if (!stats) { if (!result.missing.includes(player)) result.missing.push(player); return; }
+    if (!stats) { if (!result.missing.some(p => p.id === player.id)) result.missing.push(player); return; }
     if (!result.outlookEstimates.some(p => p.playerId === player.id)) result.outlookEstimates.push(estimate);
     if (estimate.source === "previous_only" && !result.baselineEstimates.some(p => p.playerId === player.id))
       result.baselineEstimates.push({ playerId: player.id, name: player.name, season: estimate.priorSeason!, gamesPlayed: estimate.priorGames });
@@ -128,16 +139,22 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
     const gameFor = (p: Player) => games.find(g => [nbaAbbrev(g.home), nbaAbbrev(g.away)].includes(nbaAbbrev(p.nbaTeam)));
     const slots = [...schedule.slots];
     const candidates: Player[] = [];
-    for (const player of fullRoster) {
+    for (const sourcePlayer of lineupPool) {
+      let player = sourcePlayer;
       const game = gameFor(player);
       if (!game) continue;
       const liveState = day === date ? today?.games.find(g => g.id === game.id) : undefined;
       const locked = current && day === date && (Date.parse(game.startsAt) <= now || (liveState && ["live", "final"].includes(liveState.state)));
-      // Hypothetical future exclusions cannot reopen already-locked lineup slots.
-      if (!roster.includes(player) && !locked) continue;
+      // Started games belong to the dated lineup, even after ownership changes.
+      if (locked && dailyRoster) {
+        if (!dailySlots.has(player.id)) continue;
+        player = { ...player, slot: dailySlots.get(player.id)! };
+      }
+      // Current ownership controls unlocked/future games. Omissions cannot reopen locks.
+      if (!roster.includes(sourcePlayer) && !locked) continue;
       const available = canPlay(player, day);
       if (!available) {
-        if (!excluded.includes(player)) excluded.push(player);
+        if (!excluded.some(p => p.id === player.id)) excluded.push(player);
         result.exclusions.push({ playerId: player.id, date: day, reason: availabilityReason(player) });
       }
       if (player.slot === "IR" && !available) continue;
@@ -146,10 +163,10 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
       const started = day === date && (Date.parse(game.startsAt) <= now || (live && ["live", "final"].includes(live.state)));
       if (started && current) {
         // A started player keeps their actual slot, even when their game is final.
-        if (player.slot === null) return fail("Today’s lineup is incomplete.");
+        if (player.slot === null) return fail(`Today’s lineup slot is unavailable for ${player.name}.`);
         if (player.slot === "BE") continue;
         const slot = slots.indexOf(player.slot);
-        if (slot < 0) return fail("Today’s lineup could not be verified.");
+        if (slot < 0) return fail(`Today’s lineup slot could not be verified for ${player.name}.`);
         slots.splice(slot, 1);
         const fresh = today?.status === "ready" && today.date === date && today.fetchedAt && Math.abs(now - Date.parse(today.fetchedAt)) < 90_000;
         if (!fresh || !live || live.remainingFraction == null) return fail("Live game status unavailable.");
@@ -164,7 +181,7 @@ export function projectTeam(data: Snapshot, teamId: number, window: ForecastWind
     result.benched += candidates.length - selected.length;
     for (const player of selected) add(player, 1);
   }
-  result.players = [...counts].map(([id, games]) => ({ player: fullRoster.find(p => p.id === id)!, games })).sort((a, b) => b.games - a.games || a.player.id - b.player.id);
+  result.players = [...counts].map(([id, games]) => ({ player: playerById.get(id)!, games })).sort((a, b) => b.games - a.games || a.player.id - b.player.id);
   // Missing baselines must not look like zero production or a definitive winner.
   if (result.missing.length) return fail(`Missing season stats: ${result.missing.map(p => p.name).join(", ")}.`);
   totals["FG%"] = totals.FGA! > 0 ? totals.FGM! / totals.FGA! : null;

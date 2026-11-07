@@ -63,6 +63,23 @@ def forecast_schedule(raw, slots):
         pairs = [{'period': m['matchupPeriodId'], 'home': m['home']['teamId'], 'away': m['away']['teamId']}
                  for m in league.get('schedule', []) if m.get('home') and m.get('away')
                  and m['matchupPeriodId'] in [w['period'] for w in windows]]
-        return {'lineupDate': current_day.isoformat(), 'windows': windows, 'games': relevant, 'pairs': pairs, 'slots': active}
+        # mRoster is the dated lineup, independent of current player-pool ownership.
+        # Retain dropped/traded players here so started games keep their original slots.
+        lineups = []
+        for team in league.get('teams', []):
+            entries = team.get('roster', {}).get('entries')
+            if not isinstance(entries, list):
+                continue  # Missing coverage is not an explicitly empty lineup.
+            lineup = []
+            for entry in entries:
+                player_id = entry.get('playerPoolEntry', {}).get('player', {}).get('id')
+                if not isinstance(player_id, int) or player_id <= 0:
+                    raise ValueError('Invalid lineup player')
+                lineup.append({'playerId': player_id, 'slot': slots.get(entry.get('lineupSlotId'))})
+            if len({row['playerId'] for row in lineup}) != len(lineup):
+                raise ValueError('Duplicate lineup player')
+            lineups.append({'teamId': team['id'], 'entries': lineup})
+        return {'lineupDate': current_day.isoformat(), 'lineups': lineups,
+                'windows': windows, 'games': relevant, 'pairs': pairs, 'slots': active}
     except (KeyError, TypeError, ValueError, OverflowError):
         return None

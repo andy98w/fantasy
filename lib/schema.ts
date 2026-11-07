@@ -104,6 +104,11 @@ export const transactionSchema = z.object({
 export type LeagueTransaction = z.infer<typeof transactionSchema>;
 const forecastScheduleSchema = z.object({
   lineupDate: z.iso.date(),
+  // Optional for snapshots imported before separate daily-lineup coverage existed.
+  lineups: z.array(z.object({
+    teamId: numeric,
+    entries: z.array(z.object({ playerId: numeric, slot: z.string().nullable() })),
+  })).optional(),
   windows: z.array(z.object({ period: numeric, start: z.iso.date(), end: z.iso.date() })),
   games: z.array(z.object({ id: z.string(), startsAt: z.iso.datetime({ offset: true }), date: z.iso.date(), home: z.string(), away: z.string(), scoringPeriod: numeric })),
   pairs: z.array(z.object({ period: numeric, home: numeric, away: numeric })),

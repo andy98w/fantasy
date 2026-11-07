@@ -42,3 +42,32 @@ def test_conflicting_schedule_and_unknown_slot_fail_closed():
     assert forecast_schedule(r,SLOTS) is None
     r=fixture();r['league']['settings']['rosterSettings']['lineupSlotCounts']['99']=1
     assert forecast_schedule(r,SLOTS) is None
+
+
+def test_daily_lineups_remain_separate_from_current_ownership():
+    r = fixture()
+    r['league']['teams'] = [
+        {'id': 7, 'roster': {'entries': [
+            {'lineupSlotId': 0, 'playerPoolEntry': {'player': {'id': 100}, 'onTeamId': 9}},
+            {'lineupSlotId': 12, 'playerPoolEntry': {'player': {'id': 101}, 'onTeamId': 0}},
+            {'lineupSlotId': 13, 'playerPoolEntry': {'player': {'id': 102}}},
+        ]}},
+        {'id': 9, 'roster': {'entries': []}},
+        {'id': 10},
+    ]
+    result = forecast_schedule(r, SLOTS)
+    assert result['lineups'] == [
+        {'teamId': 7, 'entries': [{'playerId': 100, 'slot': 'PG'}, {'playerId': 101, 'slot': 'BE'}, {'playerId': 102, 'slot': 'IR'}]},
+        {'teamId': 9, 'entries': []},
+    ]
+    # Missing lineup coverage is not equivalent to an empty lineup.
+    assert all(row['teamId'] != 10 for row in result['lineups'])
+
+
+def test_invalid_daily_lineup_does_not_fabricate_assignments():
+    r = fixture()
+    entry = {'lineupSlotId': 99, 'playerPoolEntry': {'player': {'id': 100}}}
+    r['league']['teams'] = [{'id': 7, 'roster': {'entries': [entry]}}]
+    assert forecast_schedule(r, SLOTS)['lineups'][0]['entries'][0]['slot'] is None
+    r['league']['teams'][0]['roster']['entries'].append(entry)
+    assert forecast_schedule(r, SLOTS) is None

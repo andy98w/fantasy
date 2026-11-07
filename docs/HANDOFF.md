@@ -10,7 +10,7 @@ Updated November 6, 2026 (Pacific/Honolulu). This is the starting point for a ne
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Current follow-up: consistent dropdowns, explanatory disclosures and supporting notes across the dashboard. Use `git log -1` and exact-commit CI/deployment checks for release state.
+- Current follow-up: preserve dated forecast lineups separately from current ownership after adds, drops and trades. Use `git log -1` and exact-commit CI/deployment checks for release state.
 - Previous application release: `006a4de5122e834e472dbd69d43713de6b4ea7ec` — bounded team Power /9.
 - That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41746722680`; Railway GitHub deployment: `7534356861`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
@@ -279,3 +279,10 @@ Validation: 159 web tests, typecheck, build and standalone smoke passed. Browser
 ## November 5 NBA team filter
 
 Players has a separate All NBA teams dropdown (full NBA franchise names), independent of fantasy ownership/roster and position filters. Options come from all snapshot players, with NBA abbreviation aliases normalized consistently for options and matching. Clear filters resets NBA team too; pinned comparison rows remain visible across team changes. The existing roster dropdown group is explicitly labeled Fantasy teams. Browser checks covered Celtics, Knicks, combined name/position filtering, and clearing while retaining a pin. Local typecheck, 159 tests, build and standalone smoke passed.
+
+
+## November 6 forecast ownership / locked lineup fix
+
+`forecastSchedule.lineups` preserves each team’s dated mRoster entries separately from current player-pool ownership. Rest-of-week forecasts use that dated membership/slot for started games, including dropped or traded players, and current ownership for unstarted/future games. A new pickup absent from the dated lineup cannot receive already-started production. Bench/IR and locked-slot limits remain enforced. Older snapshots remain compatible; truly unknown slots name the affected player. UI and MCP share `projectTeam`; actual matchup totals are unchanged.
+
+Live replay reproduced Broke Young Boys’ blank forecast after adding Brayden Burries and dropping Ryan Rollins: Burries had current ownership but no dated slot, while Rollins remained on today’s bench. Updated import/forecast restored the projection and counted only Burries’ future game. Tests cover pickup, dropped starter, trade without duplicate live production, final locks, pre-tip ownership, bench/IR and missing-slot handling. Local validation: 164 app tests, 77 worker tests, typecheck, build and standalone smoke passed. Both web and sync worker must deploy, and a new import must contain lineups; verify exact-commit CI/deployment and live forecast before reporting success.

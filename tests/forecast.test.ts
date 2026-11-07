@@ -232,3 +232,85 @@ test("forecast lineup selects outlook strength and trades retain the original re
   assert.deepEqual(trade.after!.days[0].selectedPlayerIds,[2]);
   assert.equal(moved.teamId,2);
 });
+
+function changedOwnershipFixture() {
+  const time = Date.parse("2026-10-30T01:00:00Z");
+  const data = snapshot([
+    player(1, { teamId: null, slot: null, name: "Dropped starter" }),
+    player(2, { slot: null, name: "New pickup" }),
+    player(3, { slot: "BE", nbaTeam: "LAL" }),
+  ]);
+  data.syncedAt = new Date(time).toISOString();
+  data.forecastSchedule.slots = ["PG"];
+  data.forecastSchedule.lineups = [{ teamId: 1, entries: [{ playerId: 1, slot: "PG" }, { playerId: 3, slot: "BE" }] }, { teamId: 2, entries: [] }];
+  data.forecastSchedule.games.push(
+    {...schedule.games[0], id:"later", startsAt:"2026-10-30T04:00:00Z", home:"LAL", away:"NYK"},
+    {...schedule.games[0], id:"tomorrow", startsAt:"2026-10-31T01:00:00Z", date:"2026-10-30"},
+  );
+  data.matchups = [{id:1,period:2,result:"UNDECIDED",home:{teamId:1,wins:0,ties:0,stats:{...stats,PTS:100},performers:[],performanceComplete:false},away:{teamId:2,wins:0,ties:0,stats:{...stats,PTS:80},performers:[],performanceComplete:false}}];
+  const today: TodayData = {date:"2026-10-29",fetchedAt:new Date(time).toISOString(),status:"ready",games:[{
+    ...normalizeScoreboard(board,"2026-10-29")[0],id:"1",state:"live",remainingFraction:.5,
+  }]};
+  return {data, time, today};
+}
+
+test("same-day add/drop retains live starter and locked slot; pickup contributes only future games", () => {
+  const {data,time,today} = changedOwnershipFixture();
+  const original = JSON.stringify(data);
+  const result = projectTeam(data,1,schedule.windows[0],time,today);
+  assert.equal(result.issue,null);
+  assert.equal(result.side.stats.PTS,130); // 100 scored + 10 dropped player's live remainder + 20 pickup tomorrow
+  assert.equal(result.liveGames,1); assert.equal(result.games,1);
+  assert.equal(result.days[0].lockedSlots,1);
+  assert.deepEqual(result.days[0].benchedPlayerIds,[3]);
+  assert.deepEqual(result.players.map(row=>[row.player.id,row.games]),[[2,1],[1,.5]]);
+  assert.equal(projectionSummary(result).issue,null);
+  assert.equal(JSON.stringify(data),original);
+  today.games[0].state="final"; today.games[0].remainingFraction=0;
+  const final=projectTeam(data,1,schedule.windows[0],time,today);
+  assert.equal(final.side.stats.PTS,120); // no double count of the completed game
+  assert.equal(final.days[0].lockedSlots,1);
+});
+
+test("a started traded player remains with the old lineup and cannot count live for the new owner", () => {
+  const {data,time,today} = changedOwnershipFixture();
+  data.players[0].teamId=2;
+  const oldTeam=projectTeam(data,1,schedule.windows[0],time,today);
+  const newTeam=projectTeam(data,2,schedule.windows[0],time,today);
+  assert.equal(oldTeam.side.stats.PTS,130);
+  assert.equal(newTeam.issue,null);
+  assert.equal(newTeam.liveGames,0);assert.equal(newTeam.games,1);
+  assert.equal(newTeam.side.stats.PTS,100); // 80 scored + 20 tomorrow
+});
+
+test("a pickup may fill an unlocked slot before tipoff, while dropped players cannot", () => {
+  const {data,today} = changedOwnershipFixture();
+  const time=Date.parse("2026-10-29T23:00:00Z");data.syncedAt=new Date(time).toISOString();
+  today.games[0].state="scheduled";
+  const result=projectTeam(data,1,schedule.windows[0],time,today);
+  assert.equal(result.issue,null);
+  assert.equal(result.days[0].lockedSlots,0);
+  assert.ok(!result.players.some(row=>row.player.id===1));
+  assert.equal(result.games,2);
+});
+
+test("missing lineup slots name the player and old snapshots remain conservative", () => {
+  const {data,time,today} = changedOwnershipFixture();
+  data.forecastSchedule.lineups![0].entries[0].slot=null;
+  assert.match(projectTeam(data,1,schedule.windows[0],time,today).issue!,/Dropped starter/);
+  delete data.forecastSchedule.lineups;
+  const result=projectTeam(data,1,schedule.windows[0],time,today);
+  assert.match(result.issue!,/New pickup/);assert.deepEqual(result.side.stats,{});
+});
+
+test("dated IR and bench placements never inherit the new owner's active slot", () => {
+  for (const slot of ["IR","BE"]) {
+    const {data,time,today} = changedOwnershipFixture();
+    data.players[0].teamId=2;data.players[0].slot="PG";
+    data.forecastSchedule.lineups![0].entries[0].slot=slot;
+    const result=projectTeam(data,1,schedule.windows[0],time,today);
+    assert.equal(result.issue,null);assert.equal(result.liveGames,0);
+    assert.equal(result.days[0].lockedSlots,0);
+    assert.ok(!result.players.some(row=>row.player.id===1));
+  }
+});

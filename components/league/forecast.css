@@ -3,9 +3,6 @@
 .forecast-dates { color: var(--muted); font-size: 14px; white-space: nowrap; }
 .forecast-vs span { font-size: 20px; padding: 12px; }
 .forecast-games { display: block; color: var(--text); font-size: 14px; margin-top: 8px; text-shadow: 1px 1px var(--shadow); }
-.forecast-details { color: var(--muted); font-size: 14px; line-height: 1.6; }
-.forecast-details summary { cursor: pointer; color: var(--gold); width: fit-content; }
-.forecast-details p { max-width: 85ch; }
 .forecast-breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
 .forecast-breakdowns h3 { color: var(--text); }
 .forecast-breakdowns ul { padding: 0; list-style: none; max-width: 560px; }
@@ -61,8 +58,6 @@
 .forecast-inputs { border-top: 1px solid var(--line); }
 .forecast-inputs > summary, .forecast-method > summary { padding: 14px 18px; cursor: pointer; color: var(--gold); font-size: 13px; }
 .forecast-inputs > div { padding: 0 18px 18px; }
-.forecast-inputs .forecast-details { padding: 10px 0; font-size: 12px; border-bottom: 1px solid var(--line-soft); }
-.forecast-inputs .forecast-details:last-child { border-bottom: 0; }
 .forecast-method { margin-top: 20px; border-top: 1px solid var(--line); }
 .forecast-method > summary { padding-left: 0; }
 .forecast-method-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }

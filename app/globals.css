@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap");
 @import "../components/ui/controls.css";
+@import "../components/ui/disclosure.css";
 @import "../components/league/trade.css";
 @import "../components/league/auction-house.css";
 @import "../components/league/transaction-ledger.css";
@@ -308,7 +309,15 @@ h2 {
   font-size: 12px;
 }
 .footnote {
-  padding: 18px 0;
+  padding: 12px 16px;
+  border-left: 2px solid var(--line);
+  background: var(--surface-deep);
+  line-height: 1.65;
+}
+.panel-note {
+  line-height: 1.65;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-deep);
 }
 .notice {
   display: flex;
@@ -829,27 +838,6 @@ input::placeholder {
 }
 .filters > .result-count {
   margin-left: auto;
-}
-.ranking-help {
-  margin-top: 24px;
-  font-size: 12px;
-  max-width: 760px;
-  color: var(--muted);
-}
-.ranking-help summary {
-  cursor: pointer;
-  width: fit-content;
-  padding: 6px 0;
-  color: var(--gold);
-}
-.ranking-help > div {
-  padding: 16px;
-  border: 1px solid var(--line);
-  margin-top: 8px;
-  background: var(--surface-deep);
-}
-.ranking-help p + p {
-  margin-top: 10px;
 }
 .standings-table {
   min-width: 480px;

@@ -1,5 +1,6 @@
 "use client";
 
+import { Disclosure } from "../ui/disclosure";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import {
   CATEGORIES,
@@ -73,25 +74,13 @@ export function Standings({
 
 export function RankingHelp({ model }: { model: Snapshot["model"] }) {
   return (
-    <details className="ranking-help power-help">
-      <summary>How power works</summary>
-      <div>
-        <p>
-          + means stronger than average; − means weaker. For turnovers,
-          fewer is better. Category scores are relative values, not stat totals.
-        </p>
-        <p>
-          Player power runs from 0–100. Team power runs from 0–9: average category leads
-          against the other rated teams. A lead counts one, a tie half, and a loss zero. Bigger margins earn no extra credit.
-          Bench and IR are included; injuries do not discount roster value. The heatmap shows the original category values.
-        </p>
-        <p>
-          Observed player ratings use season averages and require {model.minimumGames} games.
-          Team power is a rating, not a win probability. Estimated scores treat
-          unrated players as average. Trade priorities adjust category fit: Punt ignores a category; Priority doubles its weight. Weighted fit is normalized to 0–9. Small changes can cross an opponent; margins and raw category values remain visible.
-        </p>
+    <Disclosure className="ranking-help power-help" title="How power works">
+      <div className="detail-columns">
+        <section><h4>Player power · 0–100</h4><p>Observed season averages; requires {model.minimumGames} games. Category scores measure relative strength: + is stronger, − is weaker. Fewer turnovers is better.</p><p>Unrated players are treated as average in estimated scores.</p></section>
+        <section><h4>Team power · 0–9</h4><p>Average category leads against other rated teams. A lead counts 1, a tie ½, and a loss 0. Bigger margins earn no extra credit.</p><p>Bench and IR count toward roster value. Injuries do not discount it. This is a rating, not a win probability.</p></section>
+        <section><h4>Category fit</h4><p>The heatmap shows raw category strengths. Trade priorities change fit: Punt ignores a category; Priority doubles its weight. Weighted fit stays on a 0–9 scale.</p><p>Small changes can cross an opponent; margins and raw values remain visible.</p></section>
       </div>
-    </details>
+    </Disclosure>
   );
 }
 

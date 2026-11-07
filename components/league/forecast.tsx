@@ -1,4 +1,5 @@
 "use client";
+import { Disclosure } from "../ui/disclosure";
 import { useMemo, useState } from "react";
 import type { Snapshot } from "@/lib/schema";
 import type { TodayData } from "@/lib/nba";
@@ -54,10 +55,10 @@ export function Forecast({ data, today }: { data: Snapshot; today?: TodayData })
       <Select label="Second team" value={String(away.id)} onChange={value => { setB(Number(value)); setOmitted([]); }} options={teamOptions(data.teams.filter(t => t.id !== home.id))} />
     </div>
     <p className="forecast-games">Balanced outlook · {scenario === "conservative" ? "Only players marked active and outside IR contribute future production." : "Conditional: uncertain players play; OUT and IR players return after today. This does not predict a return date."}</p>
-    {scenario === "if_available" && <details className="forecast-details"><summary>Hypothetical roster exclusions{omitted.length ? ` (${omitted.length})` : ""}</summary>
+    {scenario === "if_available" && <Disclosure className="forecast-details" title={<>Hypothetical roster exclusions{omitted.length ? ` (${omitted.length})` : ""}</>}>
       <p>Choose players to leave out of this forecast to make room for IR returns. This only changes future projections; today’s started lineups stay locked. ESPN rosters stay unchanged.</p>
       <div className="forecast-breakdowns">{[home, away].map(team => <div key={team.id}><h3>{team.name}</h3>{data.players.filter(p => p.teamId === team.id).map(p => <label className="forecast-roster-option" key={p.id}><input type="checkbox" checked={omitted.includes(p.id)} onChange={event => setOmitted(ids => event.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />Exclude {p.name}{p.slot === "IR" ? " (IR)" : ""}</label>)}</div>)}</div>
-    </details>}
+    </Disclosure>}
     {!projections ? <Empty>{schedule ? "Forecast unavailable for this matchup period." : "Forecast available after the next schedule import."}</Empty> : <>
       <section className="rivalry-duel forecast-duel" aria-label={`Projected matchup: ${home.name} versus ${away.name}`}>
         <div className="rivalry-stage">

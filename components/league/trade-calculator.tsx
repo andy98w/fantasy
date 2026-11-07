@@ -1,5 +1,6 @@
 "use client";
 
+import { Disclosure } from "../ui/disclosure";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { useMemo, useState } from "react";
 import {
@@ -247,29 +248,29 @@ function TradeImpact({
                   "No notable category changes."}
         </p>
       </div>
-      {active && <details className="forecast-details"><summary>League category edges</summary><p>{before.opponentsCompared} → {after.opponentsCompared} opponents compared. Both traded rosters are updated. Ties count half; these are roster-strength comparisons, not weekly forecasts.{before.provisional || after.provisional ? " Incomplete roster ratings; comparison is provisional." : ""}</p>
+      {active && <Disclosure className="forecast-details" title="League category edges"><p>{before.opponentsCompared} → {after.opponentsCompared} opponents compared. Both traded rosters are updated. Ties count half; these are roster-strength comparisons, not weekly forecasts.{before.provisional || after.provisional ? " Incomplete roster ratings; comparison is provisional." : ""}</p>
         <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before (% led)</th><th>After (% led)</th></tr></thead><tbody>{CATEGORIES.map(c => <tr key={c}><td>{c}</td><td>{before.categoryEdges[c] == null ? "—" : `${Math.round(before.categoryEdges[c]! * 100)}%`}</td><td>{after.categoryEdges[c] == null ? "—" : `${Math.round(after.categoryEdges[c]! * 100)}%`}</td></tr>)}</tbody></table></div>
-      </details>}
-      {active && basis === "balanced" && <details className="forecast-details"><summary>Outlook inputs</summary>
+      </Disclosure>}
+      {active && basis === "balanced" && <Disclosure className="forecast-details" title="Outlook inputs">
         {[...sent, ...received].map(player => <OutlookDetails key={player.id} player={player} estimate={outlook.estimates.get(player.id)!} />)}
-      </details>}
-      {active && <details className="forecast-details"><summary>Next-week production impact · Balanced outlook</summary>
+      </Disclosure>}
+      {active && <Disclosure className="forecast-details" title="Next-week production impact · Balanced outlook">
         <p>Roster value includes IR. Production depends on availability and legal starting slots. Incoming IR placement is retained as an assumption; activation may require freeing roster space.</p>
         {(["conservative", "if_available"] as const).map(scenario => {
           const forecast = tradeProduction(data, team.id, beforeRoster, afterRoster, Date.now(), scenario);
           const before = forecast.before, after = forecast.after;
           const issue = forecast.issue ?? before?.issue ?? after?.issue;
-          return <div key={scenario}><h3>{scenario === "conservative" ? "Conservative availability" : "If available / IR activated"}</h3>
+          return <section className="production-scenario" key={scenario}><h3>{scenario === "conservative" ? "Conservative availability" : "If available / IR activated"}</h3>
             <p>{scenario === "conservative" ? "Only active players outside IR." : "Uncertain players play; OUT and IR players return after today. Conditional, not a predicted return date."}</p>
             {issue || !before || !after ? <p>{issue}</p> : <>
               <p>{before.games} → {after.games} playable games</p>
               <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before</th><th>After</th></tr></thead><tbody>{CATEGORIES.map(category => <tr key={category}><td>{category}</td><td>{stat(before.side.stats[category], category)}</td><td>{stat(after.side.stats[category], category)}</td></tr>)}</tbody></table></div>
             </>}
             {[before, after].map((projection, index) => projection && projection.baselineEstimates.length > 0 && <p key={index}>{index ? "After" : "Before"} — previous-season estimates: {projection.baselineEstimates.map(p => `${p.name}: ${p.season - 1}–${String(p.season).slice(-2)}, ${p.gamesPlayed} games`).join("; ")}</p>)}
-            {after && after.assumptions.length > 0 && <p>Availability assumptions: {after.assumptions.map(p => `${p.name} (${p.reason})`).join(", ")}</p>}
-          </div>;
+            {after && after.assumptions.length > 0 && <><h4>Availability assumptions</h4><dl className="detail-facts">{after.assumptions.map(p => <div key={p.playerId}><dt>{p.name}</dt><dd>{p.reason}</dd></div>)}</dl></>}
+          </section>;
         })}
-      </details>}
+      </Disclosure>}
       <TableToolbar label={`Search ${team.name} categories`} query={control.query} onQuery={control.setQuery}>
         <Select label={`${team.name} priority filter`} value={priority} onChange={setPriority} options={[{value:"all",label:"All priorities"},{value:"0",label:"Punt"},{value:"1",label:"Normal"},{value:"2",label:"Priority"}]} />
       </TableToolbar>
@@ -376,7 +377,11 @@ export function TradeCalculator({ data }: { data: Snapshot }) {
           Reset trade
         </Button>
       </Toolbar>
-      <details className="forecast-details"><summary>Valuation details</summary><p>{basis === "balanced" ? "Current production blended with the previous season; shooting uses attempt-based weights. Full-roster value includes bench and IR. Check availability separately." : "Observed current-season production. Small samples can overstate hot starts and slumps."}</p><p>{OUTLOOK_MODEL.validation}. Category values are relative strengths: positive TO means fewer turnovers. Category fit compares strengths against the other teams, with each category bounded between a loss and a lead. Priorities are normalized to a 0–9 score; it is not a win probability. Missing ratings make totals provisional. Outlook inputs show the data and weights for selected players.</p></details>
+      <Disclosure className="forecast-details" title="Valuation details"><div className="detail-columns">
+        <section><h4>Production basis</h4><p>{basis === "balanced" ? "Current production blends with the previous season; shooting weights use attempts. Full-roster value includes bench and IR. Check availability separately." : "Observed current-season production. Small samples can overstate hot starts and slumps."}</p><p>{OUTLOOK_MODEL.validation}.</p></section>
+        <section><h4>Category fit</h4><p>Relative strengths: positive TO means fewer turnovers. Fit compares each category against other teams, bounded between a loss and a lead.</p><p>Priorities are normalized to 0–9. This is not a win probability.</p></section>
+        <section><h4>Data coverage</h4><p>Missing ratings make totals provisional. Expand Outlook inputs to see each selected player’s data and weights.</p></section>
+      </div></Disclosure>
       {error && (
         <Notice
           warning

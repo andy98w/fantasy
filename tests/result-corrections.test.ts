@@ -177,5 +177,5 @@ test("fresh live scores get the Monday addition once and the UI explains restore
   assert.equal(match.home.stats.PTS,725);
   assert.equal(applyResultCorrections(corrected).matchups[0].home.stats.PTS,725);
   const html=renderToStaticMarkup(createElement(CategoryComparison,{home:match.home,away:match.away,homeName:"Broke Young Boys",awayName:"sheeeeshhhh"}));
-  assert.match(html,/restored 2026-10-26 totals/);assert.match(html,/10\/25 FG/);assert.match(html,/not assigned to individual player rows/);
+  assert.match(html,/restored 2026-10-26 totals/);assert.match(html,/<dt>FG<\/dt><dd>10\/25<\/dd>/);assert.match(html,/not assigned to individual player rows/);
 });

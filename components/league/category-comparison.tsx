@@ -1,4 +1,5 @@
 "use client";
+import { Disclosure } from "../ui/disclosure";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { CATEGORIES, type Category, type Matchup } from "@/lib/schema";
 import { compareCategories } from "@/lib/season";
@@ -14,10 +15,15 @@ export function CategoryComparison({ home, away, homeName, awayName, finished = 
   return (
     <div className="category-comparison-table">
       {[{ side: home, name: homeName }, { side: away, name: awayName }].flatMap(({ side, name }) =>
-        (side.statCorrections ?? []).map(correction => <details className="forecast-details" key={`${side.teamId}:${correction.id}`}>
-          <summary>{name}: restored {correction.date} totals</summary>
-          <p>{correction.label}. Added {correction.stats.FGM}/{correction.stats.FGA} FG, {correction.stats.FTM}/{correction.stats.FTA} FT, {correction.stats["3PM"]} threes, {correction.stats.REB} rebounds, {correction.stats.AST} assists, {correction.stats.STL} steals, {correction.stats.BLK} blocks, {correction.stats.TO} turnovers and {correction.stats.PTS} points. Shooting percentages use combined makes and attempts. These team totals are not assigned to individual player rows.</p>
-        </details>))}
+        (side.statCorrections ?? []).map(correction => <Disclosure className="forecast-details" key={`${side.teamId}:${correction.id}`} title={<>{name}: restored {correction.date} totals</>}>
+          <p>{correction.label}</p>
+          <dl className="detail-facts">
+            <div><dt>FG</dt><dd>{correction.stats.FGM}/{correction.stats.FGA}</dd></div>
+            <div><dt>FT</dt><dd>{correction.stats.FTM}/{correction.stats.FTA}</dd></div>
+            {CATEGORIES.filter(category => !["FG%", "FT%"].includes(category)).map(category => <div key={category}><dt>{category}</dt><dd>{correction.stats[category]}</dd></div>)}
+          </dl>
+          <p>Added to team totals only. Shooting percentages use combined makes and attempts; these totals are not assigned to individual player rows.</p>
+        </Disclosure>))}
       <TableToolbar label="Search categories" query={control.query} onQuery={control.setQuery} />
       <table className="matchup-categories" aria-label="Category comparison">
         <thead>

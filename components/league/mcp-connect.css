@@ -17,9 +17,6 @@
 .mcp-steps li { padding-left: 8px; }
 .mcp-steps li::marker { color: var(--gold); font-weight: 600; }
 .mcp-access { color: var(--teal); font-size: 12px; margin: 0; }
-.mcp-details { margin-top: 24px; border-top: 1px solid var(--line-soft); padding-top: 18px; }
-.mcp-details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-.mcp-details p { color: var(--muted); line-height: 1.6; font-size: 12px; max-width: 65ch; }
 @media (max-width: 900px) { .mcp-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 520px) {
   .mcp-content { padding: 18px; }

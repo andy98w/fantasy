@@ -1,4 +1,5 @@
 "use client";
+import { Disclosure } from "../ui/disclosure";
 import { useState } from "react";
 import type { Team } from "../../lib/schema";
 import { CopyField } from "../ui/copy-field";
@@ -41,13 +42,12 @@ Start by reviewing my team and this week's matchup. If the Fantasy tools aren't 
           <li>Save, then reconnect or refresh the tool list.</li>
         </ol>}
         <p className="mcp-access">Read-only. No Fantasy login, API key or skill file needed.</p>
-        <details className="mcp-details">
-          <summary>Need help connecting?</summary>
+        <Disclosure className="mcp-details" title="Need help connecting?">
           <p>Connect first; pasting a prompt alone won’t give your app access to the league. If the option is missing, check your app’s workspace permissions.</p>
           {app === "chatgpt" && <p><a href="https://developers.openai.com/api/docs/guides/custom-mcp-server" target="_blank" rel="noreferrer">ChatGPT setup guide</a></p>}
           {app === "claude" && <p><a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp" target="_blank" rel="noreferrer">Claude setup guide</a></p>}
           <p>The server uses Streamable HTTP. Opening its URL in a browser returns “Method not allowed.” If tools don’t appear, check the URL ends in <code>/mcp</code> and reconnect.</p>
-        </details>
+        </Disclosure>
       </div>
     </Panel>
     <Panel title="2. Start a conversation" className="mcp-prompts">

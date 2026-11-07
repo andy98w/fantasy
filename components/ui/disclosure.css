@@ -1,0 +1,40 @@
+/* Supporting details share a quiet frame; matchup/record summaries retain their layout. */
+.disclosure { min-width: 0; border: 1px solid var(--line); background: var(--surface-deep); color: var(--muted); font: 400 12px/1.65 var(--body); margin: 12px 0; }
+.disclosure > summary { display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 12px 16px; list-style: none; cursor: pointer; color: var(--gold); }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary > span { min-width: 0; overflow-wrap: anywhere; }
+.disclosure > summary > svg { margin-left: auto; flex-shrink: 0; transition: transform 160ms steps(4, end); }
+.disclosure[open] > summary > svg { transform: rotate(180deg); }
+.disclosure > summary:hover { background: var(--surface); }
+.disclosure[open] > summary { border-bottom: 1px solid var(--line-soft); }
+.disclosure-body { padding: 16px; min-width: 0; }
+.disclosure-body p { max-width: 72ch; margin: 0 0 12px; }
+.disclosure-body p:last-child { margin-bottom: 0; }
+.disclosure-body h3, .disclosure-body h4 { margin: 0 0 8px; color: var(--text); font: 600 13px/1.5 var(--body); }
+.disclosure-body > .table-scroll { margin: 12px 0; }
+.disclosure-body > .disclosure, .forecast-inputs .disclosure { margin: 0; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; }
+.disclosure-body > .disclosure:last-child, .forecast-inputs .disclosure:last-child { border-bottom: 0; }
+.disclosure-body > .disclosure > summary, .forecast-inputs .disclosure > summary { padding: 12px 0; }
+.disclosure-body > .disclosure > .disclosure-body, .forecast-inputs .disclosure > .disclosure-body { padding: 12px 0; }
+.detail-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 20px; }
+.detail-columns > section { min-width: 0; }
+.detail-facts { margin: 12px 0; }
+.detail-facts > div { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between; border-bottom: 1px solid var(--line-soft); padding: 8px 0; }
+.detail-facts dt { color: var(--text); }
+.detail-facts dd { margin: 0; }
+.disclosure.mcp-details { margin-top: 24px; }
+.disclosure.daily-method { margin: 12px 0; }
+/* Every native disclosure remains visible and usable with a keyboard. */
+summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .disclosure > summary, .disclosure-body { padding: 12px; }
+  .detail-columns { grid-template-columns: 1fr; gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .disclosure > summary > svg { transition: none; }
+}
+
+.production-scenario { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.rivalry-trades summary:hover, .battle-rankings summary:hover { color: var(--gold); }
+.battle-rankings summary { min-height: 44px; }
+.battle-rankings summary::-webkit-details-marker { display: none; }

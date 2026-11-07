@@ -1,6 +1,6 @@
 # Fantasy — handoff
 
-Updated November 5, 2026 (Pacific/Honolulu). This is the starting point for a new chat; verify the working tree and live state before making changes.
+Updated November 6, 2026 (Pacific/Honolulu). This is the starting point for a new chat; verify the working tree and live state before making changes.
 
 ## Start here
 
@@ -10,7 +10,7 @@ Updated November 5, 2026 (Pacific/Honolulu). This is the starting point for a ne
 - Local website: http://127.0.0.1:3000
 - Hosted MCP: https://web-production-8d109.up.railway.app/mcp
 - League: `1834203755`, season `2027` (2026–27), name Monke, 12 teams, H2H most categories.
-- Current follow-up: polished Forecast assumptions with grouped availability and playable-game panels. Use `git log -1` and exact-commit CI/deployment checks for release state.
+- Current follow-up: consistent dropdowns, explanatory disclosures and supporting notes across the dashboard. Use `git log -1` and exact-commit CI/deployment checks for release state.
 - Previous application release: `006a4de5122e834e472dbd69d43713de6b4ea7ec` — bounded team Power /9.
 - That previous application commit passed all four CI jobs and deployed successfully. GitHub Actions run: `41746722680`; Railway GitHub deployment: `7534356861`.
 - Application working tree was clean before writing this handoff. No unfinished application changes remain.
@@ -18,6 +18,12 @@ Updated November 5, 2026 (Pacific/Honolulu). This is the starting point for a ne
 Read `AGENTS.md` first. It requires reading the relevant bundled Next.js documentation under `node_modules/next/dist/docs/` before code changes. Do not assume familiar Next.js APIs match this installed version.
 
 Some README and deployment-guide paragraphs predate the live release: references to six navigation tabs, Trades → History, Matchup MVP, Rivalries, and “not yet deployed” are stale. Prefer this handoff and current implementation for those details; setup and operational sections are still useful.
+
+## Shared supporting-detail presentation
+
+The shared `components/ui/disclosure.tsx` / `disclosure.css` now styles all explanatory disclosures: power help, daily performer methodology, forecast roster exclusions, player outlooks, trade valuation/edges/production, stat corrections and MCP help. Native keyboard behavior remains intact. Structured matchup and battle summaries retain their purpose-built layouts and visible focus states. Power/valuation/daily explanations use short titled groups; correction totals and trade availability use aligned facts instead of long lists in prose.
+
+All `Select` menus share a compact field-name header, selected-row accent and visible keyboard/open states. Shared panel notes, footnotes and history warnings have consistent spacing and muted framing. No scoring or forecasting calculations changed. Local browser checks covered 390px mobile layout, long/grouped dropdowns, keyboard last-option selection, and nested trade outlook tables. Typecheck, build, 159 tests and standalone smoke passed. The existing correction provenance test now checks the FG value in its labeled fact row.
 
 ## Latest forecast presentation update
 

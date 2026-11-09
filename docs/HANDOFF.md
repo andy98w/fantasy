@@ -293,3 +293,8 @@ Live replay reproduced Broke Young Boys’ blank forecast after adding Brayden B
 ## November 8 sticky Players header
 
 The main Players table keeps its sortable column header at the viewport top while the page scrolls through its rows. `usePageTableHeader` translates the original thead within the table bounds because the horizontal overflow container prevents viewport CSS sticky positioning. The original header preserves sorting, column widths, semantics and the sticky identity column; no cloned header or extra vertical scroll area. Scroll work is animation-frame batched, resizes/filters are observed, and listeners are cleaned up on unmount. Other tables are unchanged. Browser checks covered desktop scrolling, sorting while pinned, mobile horizontal alignment, viewport resizing and filtering down to one row. Typecheck, existing tests, build and production smoke passed; verify exact-commit CI and deployment for release state.
+
+
+## November 8 refreshable page selections
+
+Dashboard links now encode the selected matchup (`#matchup?id=…&week=…`) or team (`#team?id=…`). The shared route parser restores selections on initial hydration, hash changes and snapshot refresh; Back/Forward and copied links work. Plain tab links and old aliases remain supported. Expired/invalid matchup IDs or weeks fall back to League instead of silently selecting a different game. Plain `#matchup` retains the default first-game behavior. Player filters/pins and component subtabs remain session UI state. Verified reload of a non-default matchup and team, plus Back/Forward; 167 tests, typecheck, build and standalone smoke passed. Check exact-commit CI and deployment before reporting live status.

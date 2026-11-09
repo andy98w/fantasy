@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import type { Player, Snapshot } from "@/lib/schema";
+import { dashboardRoute, dashboardHash } from "@/lib/dashboard-route";
 import { relevantNews } from "@/lib/analysis";
 import { Navigation, navigation, type View } from "./league/navigation";
 import { MatchupBoard } from "./league/matchup-board";
@@ -55,7 +56,7 @@ export default function Dashboard({
   const selected =
     data.players.find((player) => player.id === selectedId) ?? null;
   const [minutes, setMinutes] = useState<number | null>(null);
-  const [matchupId, setMatchupId] = useState(data.matchups[0]?.id);
+  const [matchupId, setMatchupId] = useState<number | undefined>(data.matchups[0]?.id);
   useEffect(() => {
     const update = () =>
       setMinutes(
@@ -70,38 +71,27 @@ export default function Dashboard({
   }, [data.syncedAt]);
   useEffect(() => {
     const update = () => {
-      const hash = window.location.hash.slice(1);
-      const aliases: Record<string, View> = {
-        overview: "league",
-        rankings: "players",
-        news: "league",
-        teams: "team",
-        rivalries: "forecast",
-      };
-      const value = aliases[hash] ?? hash;
-      if (
-        [
-          ...navigation.map((item) => item.value),
-          "connection",
-          "matchup",
-        ].includes(value as View)
-      )
-        setView(value as View);
+      const route = dashboardRoute(window.location.hash, data);
+      if (!route) return;
+      setView(route.view);
+      setTeamId(route.teamId);
+      setMatchupId(route.matchupId);
     };
     update();
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
-  }, []);
-  const go = (value: View) => {
-    setView(value);
-    if (value === "team") setTeamId(null);
-    window.location.hash = value;
+  }, [data.teams, data.matchups]);
+  const go = (value: View, details: { teamId?: number | null; matchupId?: number } = {}) => {
+    const matchup = data.matchups.find(m => m.id === details.matchupId);
+    const hash = dashboardHash(value, { ...details, period: matchup?.period });
+    const route = dashboardRoute(hash, data)!;
+    setView(route.view);
+    setTeamId(route.teamId);
+    setMatchupId(route.matchupId);
+    window.location.hash = hash;
     window.scrollTo({ top: 0, behavior: "instant" });
   };
-  const openTeam = (id: number) => {
-    go("team");
-    setTeamId(id);
-  };
+  const openTeam = (id: number) => go("team", { teamId: id });
   const onSort = (key: string) =>
     setSort((current) => ({
       key,
@@ -232,7 +222,7 @@ export default function Dashboard({
           <div className="overview-grid">
             <div className="league-main">
               <MatchupGrid matchups={data.matchups} teams={data.teams} period={data.league.matchupPeriod} fetchedAt={data.matchupSyncedAt ?? data.syncedAt}
-                onMatchup={(id) => { setMatchupId(id); go("matchup"); }} />
+                onMatchup={(id) => go("matchup", { matchupId: id })} />
               <DailyPerformers data={data} today={today} onPlayer={(player) => setSelectedId(player.id)} />
             </div>
             <aside className="league-sidebar" aria-label="League news and today's games">
@@ -268,7 +258,7 @@ export default function Dashboard({
                 label="Select team"
                 value={teamId === null ? "all" : String(teamId)}
                 onChange={(value) =>
-                  setTeamId(value === "all" ? null : Number(value))
+                  go("team", { teamId: value === "all" ? null : Number(value) })
                 }
               />
               <ResultCount

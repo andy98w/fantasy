@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { useMemo, useState } from "react";
 import { CATEGORIES, type Category, type Snapshot, type Matchup } from "@/lib/schema";
@@ -75,11 +76,11 @@ export function Rivalries({ data, mode }: { data: Snapshot; mode?: "duel" | "wha
       <div className="what-if-heading"><h2>Everyone plays everyone</h2><span>{completeWeek ? "Final weekly totals" : "Week in progress"}</span></div>
       <div className="category-switches" role="group" aria-label="Scoring categories">{CATEGORIES.map(category => <button key={category} type="button" aria-pressed={categories.includes(category)} disabled={categories.length === 1 && categories.includes(category)} onClick={() => setCategories(old => old.includes(category) ? old.filter(c => c !== category) : CATEGORIES.filter(c => c === category || old.includes(c)))}>{category}{!categories.includes(category) && <span aria-hidden="true"> ×</span>}</button>)}</div>
       {simulation.missing.length > 0 && <p className="history-warning">Missing weekly stats: {simulation.missing.map(t => t.name).join(", ")}</p>}
-      <Panel><TableToolbar label="Search simulated standings" query={control.query} onQuery={control.setQuery} />{simulation.rows.length ? <div className="table-scroll"><table className="data-table what-if-table"><thead><tr>{[["rank", "Rank"], ["team", "Team"], ["wins", "Wins"], ["losses", "Losses"], ["ties", "Ties"], ["categoryWins", "Category wins"]].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["rank", "team", "losses"].includes(key)} className={key === "team" ? "identity-col" : undefined}>{label}</SortableHeader>)}</tr></thead>
+      <Panel><TableToolbar label="Search simulated standings" query={control.query} onQuery={control.setQuery} />{simulation.rows.length ? <div className="table-scroll"><StickyTable className="data-table what-if-table"><thead><tr>{[["rank", "Rank"], ["team", "Team"], ["wins", "Wins"], ["losses", "Losses"], ["ties", "Ties"], ["categoryWins", "Category wins"]].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["rank", "team", "losses"].includes(key)} className={key === "team" ? "identity-col" : undefined}>{label}</SortableHeader>)}</tr></thead>
         <AnimatedRows revision={`${selectedPeriod}:${categories.join()}:${simulation.rows.map(r => `${r.team.id}:${r.points}`).join()}`}>{control.rows.map(row => <tr key={row.team.id} data-motion-key={row.team.id}>
           <td className="rank-cell"><MotionNumber>{`#${row.rank}`}</MotionNumber></td><td className="identity-col"><span className="identity"><TeamAvatar team={row.team} /><strong>{row.team.name}</strong></span></td>
           <td><MotionNumber>{row.wins}</MotionNumber></td><td><MotionNumber>{row.losses}</MotionNumber></td><td><MotionNumber>{row.ties}</MotionNumber></td><td><MotionNumber>{row.categoryWins}</MotionNumber></td>
-        </tr>)}{!control.rows.length && <TableEmpty columns={6} />}</AnimatedRows></table></div> : <Empty>At least two teams need scored totals.</Empty>}</Panel>
+        </tr>)}{!control.rows.length && <TableEmpty columns={6} />}</AnimatedRows></StickyTable></div> : <Empty>At least two teams need scored totals.</Empty>}</Panel>
     </section>}
   </div>;
 }

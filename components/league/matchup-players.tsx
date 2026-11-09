@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 
 import { useState } from "react";
 import { CATEGORIES, type Player, type Snapshot, type Team } from "@/lib/schema";
@@ -51,7 +52,7 @@ export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
       }} options={[{ value: "all", label: "All categories" }, ...CATEGORIES.map(value => ({ value, label: value }))]} />
     </Toolbar>
     <div className="table-scroll" tabIndex={0} role="region" aria-label={daily ? `${dayLabel} player table` : "Weekly player table"}>
-      <table className="data-table weekly-players-table">
+      <StickyTable className="data-table weekly-players-table">
         <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{daily && <SortableHeader column="game" sort={control.sort} onSort={control.onSort} descending={false}>Game</SortableHeader>}{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
         {groups.map(group => <tbody key={group.key}>
           {group.label && <tr className="matchup-lineup-divider"><th scope="rowgroup" colSpan={columns.length + 4} title={recap ? "Current roster slots, not historical lineup credit." : "Based on current fantasy roster slots. Bench and IR NBA stats are shown for reference."}>{group.label}</th></tr>}
@@ -64,7 +65,7 @@ export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
           {daily && <td>{row.game && <span className={`matchup-game-state ${row.game.state === "live" && !stale ? "live" : ""}`} title="NBA game status"><span>{matchupGameLabel(row.game, stale)}</span>{row.game.state === "live" && <small>{gameLabel(row.game)}</small>}</span>}</td>}
           {columns.map(key => <td key={key}>{stat(row.stats[key], key)}{(key === "FG%" || key === "FT%") && row.stats[key === "FG%" ? "FGA" : "FTA"] != null && <small className="weekly-shooting">{stat(row.stats[key === "FG%" ? "FGM" : "FTM"], "")}/{stat(row.stats[key === "FG%" ? "FGA" : "FTA"], "")}</small>}</td>)}
         </tr>)}</tbody>)}
-      </table>
+      </StickyTable>
       {!rows.length && <Empty>{daily ? unavailable ? "Game stats are unavailable. Retrying automatically." : source.length ? "No players match these filters." : `No players from these teams have a game ${recap ? `on ${displayDate}` : "today"}.` : "No players for this matchup."}</Empty>}
     </div>
   </section>;

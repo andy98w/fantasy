@@ -313,7 +313,7 @@ export default function Dashboard({
             />
             <PowerMovers players={visiblePlayers} teams={data.teams} baselineAt={data.powerBaselineAt} onSelect={tableProps.onSelect} />
             <Panel>
-              <PlayerTable stickyHeader searchable={false} players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt}
+              <PlayerTable searchable={false} players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt}
                 pinning={{ players: pinnedPlayers, onToggle: togglePin, onClear: () => setPinnedIds([]) }} />
             </Panel>
           </>

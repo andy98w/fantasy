@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 
 import { Disclosure } from "../ui/disclosure";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
@@ -39,7 +40,7 @@ export function Standings({
         role="region"
         aria-label="League standings"
       >
-        <table className="data-table standings-table">
+        <StickyTable className="data-table standings-table">
           <thead>
             <tr>
               {[ ["rank", "Rank"], ["name", "Team"], ["wins", "W"], ["losses", "L"], ["ties", "T"] ].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["rank", "name", "losses"].includes(key)} className={key === "name" ? "identity-col" : undefined}>{label}</SortableHeader>)}
@@ -66,7 +67,7 @@ export function Standings({
               ))}
             {!control.rows.length && <TableEmpty columns={5} />}
           </AnimatedRows>
-        </table>
+        </StickyTable>
       </div>
     </Panel>
   );
@@ -126,7 +127,7 @@ export function TeamRankings({
         role="region"
         aria-label="Team power rankings"
       >
-        <table className="data-table heatmap-table">
+        <StickyTable className="data-table heatmap-table">
           <thead>
             <tr>
               {sortHeader("rank", "Rank")}
@@ -162,7 +163,7 @@ export function TeamRankings({
             ))}
             {!values.length && <TableEmpty columns={CATEGORIES.length + 3} />}
           </AnimatedRows>
-        </table>
+        </StickyTable>
       </div>
       {values.some(value => value.provisional) && <p className="panel-note">* Estimated: some player ratings in this league are missing.</p>}
     </Panel>

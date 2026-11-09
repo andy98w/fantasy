@@ -35,7 +35,7 @@ export function PlayerDialog({
     >
       {player && (
         <>
-          <div className="dialog-topline">
+          <div className="dialog-topline" data-sticky-table-bar>
             <span>Player stats</span>
             <Button
               variant="quiet"

@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 
 import { useEffect, useRef, useState } from "react";
 import { BOX_COLUMNS, type BoxTeam, type GameBoxscore } from "@/lib/game-boxscore";
@@ -29,14 +30,14 @@ export function BoxscoreTable({ team, box, players = [] }: { team: NbaTeam; box?
       <><TableToolbar label={`Search ${team.abbrev} players`} query={control.query} onQuery={control.setQuery}>
         <Select label={`${team.abbrev} lineup`} value={role} onChange={setRole} options={[{ value: "all", label: "All players" }, { value: "starters", label: "Starters" }, { value: "bench", label: "Bench" }, { value: "played", label: "Played" }]} />
       </TableToolbar><div className="table-scroll" tabIndex={0} role="region" aria-label={`${team.abbrev} player stats`}>
-        <table className="data-table boxscore-table">
+        <StickyTable className="data-table boxscore-table">
           <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false}>Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader>{BOX_COLUMNS.map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
           <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 2} /> : control.sort ? <BoxscoreGroup players={control.rows} statuses={statuses} /> : [true, false].map((starter) => {
             const players = control.rows.filter((player) => player.starter === starter);
             return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} statuses={statuses} label={starter ? "Starters" : "Bench"} />;
           })}</tbody>
           {Object.keys(box.totals).length > 0 && <tfoot><tr><th scope="row">Team total</th><td />{BOX_COLUMNS.map(([key]) => <td key={key}>{box.totals[key] ?? "—"}</td>)}</tr></tfoot>}
-        </table>
+        </StickyTable>
       </div></>}
   </section>;
 }
@@ -102,7 +103,7 @@ export function GameDialog({ game: initialGame, players, onClose }: { game: NbaG
   const hasStats = data?.teams.some((team) => team.players.length > 0);
   return <dialog ref={dialog} className="player-dialog game-dialog" aria-label={`${game.away.name} at ${game.home.name} box score`}
     onCancel={(event) => { event.stopPropagation(); onClose(); }} onClick={(event) => { if (event.target === dialog.current) onClose(); }}>
-    <div className="dialog-topline"><span>Box score</span><Button variant="quiet" aria-label="Close box score" onClick={onClose}><PixelIcon name="close" size={16} /></Button></div>
+    <div className="dialog-topline" data-sticky-table-bar><span>Box score</span><Button variant="quiet" aria-label="Close box score" onClick={onClose}><PixelIcon name="close" size={16} /></Button></div>
     <div className="boxscore-scoreboard">
       {[game.away, game.home].map((team) => <div className="boxscore-side" key={team.id}>
         <NbaAvatar team={team} /><span>{team.name}</span><strong><MotionNumber>{team.score ?? "—"}</MotionNumber></strong>

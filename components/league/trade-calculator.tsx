@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 
 import { Disclosure } from "../ui/disclosure";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
@@ -249,7 +250,7 @@ function TradeImpact({
         </p>
       </div>
       {active && <Disclosure className="forecast-details" title="League category edges"><p>{before.opponentsCompared} → {after.opponentsCompared} opponents compared. Both traded rosters are updated. Ties count half; these are roster-strength comparisons, not weekly forecasts.{before.provisional || after.provisional ? " Incomplete roster ratings; comparison is provisional." : ""}</p>
-        <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before (% led)</th><th>After (% led)</th></tr></thead><tbody>{CATEGORIES.map(c => <tr key={c}><td>{c}</td><td>{before.categoryEdges[c] == null ? "—" : `${Math.round(before.categoryEdges[c]! * 100)}%`}</td><td>{after.categoryEdges[c] == null ? "—" : `${Math.round(after.categoryEdges[c]! * 100)}%`}</td></tr>)}</tbody></table></div>
+        <div className="table-scroll"><StickyTable className="data-table"><thead><tr><th>Category</th><th>Before (% led)</th><th>After (% led)</th></tr></thead><tbody>{CATEGORIES.map(c => <tr key={c}><td>{c}</td><td>{before.categoryEdges[c] == null ? "—" : `${Math.round(before.categoryEdges[c]! * 100)}%`}</td><td>{after.categoryEdges[c] == null ? "—" : `${Math.round(after.categoryEdges[c]! * 100)}%`}</td></tr>)}</tbody></StickyTable></div>
       </Disclosure>}
       {active && basis === "balanced" && <Disclosure className="forecast-details" title="Outlook inputs">
         {[...sent, ...received].map(player => <OutlookDetails key={player.id} player={player} estimate={outlook.estimates.get(player.id)!} />)}
@@ -264,7 +265,7 @@ function TradeImpact({
             <p>{scenario === "conservative" ? "Only active players outside IR." : "Uncertain players play; OUT and IR players return after today. Conditional, not a predicted return date."}</p>
             {issue || !before || !after ? <p>{issue}</p> : <>
               <p>{before.games} → {after.games} playable games</p>
-              <div className="table-scroll"><table className="data-table"><thead><tr><th>Category</th><th>Before</th><th>After</th></tr></thead><tbody>{CATEGORIES.map(category => <tr key={category}><td>{category}</td><td>{stat(before.side.stats[category], category)}</td><td>{stat(after.side.stats[category], category)}</td></tr>)}</tbody></table></div>
+              <div className="table-scroll"><StickyTable className="data-table"><thead><tr><th>Category</th><th>Before</th><th>After</th></tr></thead><tbody>{CATEGORIES.map(category => <tr key={category}><td>{category}</td><td>{stat(before.side.stats[category], category)}</td><td>{stat(after.side.stats[category], category)}</td></tr>)}</tbody></StickyTable></div>
             </>}
             {[before, after].map((projection, index) => projection && projection.baselineEstimates.length > 0 && <p key={index}>{index ? "After" : "Before"} — previous-season estimates: {projection.baselineEstimates.map(p => `${p.name}: ${p.season - 1}–${String(p.season).slice(-2)}, ${p.gamesPlayed} games`).join("; ")}</p>)}
             {after && after.assumptions.length > 0 && <><h4>Availability assumptions</h4><dl className="detail-facts">{after.assumptions.map(p => <div key={p.playerId}><dt>{p.name}</dt><dd>{p.reason}</dd></div>)}</dl></>}
@@ -280,7 +281,7 @@ function TradeImpact({
         role="region"
         aria-label={`${team.name} trade impact`}
       >
-        <table className="data-table trade-impact-table">
+        <StickyTable className="data-table trade-impact-table">
           <thead>
             <tr>
               {[["category", "Category"], ["before", "Before"], ["after", "After"], ["change", "Change"], ["priority", "Priority"]].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "category"}>{label}</SortableHeader>)}
@@ -320,7 +321,7 @@ function TradeImpact({
             ))}
             {!control.rows.length && <TableEmpty columns={5} />}
           </tbody>
-        </table>
+        </StickyTable>
       </div>
     </Panel>
   );

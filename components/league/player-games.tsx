@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 import { useEffect, useState } from "react";
 import type { Player } from "@/lib/schema";
 import type { PlayerGames } from "@/lib/player-games";
@@ -41,7 +42,7 @@ export function PlayerRecentGames({ playerId, season, players }: { playerId: num
         <Select label="Game result" value={result} onChange={setResult} options={[{value:"all",label:"All results"},{value:"W",label:"Wins"},{value:"L",label:"Losses"}]} />
       </TableToolbar>
       <div className="table-scroll" tabIndex={0} role="region" aria-label="Recent game stats">
-        <table className="data-table player-games-table">
+        <StickyTable className="data-table player-games-table">
           <thead><tr><SortableHeader column="date" sort={control.sort} onSort={control.onSort}>Game</SortableHeader><SortableHeader column="result" sort={control.sort} onSort={control.onSort} descending={false}>Result</SortableHeader>{columns.map(([key, label]) => <SortableHeader column={key} key={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
           <tbody>{control.rows.slice(0, limit).map(({ game, opponent, result, stats }) => <tr key={game.id} onClick={() => setSelected(game)}>
             <th scope="row"><button type="button" aria-haspopup="dialog" aria-label={`View ${dateFormat.format(new Date(game.startsAt))} ${opponent} box score`} onClick={(event) => { event.stopPropagation(); setSelected(game); }}>
@@ -50,7 +51,7 @@ export function PlayerRecentGames({ playerId, season, players }: { playerId: num
             <td className={result === "W" ? "positive-text" : "negative-text"}>{result}</td>
             {columns.map(([key]) => <td key={key}>{stats[key] ?? "—"}</td>)}
           </tr>)}{!control.rows.length && <TableEmpty columns={columns.length + 2} />}</tbody>
-        </table>
+        </StickyTable>
       </div>
       {control.rows.length > limit && <Button variant="quiet" onClick={() => setLimit((value) => value + 10)}>Older games</Button>}
     </>}

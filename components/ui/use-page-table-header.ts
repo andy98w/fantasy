@@ -1,20 +1,33 @@
 "use client";
 import { useEffect, useRef } from "react";
 
-/** Keep the real, sortable header visible during page scroll, including wide tables.
- * CSS sticky alone is trapped by the table's horizontal overflow container.
+/** CSS sticky is trapped by horizontal overflow wrappers; move the real header
+ * within its table, relative to the viewport or a containing vertical scroller.
  */
-export function usePageTableHeader(enabled: boolean) {
+export function usePageTableHeader() {
   const ref = useRef<HTMLTableElement>(null);
   useEffect(() => {
     const table = ref.current;
     const head = table?.tHead;
-    if (!enabled || !table || !head) return;
+    if (!table || !head) return;
+    const ancestors: HTMLElement[] = [];
+    for (let parent = table.parentElement; parent && parent !== document.body; parent = parent.parentElement)
+      ancestors.push(parent);
     let frame = 0;
     const update = () => {
       frame = 0;
+      if (!table.getClientRects().length) return;
+      let top = 0;
+      for (const parent of ancestors) {
+        if (!/(auto|scroll)/.test(getComputedStyle(parent).overflowY) || parent.scrollHeight <= parent.clientHeight + 1) continue;
+        top = Math.max(top, parent.getBoundingClientRect().top + parent.clientTop);
+        // Keep table labels below the dialog's sticky title/close controls.
+        const bar = parent.querySelector<HTMLElement>(":scope > [data-sticky-table-bar]");
+        if (bar && getComputedStyle(bar).position === "sticky")
+          top = Math.max(top, bar.getBoundingClientRect().bottom);
+      }
       const bounds = table.getBoundingClientRect();
-      const offset = Math.max(0, Math.min(-bounds.top, bounds.height - head.offsetHeight));
+      const offset = Math.max(0, Math.min(top - bounds.top, bounds.height - head.offsetHeight));
       head.style.transform = `translateY(${offset}px)`;
     };
     const schedule = () => {
@@ -23,18 +36,20 @@ export function usePageTableHeader(enabled: boolean) {
     const observer = new ResizeObserver(schedule);
     observer.observe(table);
     observer.observe(head);
-    // Content above the table can resize after loading or filtering.
     observer.observe(document.body);
+    for (const parent of ancestors) observer.observe(parent);
     window.addEventListener("scroll", schedule, { passive: true, capture: true });
     window.addEventListener("resize", schedule);
+    document.addEventListener("toggle", schedule, true);
     update();
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
+      document.removeEventListener("toggle", schedule, true);
       head.style.removeProperty("transform");
     };
-  }, [enabled]);
+  }, []);
   return ref;
 }

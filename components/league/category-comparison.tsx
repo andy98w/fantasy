@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 import { Disclosure } from "../ui/disclosure";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { CATEGORIES, type Category, type Matchup } from "@/lib/schema";
@@ -25,7 +26,7 @@ export function CategoryComparison({ home, away, homeName, awayName, finished = 
           <p>Added to team totals only. Shooting percentages use combined makes and attempts; these totals are not assigned to individual player rows.</p>
         </Disclosure>))}
       <TableToolbar label="Search categories" query={control.query} onQuery={control.setQuery} />
-      <table className="matchup-categories" aria-label="Category comparison">
+      <StickyTable className="matchup-categories" aria-label="Category comparison">
         <thead>
           <tr><SortableHeader column="home" sort={control.sort} onSort={control.onSort}>{homeName}</SortableHeader><SortableHeader column="category" sort={control.sort} onSort={control.onSort} descending={false}>Category</SortableHeader><SortableHeader column="away" sort={control.sort} onSort={control.onSort}>{awayName}</SortableHeader></tr>
         </thead>
@@ -56,7 +57,7 @@ export function CategoryComparison({ home, away, homeName, awayName, finished = 
           })}
           {!control.rows.length && <TableEmpty columns={3} />}
         </tbody>
-      </table>
+      </StickyTable>
     </div>
   );
 }

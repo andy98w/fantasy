@@ -1,4 +1,5 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { TeamSelect } from "./team-select";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -152,13 +153,13 @@ export function TradeBattles({ data, active }: { data: Snapshot; active: boolean
       <TableToolbar label="Search trades" query={control.query} onQuery={control.setQuery}>
         <TeamSelect label="Filter trade rankings team" teams={data.teams} value={rankTeam} onChange={setRankTeam} allLabel="All teams" />
       </TableToolbar>
-      {rankError ? <div className="battle-error" role="status">{rankError} <Button variant="quiet" onClick={() => setRefresh(n => n + 1)}>Retry</Button></div> : !ready ? <Empty>Loading rankings…</Empty> : !entries.length ? <Empty>No completed trades yet.</Empty> : <div className="battle-ranking-scroll"><table className="battle-rankings">
+      {rankError ? <div className="battle-error" role="status">{rankError} <Button variant="quiet" onClick={() => setRefresh(n => n + 1)}>Retry</Button></div> : !ready ? <Empty>Loading rankings…</Empty> : !entries.length ? <Empty>No completed trades yet.</Empty> : <div className="battle-ranking-scroll"><StickyTable className="battle-rankings">
         <thead><tr>{[["rank", "Rank"], ["deal", "Deal"], ["rating", "MMR"], ["votes", "Votes"]].map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={!["rank", "deal"].includes(key)}>{label}</SortableHeader>)}</tr></thead>
         <AnimatedRows revision={JSON.stringify(ratings)}>{control.rows.map(row => {
           const team = data.teams.find(t => t.id === row.entry.teamId);
           return <tr key={row.entry.id} data-motion-key={row.entry.id}><td>{row.rank === null ? "—" : `#${row.rank}`}</td><td><details><summary>{team && <TeamAvatar team={team} />}<span>{team?.name ?? `Team ${row.entry.teamId}`}<small>{date(row.entry.completedAt)}</small></span></summary><div className="ranked-deal"><TradeSide entry={row.entry} data={data} /></div></details></td><td><MotionNumber>{row.votes ? Math.round(row.rating).toLocaleString("en-US") : "—"}</MotionNumber></td><td><MotionNumber>{row.votes}</MotionNumber></td></tr>;
         })}{!control.rows.length && <TableEmpty columns={4} />}</AnimatedRows>
-      </table></div>}
+      </StickyTable></div>}
     </Panel>
   </div>;
 }

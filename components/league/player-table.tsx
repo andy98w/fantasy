@@ -1,6 +1,6 @@
 "use client";
+import { StickyTable } from "../ui/sticky-table";
 import { Fragment, useState } from "react";
-import { usePageTableHeader } from "../ui/use-page-table-header";
 import { matchesSearch } from "@/lib/table";
 import { SortableHeader, TableToolbar } from "../ui/table-controls";
 import { CATEGORIES, type Player, type Team } from "@/lib/schema";
@@ -17,7 +17,6 @@ export function PlayerTable({
   onSort,
   onSelect,
   compact = false,
-  stickyHeader = false,
   ownership = false,
   trends = false,
   baselineAt,
@@ -31,7 +30,6 @@ export function PlayerTable({
   onSort: (key: string) => void;
   onSelect: (player: Player) => void;
   compact?: boolean;
-  stickyHeader?: boolean;
   ownership?: boolean;
   trends?: boolean;
   baselineAt?: string | null;
@@ -42,7 +40,6 @@ export function PlayerTable({
     onClear: () => void;
   };
 }) {
-  const tableRef = usePageTableHeader(stickyHeader);
   const [query, setQuery] = useState("");
   const pinned = pinning?.players ?? [];
   const pinnedIds = new Set(pinned.map(player => player.id));
@@ -62,7 +59,7 @@ export function PlayerTable({
       role="region"
       aria-label="Player statistics"
     >
-      <table ref={tableRef} className={`data-table players-table ${stickyHeader ? "page-sticky-header" : ""} ${compact ? "compact" : ""} ${pinning ? "pinnable" : ""}`}>
+      <StickyTable className={`data-table players-table ${compact ? "compact" : ""} ${pinning ? "pinnable" : ""}`}>
         <thead>
           <tr>
             <SortableHeader column="name" sort={sort} onSort={onSort} descending={false} className="identity-col">Player</SortableHeader>
@@ -136,7 +133,7 @@ export function PlayerTable({
             </Fragment>
           ))}
         </tbody>
-      </table>
+      </StickyTable>
       {!visible.length && (
         <Empty>{pinned.length ? "No other matching players." : "No matching players."}</Empty>
       )}

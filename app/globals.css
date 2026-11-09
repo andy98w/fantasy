@@ -626,6 +626,11 @@ h2 {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+.page-sticky-header > thead {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 2px 0 var(--line);
+}
 .data-table th {
   font-weight: 400;
   font-size: 10px;

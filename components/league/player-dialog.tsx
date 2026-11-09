@@ -7,14 +7,17 @@ import { NewsFeed } from "./news-feed";
 import { Button } from "../ui/primitives";
 import { PlayerInjuryOutlook } from "./player-injury";
 import { PlayerRecentGames } from "./player-games";
+import type { TodayData } from "@/lib/nba";
 import { PixelIcon } from "../ui/pixel-icon";
 export function PlayerDialog({
   player,
   data,
+  today,
   onClose,
 }: {
   player: Player | null;
   data: Snapshot;
+  today?: TodayData;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -81,7 +84,7 @@ export function PlayerDialog({
               Unrated: {ratingReason(player, data.model.minimumGames)}.
             </p>
           )}
-          <PlayerRecentGames key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} players={data.players} />
+          <PlayerRecentGames key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} players={data.players} today={today} />
           <div className="contribution-header">
             <h3>Category value</h3>
             <span>Per game / Value</span>

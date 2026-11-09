@@ -331,6 +331,7 @@ export default function Dashboard({
       <PlayerDialog
         player={selected}
         data={data}
+        today={today}
         onClose={() => setSelectedId(null)}
       />
     </div>

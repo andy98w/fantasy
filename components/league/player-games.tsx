@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import type { Player } from "@/lib/schema";
 import type { PlayerGames } from "@/lib/player-games";
 import { BOX_COLUMNS } from "@/lib/game-boxscore";
-import { NBA_TIMEZONE, type NbaGame } from "@/lib/nba";
+import { gameLabel, NBA_TIMEZONE, type TodayData, type NbaGame } from "@/lib/nba";
 import { Button, Empty } from "../ui/primitives";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { Select } from "../ui/select";
 import { statSortValue } from "@/lib/table";
+import { playerGameHistory } from "@/lib/current-player-game";
 import { GameDialog } from "./game-dialog";
 
 const columns = BOX_COLUMNS.filter(([key]) => key !== "plusMinus");
 const dateFormat = new Intl.DateTimeFormat("en-US", { timeZone: NBA_TIMEZONE, month: "short", day: "numeric" });
-export function PlayerRecentGames({ playerId, season, players }: { playerId: number; season: number; players: Player[] }) {
+export function PlayerRecentGames({ playerId, season, players, today }: { playerId: number; season: number; players: Player[]; today?: TodayData }) {
   const [data, setData] = useState<PlayerGames | null>(null);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NbaGame | null>(null);
@@ -29,28 +30,32 @@ export function PlayerRecentGames({ playerId, season, players }: { playerId: num
     return () => controller.abort();
   }, [playerId, season, retry]);
   const [result, setResult] = useState("all");
-  const control = useTableControls((data?.games ?? []).filter(row => result === "all" || row.result === result), {
+  const player = players.find(p => p.id === playerId);
+  const { current, history } = player ? playerGameHistory(player, data?.games ?? [], today) : { current: null, history: data?.games ?? [] };
+  const control = useTableControls(history.filter(row => result === "all" || row.result === result), {
     initialSort: { key: "date", descending: true },
     search: row => `${dateFormat.format(new Date(row.game.startsAt))} ${row.opponent} ${row.game.home.name} ${row.game.away.name} ${row.result}`,
     value: (row, key) => key === "date" ? Date.parse(row.game.startsAt) : key === "result" ? row.result : statSortValue(row.stats[key]),
   });
+  const rows = [...(current ? [current] : []), ...control.rows.slice(0, limit)];
   return <section className="player-recent-games" aria-label="Recent games">
     <h3>Recent games</h3>
     {error && <p className="today-stale" role="status">{data ? "Game log may be out of date." : "Game log unavailable."} <Button variant="quiet" onClick={() => setRetry((value) => value + 1)}>Retry</Button></p>}
-    {!data ? !error && <Empty>Loading games…</Empty> : !data.games.length ? <Empty>No games played this season.</Empty> : <>
+    {!data && !current ? !error && <Empty>Loading games…</Empty> : !history.length && !current ? <Empty>No games played this season.</Empty> : <>
       <TableToolbar label="Search games" query={control.query} onQuery={control.setQuery}>
         <Select label="Game result" value={result} onChange={setResult} options={[{value:"all",label:"All results"},{value:"W",label:"Wins"},{value:"L",label:"Losses"}]} />
       </TableToolbar>
       <div className="table-scroll" tabIndex={0} role="region" aria-label="Recent game stats">
         <StickyTable className="data-table player-games-table">
           <thead><tr><SortableHeader column="date" sort={control.sort} onSort={control.onSort}>Game</SortableHeader><SortableHeader column="result" sort={control.sort} onSort={control.onSort} descending={false}>Result</SortableHeader>{columns.map(([key, label]) => <SortableHeader column={key} key={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
-          <tbody>{control.rows.slice(0, limit).map(({ game, opponent, result, stats }) => <tr key={game.id} onClick={() => setSelected(game)}>
+          <tbody>{rows.map(({ game, opponent, result, stats }) => <tr key={game.id} className={current?.game.id === game.id ? "current-player-game" : undefined} onClick={() => setSelected(game)}>
             <th scope="row"><button type="button" aria-haspopup="dialog" aria-label={`View ${dateFormat.format(new Date(game.startsAt))} ${opponent} box score`} onClick={(event) => { event.stopPropagation(); setSelected(game); }}>
               <span>{dateFormat.format(new Date(game.startsAt))}</span><strong>{opponent}</strong>
+              {current?.game.id === game.id && <span className="current-game-status">{current.stale ? "Last seen · " : game.state === "live" ? "Live · " : ""}{gameLabel(game)}</span>}
             </button></th>
-            <td className={result === "W" ? "positive-text" : "negative-text"}>{result}</td>
+            <td className={result === "W" ? "positive-text" : result === "L" ? "negative-text" : "muted"}>{result}</td>
             {columns.map(([key]) => <td key={key}>{stats[key] ?? "—"}</td>)}
-          </tr>)}{!control.rows.length && <TableEmpty columns={columns.length + 2} />}</tbody>
+          </tr>)}{!rows.length && <TableEmpty columns={columns.length + 2} />}</tbody>
         </StickyTable>
       </div>
       {control.rows.length > limit && <Button variant="quiet" onClick={() => setLimit((value) => value + 10)}>Older games</Button>}

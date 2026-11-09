@@ -1657,3 +1657,6 @@ th[aria-sort="ascending"] .sort-arrow, th[aria-sort="descending"] .sort-arrow { 
 .players-table .player-pinned td { background: #292c3d; }
 .players-table .player-pinned .identity-col { box-shadow: inset 3px 0 var(--gold); }
 .players-table .player-pins-divider th { text-align: left; padding: 10px 20px; border-top: 1px solid var(--gold); }
+
+.player-games-table .current-player-game > * { border-bottom: 2px solid var(--gold); }
+.player-games-table button .current-game-status { color: var(--gold); }

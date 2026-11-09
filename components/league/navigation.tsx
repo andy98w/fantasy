@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import type { Snapshot } from "@/lib/schema";
 import { PixelIcon, type IconName } from "../ui/pixel-icon";
 export const navigation = [
@@ -25,11 +25,17 @@ export function Navigation({
   minutes,
 }: {
   data: Snapshot;
-  view: View;
+  view: View | null;
   go: (view: View) => void;
   espn: string;
   minutes: number | null;
 }) {
+  const navigate = (event: MouseEvent<HTMLAnchorElement>, next: View) => {
+    // Preserve ordinary link behavior for opening a tab/window with modifiers.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    go(next);
+  };
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
     navRef.current?.querySelector('a[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
@@ -40,7 +46,7 @@ export function Navigation({
         <a
           className="brand"
           href="#league"
-          onClick={() => go("league")}
+          onClick={(event) => navigate(event, "league")}
           aria-label="Fantasy league"
         >
           <span className="brand-ball">
@@ -61,7 +67,7 @@ export function Navigation({
               href="#connection"
               title="Sync status"
               aria-label={`Sync status: ${data.mode === "demo" ? "demo" : minutes === null ? "imported" : `updated ${minutes} minutes ago`}`}
-              onClick={() => go("connection")}
+              onClick={(event) => navigate(event, "connection")}
               className={view === "connection" ? "selected" : ""}
             >
               <span
@@ -95,7 +101,7 @@ export function Navigation({
               key={item.value}
               className={item.value === "mcp" ? "nav-mcp" : undefined}
               href={`#${item.value}`}
-              onClick={() => go(item.value)}
+              onClick={(event) => navigate(event, item.value)}
               aria-current={
                 view === item.value ||
                 (view === "matchup" && item.value === "league")

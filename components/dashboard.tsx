@@ -44,6 +44,7 @@ export default function Dashboard({
   syncFailure: string | null;
   today?: TodayData;
 }) {
+  const [routeReady, setRouteReady] = useState(false);
   const [view, setView] = useState<View>("league");
   const [teamId, setTeamId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
@@ -72,14 +73,24 @@ export default function Dashboard({
   useEffect(() => {
     const update = () => {
       const route = dashboardRoute(window.location.hash, data);
+      setRouteReady(true);
       if (!route) return;
       setView(route.view);
       setTeamId(route.teamId);
       setMatchupId(route.matchupId);
     };
     update();
-    window.addEventListener("hashchange", update);
-    return () => window.removeEventListener("hashchange", update);
+    const onHashChange = () => {
+      // Native hash links do not notify Next's router. Keep its refresh URL in sync.
+      window.history.replaceState(null, "", window.location.href);
+      update();
+    };
+    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("popstate", update);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("popstate", update);
+    };
   }, [data.teams, data.matchups]);
   const go = (value: View, details: { teamId?: number | null; matchupId?: number } = {}) => {
     const matchup = data.matchups.find(m => m.id === details.matchupId);
@@ -88,7 +99,9 @@ export default function Dashboard({
     setView(route.view);
     setTeamId(route.teamId);
     setMatchupId(route.matchupId);
-    window.location.hash = hash;
+    // Next patches the History API to update its canonical URL. Assigning
+    // location.hash leaves that URL stale and router.refresh() restores it.
+    if (window.location.hash !== hash) window.history.pushState(null, "", hash);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
   const openTeam = (id: number) => go("team", { teamId: id });
@@ -146,17 +159,23 @@ export default function Dashboard({
   };
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a className="skip-link" href="#main-content" onClick={(event) => {
+        event.preventDefault();
+        const main = document.getElementById("main-content");
+        main?.focus({ preventScroll: true });
+        main?.scrollIntoView();
+      }}>
         Skip to content
       </a>
       <Navigation
         data={data}
-        view={view}
+        view={routeReady ? view : null}
         go={go}
         espn={espn}
         minutes={minutes}
       />
-      <main className="main-content" id="main-content">
+      <main className="main-content" id="main-content" tabIndex={-1} aria-busy={!routeReady}>
+        {routeReady ? <>
         {data.mode === "demo" ? (
           <Notice
             action={
@@ -327,6 +346,7 @@ export default function Dashboard({
         {view === "connection" && (
           <Connection data={data} syncFailure={syncFailure} />
         )}
+        </> : <div className="empty-state" role="status">Loading…</div>}
       </main>
       <PlayerDialog
         player={selected}

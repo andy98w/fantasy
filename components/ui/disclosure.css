@@ -23,7 +23,6 @@
 .detail-facts dt { color: var(--text); }
 .detail-facts dd { margin: 0; }
 .disclosure.mcp-details { margin-top: 24px; }
-.disclosure.daily-method { margin: 12px 0; }
 /* Every native disclosure remains visible and usable with a keyboard. */
 summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 @media (max-width: 640px) {

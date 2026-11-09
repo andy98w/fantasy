@@ -1,5 +1,4 @@
 "use client";
-import { Disclosure } from "../ui/disclosure";
 import { useMemo, useState } from "react";
 import type { Snapshot, Player } from "@/lib/schema";
 import type { TodayData } from "@/lib/nba";
@@ -23,7 +22,6 @@ export function DailyPerformers({ data, today, onPlayer }: { data: Snapshot; tod
   return <section className={`daily-performers ${negative ? "daily-negative" : ""}`} aria-label={title}>
     <div className="section-heading"><h2>{title}</h2><span title="9-category production against the season reference pool. Surprises compare game production with that player's season per-game average. Underperformers require a finished game and at least 10 minutes played.">{dateLabel ? `${dateLabel} · PT` : negative ? "Final games · 10+ min" : "9-cat"}</span></div>
     <Tabs label={title} value={mode} onChange={setMode} options={[{value:"top", label:"Top performers"}, {value:"worst", label:"Shitters"}, {value:"surprise", label:"Surprises"}, {value:"letdown", label:"Letdowns"}]} />
-    {mode === "worst" && <Disclosure className="daily-method" title="How this list works"><div className="detail-columns"><section><h4>Qualifying games</h4><p>Final games, 10+ minutes, and a negative nine-category score below the historical 10th percentile. Up to six players; fewer when appropriate.</p><p>Shooting is weighted by attempts. Fewer turnovers is better.</p></section><section><h4>Historical cutoff</h4>{calibrated && calibration ? <p>{calibration.sampleSize.toLocaleString()} performances across {calibration.gameCount} NBA games, {calibration.from}–{calibration.to}. Includes current reference-pool players; excludes this slate.</p> : <p>Waiting for enough recent historical games to calibrate this list.</p>}<p>Measures fantasy production. Letdowns compares each player with their own season average.</p></section></div></Disclosure>}
     {slate?.boxscoreStatus === "partial" && <p className="today-stale" role="status">Some game stats are unavailable.</p>}
     {slate?.status === "stale" && <p className="today-stale" role="status">Showing saved game stats.</p>}
     {slate?.boxscoreStatus === "error" || slate?.status === "error" ? <Empty>Player stats unavailable. Retrying automatically.</Empty> : selected.length ? <div className="daily-player-grid">{selected.map((row, index) => {

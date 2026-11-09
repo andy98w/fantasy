@@ -21,6 +21,8 @@ Some README and deployment-guide paragraphs predate the live release: references
 
 ## Copy restraint
 
+November 8: removed the daily Shitters “How this list works” disclosure and its qualifying-game / historical-cutoff text at the user’s request. Ranking logic, calibration and missing-data messages remain unchanged.
+
 Removed the always-visible Team power explanation (methodology remains in How power works), redundant dropdown menu titles, Forecast assumptions subtitle and per-team Projected labels. The default forecast explanation lives in the expandable methodology; conditional-return mode still shows a short reminder that returns are assumed. MCP access copy is shorter. Keep dates, units, missing/stale-data warnings and meaningful scenario limitations.
 
 ## Scrollbar presentation

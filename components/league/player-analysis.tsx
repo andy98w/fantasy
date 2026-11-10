@@ -8,6 +8,7 @@ import { nbaAbbrev, NBA_TIMEZONE, type TodayData } from "@/lib/nba";
 import { ShotChart } from "./shot-chart";
 import { PlayerAvatar } from "./avatars";
 import { Select } from "../ui/select";
+import { SearchField } from "../ui/search-field";
 import { Button, Empty, Panel } from "../ui/primitives";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", {month:"short", day:"numeric", timeZone:NBA_TIMEZONE});
@@ -17,7 +18,7 @@ export function PlayerAnalysis({data,today}:{data:Snapshot;today?:TodayData}) {
   const player = data.players.find(p=>p.id===playerId);
   const options = data.players.filter(p=>p.id===playerId || p.name.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name));
   return <>
-    <div className="analysis-controls"><input type="search" aria-label="Find analysis player" placeholder="Find a player" value={query} onChange={e=>setQuery(e.target.value)} />
+    <div className="analysis-controls"><SearchField label="Find a player" value={query} onChange={setQuery} />
       <Select label="Analysis player" value={String(playerId??"")} onChange={id=>setPlayerId(Number(id))} options={options.map(p=>({value:String(p.id),label:`${p.name} · ${p.nbaTeam}`}))} />
     </div>
     {player ? <PlayerAnalysisGames key={`${player.id}:${data.league.season}`} player={player} season={data.league.season} today={data.mode === "live" ? today : undefined} /> : <Empty>No players available.</Empty>}

@@ -34,7 +34,7 @@ export function ShotChart({ report, teams, timeline = true, dates = {}, title = 
   const visible = eligible.filter(s => result === "all" || (result === "made") === s.made);
   const located = visible.filter(s => s.x !== null && s.y !== null);
   const totals = shootingTotals(eligible);
-  const heaves = eligible.filter(s => s.teamAttempt).length;
+  const heaves = base.filter(s => s.teamAttempt).length;
   const active = visible.find(s => `${s.gameId}:${s.id}` === selected);
   const height = Math.max(47, ...report.shots.filter(s => s.y !== null).map(s => Math.min(94, s.y! + 8.25)));
   const playerOptions = [...new Map(report.shots.filter(s => team === "all" || s.teamId === team).map(s => [s.playerId, s.playerName])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
@@ -53,7 +53,7 @@ export function ShotChart({ report, teams, timeline = true, dates = {}, title = 
     </div>
     {!report.available && <p role="status" className="inline-notice">Shot locations aren’t available for this game.</p>}
     {report.available && expected !== undefined && expected !== base.filter(s => !s.teamAttempt).length && <p className="shot-coverage" role="status">Play-by-play: {base.filter(s => !s.teamAttempt).length} attempts · Box score: {expected}. Shot coverage differs.</p>}
-    {heaves > 0 && <p className="shot-coverage">{heaves} heave{heaves === 1 ? "" : "s"} shown · excluded from player FG%</p>}
+    {heaves > 0 && <p className="shot-coverage">{heaves} heave{heaves === 1 ? "" : "s"} excluded from player FG%</p>}
     {report.skipped > 0 && <p className="shot-coverage">{report.skipped} play entries could not be verified.</p>}
     <div className="shot-layout">
       <div className="shot-court-wrap">

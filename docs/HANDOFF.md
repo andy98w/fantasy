@@ -324,3 +324,10 @@ Explicitly tagged missed heaves in the last three seconds of Q1–Q3 at 36+ feet
 `/api/games/[id]/shots?player=ID` returns only that player's shots and box-score row when requested, sharing the existing bounded, coalesced box-score loader with the game dialog endpoint via `lib/game-boxscore-data.ts`. Upstream final-game caching is five minutes, live twenty seconds, with labeled stale fallback. Season coverage is limited to available game logs/play-by-play and is loaded progressively; no fabricated historical chart or new database storage.
 
 Validation: 177 web tests (including shot identity, malformed coordinates/clocks, overtime, weighted shooting and heave reconciliation), typecheck, production build and standalone smoke. Browser checks covered game-dialog and Analysis filters, replay/scrubbing, keyboard shot selection, all-season loading, switching players without retaining prior stats, and 390px mobile layout. Verify exact-commit CI and Railway before claiming deployment.
+
+
+## November 9 Analysis layout and controls
+
+Analysis now uses one searchable player combobox (matching names/team abbreviations, accent-insensitive multiword matching, click or arrow/Enter selection, Escape cancellation and explicit no-results state) beside the game picker and Refresh. Results do not retain a nonmatching previously selected player. The player heading and ten stats are compact above a court-first layout; quarter/result filters sit beside the chart heading. Mobile wraps controls and stats without horizontal page overflow.
+
+Shot replay uses an explicitly styled range track/thumb, focus treatment, Play/Pause button and quarter markers. Court bounds come from the entire report instead of the visible/time-filtered subset, preventing court resizing while scrubbing. Player box-score absence is explicit rather than displaying an empty shooting chart as measured zero attempts. Validation: 177 existing tests, typecheck, production build and standalone smoke; browser checks covered direct Jalen Brunson search, keyboard/mouse selection, no results and Escape, stable court dimensions at start/end, playback, and 390px mobile layout.

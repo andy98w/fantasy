@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Player, Snapshot } from "@/lib/schema";
 import type { PlayerGames } from "@/lib/player-games";
 import type { GameBoxscore } from "@/lib/game-boxscore";
@@ -8,23 +8,18 @@ import { nbaAbbrev, NBA_TIMEZONE, type TodayData } from "@/lib/nba";
 import { ShotChart } from "./shot-chart";
 import { PlayerAvatar } from "./avatars";
 import { Select } from "../ui/select";
-import { SearchField } from "../ui/search-field";
+import { AnalysisPlayerPicker } from "./analysis-player-picker";
 import { Button, Empty, Panel } from "../ui/primitives";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", {month:"short", day:"numeric", timeZone:NBA_TIMEZONE});
 export function PlayerAnalysis({data,today}:{data:Snapshot;today?:TodayData}) {
   const [playerId,setPlayerId] = useState(data.players.filter(p=>p.gamesPlayed>0).sort((a,b)=>(a.rank??9999)-(b.rank??9999))[0]?.id);
-  const [query,setQuery] = useState("");
   const player = data.players.find(p=>p.id===playerId);
-  const options = data.players.filter(p=>p.id===playerId || p.name.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name));
-  return <>
-    <div className="analysis-controls"><SearchField label="Find a player" value={query} onChange={setQuery} />
-      <Select label="Analysis player" value={String(playerId??"")} onChange={id=>setPlayerId(Number(id))} options={options.map(p=>({value:String(p.id),label:`${p.name} · ${p.nbaTeam}`}))} />
-    </div>
-    {player ? <PlayerAnalysisGames key={`${player.id}:${data.league.season}`} player={player} season={data.league.season} today={data.mode === "live" ? today : undefined} /> : <Empty>No players available.</Empty>}
-  </>;
+  return player ? <PlayerAnalysisGames key={`${player.id}:${data.league.season}`} player={player} season={data.league.season} today={data.mode === "live" ? today : undefined}
+    picker={<AnalysisPlayerPicker players={data.players} value={playerId} onChange={setPlayerId} />} /> : <Empty>No players available.</Empty>;
 }
-function PlayerAnalysisGames({player,season,today}:{player:Player;season:number;today?:TodayData}) {
+
+function PlayerAnalysisGames({player,season,today,picker}:{player:Player;season:number;today?:TodayData;picker:ReactNode}) {
   const [log,setLog] = useState<PlayerGames|null>(null), [logError,setLogError]=useState(false),[choice,setChoice]=useState("latest"),[retry,setRetry]=useState(0);
   const [boxes,setBoxes]=useState<GameBoxscore[]>([]),[finished,setFinished]=useState(0),[failed,setFailed]=useState(0),[busy,setBusy]=useState(false);
   const [loadedIds,setLoadedIds]=useState("");
@@ -82,10 +77,12 @@ function PlayerAnalysisGames({player,season,today}:{player:Player;season:number;
     [seasonView ? "FG%" : "FG", "fieldGoalsMade-fieldGoalsAttempted"], [seasonView ? "3PM" : "3PT", "threePointFieldGoalsMade-threePointFieldGoalsAttempted"], [seasonView ? "FT%" : "FT", "freeThrowsMade-freeThrowsAttempted"]];
   const dates=Object.fromEntries(games.map(g=>[g.id,dateFormat.format(new Date(g.startsAt))]));
   const unavailable=currentBoxes.filter(b=>!b.shotReport?.available).length;
-  return <Panel>
+  return <div className="player-analysis">
+    <div className="analysis-toolbar">{picker}<Select label="Analysis game" value={choice} onChange={setChoice} options={[{value:"latest",label:"Most recent game"},{value:"season",label:"All games this season"},...games.map(g=>({value:g.id,label:`${dates[g.id]} · ${g.away.abbrev} at ${g.home.abbrev}`}))]} /><Button variant="quiet" onClick={()=>setRetry(n=>n+1)}>Refresh</Button></div>
+    <Panel className="analysis-panel">
     <div className="analysis-player"><PlayerAvatar player={player} large /><div><h2>{player.name}</h2><p>{seasonView?`Season per game · ${player.gamesPlayed} games`:selectedGame?`${dates[selectedGame.id]} · ${selectedGame.away.abbrev} at ${selectedGame.home.abbrev}`:"Recent game"}</p></div></div>
     <div className="analysis-stats">{pairs.map(([label,key])=><span key={key}>{label}<strong>{seasonView?(player.stats[label]===null||player.stats[label]===undefined?"—":label.includes("%") ? `${(player.stats[label] * 100).toFixed(1)}%` : Number(player.stats[label].toFixed(1))):boxPlayer?.didNotPlay?"—":boxPlayer?.stats[key]??"—"}</strong></span>)}</div>
-    <div className="shot-controls" style={{padding:"0 24px"}}><Select label="Analysis game" value={choice} onChange={setChoice} options={[{value:"latest",label:"Most recent game"},{value:"season",label:"All games this season"},...games.map(g=>({value:g.id,label:`${dates[g.id]} · ${g.away.abbrev} at ${g.home.abbrev}`}))]} /><Button variant="quiet" onClick={()=>setRetry(n=>n+1)}>Refresh</Button></div>
+
     {logError&&<p className="analysis-progress" role="status">Game history unavailable. <Button variant="quiet" onClick={()=>setRetry(n=>n+1)}>Retry</Button></p>}
     {!log&&!logError&&<Empty>Loading games…</Empty>}
     {log?.stale&&<p className="analysis-progress">Game list may be out of date.</p>}
@@ -95,6 +92,8 @@ function PlayerAnalysisGames({player,season,today}:{player:Player;season:number;
     {currentBoxes.some(b=>b.stale)&&<p className="analysis-progress">Some game data may be out of date.</p>}
     {seasonView&&currentBoxes.length>0&&<p className="analysis-progress">Shots from {currentBoxes.length-unavailable}/{games.length} games</p>}
     {boxPlayer?.didNotPlay&&!seasonView&&<p className="analysis-progress">Did not play{boxPlayer.reason?` · ${boxPlayer.reason}`:""}</p>}
-    {currentBoxes.length>0&&<ShotChart key={`${choice}:${ids}`} report={report} teams={[]} fixedPlayer timeline={!seasonView} dates={dates} title={seasonView?"Season shot chart":"Shot chart"} />}
-  </Panel>;
+    {!seasonView&&currentBoxes.length>0&&!boxPlayer&&<Empty>Player box score unavailable for this game.</Empty>}
+    {currentBoxes.length>0&&(seasonView||boxPlayer)&&<ShotChart key={`${choice}:${ids}`} report={report} teams={[]} fixedPlayer timeline={!seasonView} dates={dates} title={seasonView?"Season shot chart":"Shot chart"} />}
+    </Panel>
+  </div>;
 }

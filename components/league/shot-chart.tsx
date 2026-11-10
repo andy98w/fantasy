@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import { type Shot, type ShotReport, shootingTotals, shotZone, periodStart } from "@/lib/shots";
 import { Select } from "../ui/select";
 import { Button } from "../ui/primitives";
@@ -36,19 +36,20 @@ export function ShotChart({ report, teams, timeline = true, dates = {}, title = 
   const totals = shootingTotals(eligible);
   const heaves = eligible.filter(s => s.teamAttempt).length;
   const active = visible.find(s => `${s.gameId}:${s.id}` === selected);
-  const height = Math.max(47, ...located.map(s => Math.min(94, s.y! + 8.25)));
+  const height = Math.max(47, ...report.shots.filter(s => s.y !== null).map(s => Math.min(94, s.y! + 8.25)));
   const playerOptions = [...new Map(report.shots.filter(s => team === "all" || s.teamId === team).map(s => [s.playerId, s.playerName])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const periods = [...new Set(report.shots.map(s => s.period))].sort((a,b) => a-b);
   const expected = player !== "all" ? report.expected[player] : team === "all" ? Object.values(report.expected).reduce((a,b) => a+b,0) : undefined;
   const zoneNames = ["At rim", "Other 2PT", "Corner 3", "Above-break 3", "Backcourt", "Unlocated"];
   const describe = (s: Shot) => `${dates[s.gameId] ? dates[s.gameId] + " · " : ""}${periodLabel(s.period)} ${s.clock} · ${s.text}${s.teamAttempt ? " · Heave, excluded from player FG" : ""}`;
   return <section className="shot-explorer" aria-label={title}>
-    <div className="shot-heading"><h3>{title}</h3><span className="shot-legend"><span className="positive-text">● Made</span><span className="negative-text">× Missed</span></span></div>
+    <div className="shot-topbar"><div className="shot-heading"><h3>{title}</h3><span className="shot-legend"><span className="positive-text">● Made</span><span className="negative-text">× Missed</span></span></div>
     <div className="shot-controls">
       {!fixedPlayer && <><Select label="Shot team" value={team} onChange={value => { setTeam(value); setPlayer("all"); }} options={[{ value: "all", label: "Both teams" }, ...teams.map(t => ({value:t.id,label:t.name}))]} />
       <Select label="Shot player" value={player} onChange={setPlayer} options={[{ value:"all",label:"All players" }, ...playerOptions.map(([id,name]) => ({value:String(id),label:name}))]} /></>}
       <Select label="Shot quarter" value={period} onChange={setPeriod} options={[{value:"all",label:"All quarters"},...periods.map(p => ({value:String(p),label:periodLabel(p)}))]} />
       <Select label="Shot result" value={result} onChange={setResult} options={[{value:"all",label:"All shots"},{value:"made",label:"Made"},{value:"missed",label:"Missed"}]} />
+    </div>
     </div>
     {!report.available && <p role="status" className="inline-notice">Shot locations aren’t available for this game.</p>}
     {report.available && expected !== undefined && expected !== base.filter(s => !s.teamAttempt).length && <p className="shot-coverage" role="status">Play-by-play: {base.filter(s => !s.teamAttempt).length} attempts · Box score: {expected}. Shot coverage differs.</p>}
@@ -75,10 +76,10 @@ export function ShotChart({ report, teams, timeline = true, dates = {}, title = 
         <p className="shot-detail" aria-live="polite">{active ? describe(active) : visible.length ? "Select a shot for details." : "No shots for this selection."}</p>
         {visible.length !== located.length && <span className="shot-coverage">{visible.length - located.length} attempts have no usable location.</span>}
         {timeline && <div className="shot-timeline">
-          <Button variant="quiet" onClick={() => { if (!playing && (until === null || until >= max)) setUntil(0); setPlaying(!playing); }} disabled={!report.shots.length}>{playing ? "Pause" : "Play"}</Button>
+          <Button className="shot-play" onClick={() => { if (!playing && (until === null || until >= max)) setUntil(0); setPlaying(!playing); }} disabled={!report.shots.length} aria-label={playing ? "Pause shot replay" : "Play shot replay"}>{playing ? "Ⅱ Pause" : "▶ Play"}</Button>
           <div><label htmlFor={timelineId}>{until === null || until === max ? "All shots" : timeLabel(until)}</label>
-            <input id={timelineId} aria-label="Game timeline" type="range" min="0" max={max} step="1" value={until ?? max} onChange={event => { setPlaying(false); setUntil(Number(event.target.value)); }} />
-            <div className="shot-ticks"><span>Tip-off</span><span>Half</span><span>{max > 2880 ? "OT" : "End"}</span></div></div>
+            <input className="shot-range" style={{"--shot-progress": `${100 * (until ?? max) / max}%`} as CSSProperties} id={timelineId} aria-label="Game timeline" aria-valuetext={until === null || until === max ? "All shots" : timeLabel(until)} type="range" min="0" max={max} step="1" value={until ?? max} onChange={event => { setPlaying(false); setUntil(Number(event.target.value)); }} />
+            <div className="shot-ticks"><span>Tip-off</span>{Array.from({length:Math.ceil(max / 720)-1},(_,i)=>(i+1)*720).filter(t=>t<Math.min(max,2881)).map(t=><span key={t} style={{left:`${100*t/max}%`}}>{t===2880 ? "Q4" : `Q${t/720}`}</span>)}<span>End</span></div></div>
         </div>}
       </div>
       <aside className="shot-breakdown" aria-label="Shooting breakdown">

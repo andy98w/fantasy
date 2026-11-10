@@ -30,7 +30,7 @@ test("server shell waits for the browser route instead of flashing League on dir
   const mainNav = html.match(
     /<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/,
   )![1];
-  assert.equal((mainNav.match(/<a /g) ?? []).length, 7);
+  assert.equal((mainNav.match(/<a /g) ?? []).length, 8);
   assert.match(mainNav, /Trades/);
   assert.doesNotMatch(mainNav, /Standings|Rankings|News|Overview/);
   assert.doesNotMatch(html, /standings-table|League awards/);

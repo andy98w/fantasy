@@ -6,6 +6,7 @@ export const navigation = [
   { value: "league", label: "League", icon: "home" },
   { value: "team", label: "Teams", icon: "roster" },
   { value: "players", label: "Players", icon: "players" },
+  { value: "analysis", label: "Analysis", icon: "ball" },
   { value: "trades", label: "Trades", icon: "trade" },
   { value: "forecast", label: "Forecast", icon: "matchup" },
   { value: "records", label: "Records", icon: "standings" },

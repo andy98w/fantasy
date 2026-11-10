@@ -2,7 +2,7 @@ import type { View } from "../components/league/navigation";
 import type { Snapshot } from "./schema";
 
 export type DashboardRoute = { view: View; teamId: number | null; matchupId?: number };
-const views = new Set<View>(["league", "team", "players", "trades", "forecast", "records", "mcp", "connection", "matchup"]);
+const views = new Set<View>(["league", "team", "players", "analysis", "trades", "forecast", "records", "mcp", "connection", "matchup"]);
 const aliases: Record<string, View> = { overview: "league", rankings: "players", news: "league", teams: "team", rivalries: "forecast" };
 const idFrom = (value: string | null) => value !== null && /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined;
 

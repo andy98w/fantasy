@@ -15,7 +15,7 @@ test("matchup URLs restore the selected game after refresh or opening a shared l
 test("team selection and plain tabs restore independently of previous state", () => {
   assert.deepEqual(dashboardRoute(dashboardHash("team", {teamId:data.teams[1].id}), data), {view:"team",teamId:data.teams[1].id});
   assert.deepEqual(dashboardRoute("#team", data), {view:"team",teamId:null});
-  for (const view of ["league","players","trades","forecast","records","mcp","connection"] as const)
+  for (const view of ["league","players","analysis","trades","forecast","records","mcp","connection"] as const)
     assert.equal(dashboardRoute(dashboardHash(view),data)?.view,view);
   assert.equal(dashboardRoute("#rankings",data)?.view,"players");
   assert.equal(dashboardRoute("",data)?.view,"league");

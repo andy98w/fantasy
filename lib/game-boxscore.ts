@@ -1,3 +1,4 @@
+import { normalizeShots, type ShotReport } from "./shots";
 import { z } from "zod";
 import { nbaDate, normalizeScoreboard, type NbaGame } from "./nba";
 
@@ -11,7 +12,7 @@ export const BOX_COLUMNS = [
 ] as const;
 export type BoxPlayer = { id: number; name: string; starter: boolean; didNotPlay: boolean; reason: string; stats: Record<string, string> };
 export type BoxTeam = { id: string; players: BoxPlayer[]; totals: Record<string, string> };
-export type GameBoxscore = { game: NbaGame; teams: BoxTeam[]; fetchedAt: string; stale: boolean };
+export type GameBoxscore = { game: NbaGame; teams: BoxTeam[]; fetchedAt: string; stale: boolean; shotReport?: ShotReport };
 export const validGameId = (id: string) => /^\d{6,12}$/.test(id);
 
 const summarySchema = z.object({
@@ -70,5 +71,5 @@ export function normalizeGameBoxscore(payload: unknown, id: string, fetchedAt: s
     });
     return { id: team.team.id, players, totals };
   });
-  return { game, teams, fetchedAt, stale: false };
+  return { game, teams, fetchedAt, stale: false, shotReport: normalizeShots(payload, id, teams) };
 }

@@ -7,6 +7,7 @@ import { Navigation, navigation, type View } from "./league/navigation";
 import { MatchupBoard } from "./league/matchup-board";
 import { MatchupGrid } from "./league/matchup-grid";
 import { PlayerTable } from "./league/player-table";
+import { PlayerAnalysis } from "./league/player-analysis";
 import { PlayerDialog } from "./league/player-dialog";
 import { PowerMovers } from "./league/power-movers";
 import { PlayerFilters } from "./league/player-filters";
@@ -340,6 +341,7 @@ export default function Dashboard({
         <div hidden={view !== "trades"}>
           <TradeHub data={data} active={view === "trades"} />
         </div>
+        {view === "analysis" && <PlayerAnalysis data={data} today={today} />}
         {view === "forecast" && <Forecast data={data} today={today} />}
         {view === "records" && <Records data={data} onTeam={openTeam} />}
         {view === "mcp" && <McpConnect teams={data.teams} />}

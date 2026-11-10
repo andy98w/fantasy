@@ -13,6 +13,7 @@ import { statSortValue } from "@/lib/table";
 import type { Player } from "@/lib/schema";
 import { statusText } from "./format";
 import { PlayerStatus } from "./player-status";
+import { ShotChart } from "./shot-chart";
 import { MotionNumber } from "../ui/motion";
 
 type CurrentPlayers = Pick<Player, "id" | "status">[];
@@ -114,5 +115,6 @@ export function GameDialog({ game: initialGame, players, onClose }: { game: NbaG
     {loading ? <Empty>Loading box score…</Empty>
       : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} players={players} box={data?.teams.find((box) => box.id === team.id)} />)
       : !error && <Empty>{game.state === "scheduled" ? "Stats appear when the game starts." : game.state === "postponed" || game.state === "cancelled" ? gameLabel(game) : "Box score not available yet."}</Empty>}
+    {data?.shotReport && <ShotChart report={data.shotReport} teams={[game.away, game.home]} />}
   </dialog>;
 }

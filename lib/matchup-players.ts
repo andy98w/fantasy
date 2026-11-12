@@ -1,7 +1,8 @@
+import type { RecapRoster } from "./recap-roster";
 import type { Player, Snapshot, WeeklyPlayer } from "./schema";
 import { gameLabel, nbaAbbrev, nbaDate, type NbaGame, type TodayData, type PerformanceDay } from "./nba";
 
-export type MatchupPlayer = WeeklyPlayer & { teamId: number; player?: Player; game?: NbaGame };
+export type MatchupPlayer = WeeklyPlayer & { teamId: number; player?: Player; game?: NbaGame; lineupSlot?: string | null };
 
 export function matchupLineupSlot(slot: string | null | undefined): "active" | "bench" | "ir" | "unknown" {
   if (slot === "BE" || slot === "12") return "bench";
@@ -9,13 +10,17 @@ export function matchupLineupSlot(slot: string | null | undefined): "active" | "
   return slot && ["PG", "SG", "SF", "PF", "C", "G", "F", "SG/SF", "G/F", "PF/C", "F/C", "UTIL", "Rookie"].includes(slot) ? "active" : "unknown";
 }
 
+export function matchupRowSlot(row: MatchupPlayer, recap = false) {
+  return matchupLineupSlot(row.lineupSlot !== undefined ? row.lineupSlot : recap ? null : row.player?.slot);
+}
+
 /** Group after sorting so each section retains the selected stat order. */
 export function matchupPlayerGroups(rows: MatchupPlayer[], daily: boolean, recap = false) {
   if (!daily) return [{ key: "week", label: null, rows }];
   return [
-    { key: "active", label: recap ? "Current active lineup" : "Active lineup", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "active") },
-    { key: "inactive", label: recap ? "Current bench / IR" : "Bench / IR · Not in scoring lineup", rows: rows.filter(row => ["bench", "ir"].includes(matchupLineupSlot(row.player?.slot))) },
-    { key: "unknown", label: "Lineup slot unavailable", rows: rows.filter(row => matchupLineupSlot(row.player?.slot) === "unknown") },
+    { key: "active", label: "Active lineup", rows: rows.filter(row => matchupRowSlot(row, recap) === "active") },
+    { key: "inactive", label: "Bench / IR · Not in scoring lineup", rows: rows.filter(row => ["bench", "ir"].includes(matchupRowSlot(row, recap))) },
+    { key: "unknown", label: "Lineup slot unavailable", rows: rows.filter(row => matchupRowSlot(row, recap) === "unknown") },
   ].filter(group => group.rows.length);
 }
 
@@ -30,18 +35,27 @@ export function matchupPlayerDay(today: TodayData | undefined, date: string): Pe
   return today;
 }
 
-/** One explicitly selected day's NBA stats for current rosters, not lineup credit. */
-export function todayMatchupPlayers(matchup: Snapshot["matchups"][number], players: Player[], today: PerformanceDay | undefined, date: string): MatchupPlayer[] {
+/** One day's NBA stats; recaps use dated membership and slots when retained. */
+export function todayMatchupPlayers(matchup: Snapshot["matchups"][number], players: Player[], today: PerformanceDay | undefined, date: string, recapRoster?: RecapRoster): MatchupPlayer[] {
   if (!today || today.date !== date || today.status === "error") return [];
   const games = today.games.filter(game => nbaDate(new Date(game.startsAt)) === date);
-  return players.flatMap(player => {
+  const dated = recapRoster?.date === date ? recapRoster : undefined;
+  const profiles = new Map(players.map(player => [player.id, player]));
+  const datedPlayers = new Map(dated?.players.map(player => [player.id, player]));
+  const roster = dated ? dated.lineups.flatMap(team => team.entries.flatMap(entry => {
+    const player = datedPlayers.get(entry.playerId) ?? profiles.get(entry.playerId);
+    return player ? [{ ...player, teamId: team.teamId, slot: entry.slot }] : [];
+  })) : players;
+  return roster.flatMap(player => {
     if (player.teamId !== matchup.home.teamId && player.teamId !== matchup.away.teamId) return [];
     const lines = (today.performances ?? []).filter(line => line.playerId === player.id && games.some(game => game.id === line.gameId));
     const scheduled = games.filter(game => [game.home.abbrev, game.away.abbrev].includes(nbaAbbrev(player.nbaTeam)));
     const playerGames = lines.length ? games.filter(game => lines.some(line => line.gameId === game.id)) : scheduled;
     return playerGames.map(game => {
       const line = ["live", "final", "suspended"].includes(game.state) ? lines.find(line => line.gameId === game.id) : undefined;
-      return { playerId: player.id, name: player.name, player, teamId: player.teamId!, game,
+      return { playerId: player.id, name: player.name, player: profiles.get(player.id) ?? player, teamId: player.teamId!, game,
+        // A pre-tip capture is not proof of a locked historical lineup.
+        lineupSlot: dated ? Date.parse(dated.capturedAt) >= Date.parse(game.startsAt) ? player.slot : null : undefined,
         stats: line ? { ...line.stats, GP: 1, MIN: line.minutes,
           "FG%": line.stats.FGA > 0 ? line.stats.FGM / line.stats.FGA : null,
           "FT%": line.stats.FTA > 0 ? line.stats.FTM / line.stats.FTA : null } : {} };

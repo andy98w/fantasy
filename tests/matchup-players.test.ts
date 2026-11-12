@@ -30,7 +30,7 @@ test("daily view keeps the last played slate through empty days and delayed tips
     assert.deepEqual(todayMatchupPlayers(matchup, [player], matchupPlayerDay(started, date), date), []);
   }
   const recapRows = todayMatchupPlayers(matchup, [{ ...player, slot: "BE" }], selected, selected.date);
-  assert.equal(matchupPlayerGroups(recapRows, true, true)[0].label, "Current bench / IR");
+  assert.equal(matchupPlayerGroups(recapRows, true, true)[0].label, "Lineup slot unavailable");
 });
 
 test("recap selection respects Pacific date, failed feeds, and loader's started-day latch", () => {
@@ -136,4 +136,32 @@ test("weekly sorting handles percentages, ties and missing values in both direct
   ];
   assert.deepEqual(sortMatchupPlayers(rows, "FG%", true).map(r => r.name), ["D", "A", "B", "C"]);
   assert.deepEqual(sortMatchupPlayers(rows, "FG%", false).map(r => r.name), ["A", "B", "D", "C"]);
+});
+
+
+test("recap uses dated ownership and slots after moves, never today's bench or IR", () => {
+  const snapshot = snapshotSchema.parse(demo), matchup = snapshot.matchups[0];
+  const original = { ...snapshot.players[0], nbaTeam: "NYK", teamId: matchup.home.teamId, slot: "PG" };
+  const benched = { ...original, id: 98765, name: "Benched yesterday", slot: "BE" };
+  const slate = { date, fetchedAt: null, status: "ready" as const, games: [game], performances: [
+    {playerId: original.id, gameId: game.id, minutes: 35, stats: {PTS:27}},
+    {playerId: benched.id, gameId: game.id, minutes: 20, stats: {PTS:15}},
+  ] };
+  const saved = {date, capturedAt:"2026-11-03T08:00:00Z", players:[original,benched], lineups:[
+    {teamId:matchup.home.teamId,entries:[{playerId:original.id,slot:"PG"},{playerId:benched.id,slot:"BE"}]},
+  ]};
+  const current = [{...original,teamId:matchup.away.teamId,slot:"IR"}, {...benched,slot:"UTIL"}];
+  const rows = todayMatchupPlayers(matchup,current,slate,date,saved);
+  assert.deepEqual(rows.map(row=>row.teamId),[matchup.home.teamId,matchup.home.teamId]);
+  assert.equal(rows[0].player?.slot,"IR"); // Current profile is still available to click.
+  const groups = matchupPlayerGroups(rows,true,true);
+  assert.deepEqual(groups.map(group=>group.key),["active","inactive"]);
+  assert.equal(groups[0].rows[0].stats.PTS,27);
+  assert.equal(groups[1].rows[0].playerId,benched.id);
+  const dropped = todayMatchupPlayers(matchup,[],slate,date,saved);
+  assert.equal(dropped[0].playerId,original.id);
+  for (const unavailable of [undefined,{...saved,date:"2026-11-01"},{...saved,capturedAt:"2026-11-02T15:00:00Z"}]) {
+    const unknown = todayMatchupPlayers(matchup,current,slate,date,unavailable);
+    assert.deepEqual(matchupPlayerGroups(unknown,true,true).map(group=>group.key),["unknown"]);
+  }
 });

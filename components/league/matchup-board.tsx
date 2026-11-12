@@ -1,3 +1,4 @@
+import type { RecapRoster } from "@/lib/recap-roster";
 import { type Snapshot, type Team, type Player } from "@/lib/schema";
 import type { TodayData } from "@/lib/nba";
 import { TeamAvatar } from "./avatars";
@@ -13,6 +14,7 @@ export function MatchupBoard({
   onDetails,
   players,
   today,
+  recapRoster,
   onPlayer,
 }: {
   matchup?: Snapshot["matchups"][number];
@@ -20,6 +22,7 @@ export function MatchupBoard({
   onDetails?: () => void;
   players: Player[];
   today?: TodayData;
+  recapRoster?: RecapRoster;
   onPlayer: (player: Player) => void;
 }) {
   const home = teams.find((t) => t.id === matchup?.home.teamId),
@@ -75,7 +78,7 @@ export function MatchupBoard({
         </div>
       </div>
       <CategoryComparison home={matchup.home} away={matchup.away} homeName={home.name} awayName={away.name} finished={matchup.result !== "UNDECIDED"} />
-      <MatchupPlayers key={matchup.id} matchup={matchup} teams={[home, away]} players={players} today={today} onPlayer={onPlayer} />
+      <MatchupPlayers key={matchup.id} matchup={matchup} teams={[home, away]} players={players} today={today} recapRoster={recapRoster} onPlayer={onPlayer} />
     </section>
   );
 }

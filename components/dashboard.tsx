@@ -22,6 +22,7 @@ import { Records } from "./league/records";
 import { TradeHub } from "./league/trade-hub";
 import { McpConnect } from "./league/mcp-connect";
 import { Connection } from "./league/connection";
+import type { RecapRoster } from "@/lib/recap-roster";
 import { DailyPerformers } from "./league/daily-performers";
 import { Today } from "./league/today";
 import { nbaAbbrev, type TodayData } from "@/lib/nba";
@@ -40,10 +41,12 @@ export default function Dashboard({
   data,
   syncFailure,
   today,
+  recapRoster,
 }: {
   data: Snapshot;
   syncFailure: string | null;
   today?: TodayData;
+  recapRoster?: RecapRoster;
 }) {
   const [routeReady, setRouteReady] = useState(false);
   const [view, setView] = useState<View>("league");
@@ -259,6 +262,7 @@ export default function Dashboard({
               </Button>
             </Toolbar>
             <MatchupBoard
+              recapRoster={recapRoster}
               today={today}
               players={data.players}
               onPlayer={(player) => setSelectedId(player.id)}

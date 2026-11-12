@@ -1,4 +1,5 @@
-import { loadLeague } from "@/lib/data";
+import { matchupPlayerDay } from "@/lib/matchup-players";
+import { loadLeague, loadRecapRoster } from "@/lib/data";
 import Dashboard from "@/components/dashboard";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { loadToday } from "@/lib/nba-data";
@@ -24,10 +25,12 @@ export default async function Page() {
       </main>
     );
   const today = result.snapshot.mode === "live" ? await loadToday() : undefined;
+  const slate = today ? matchupPlayerDay(today, today.date) : undefined;
+  const recapRoster = slate && today && slate.date !== today.date ? await loadRecapRoster(result.snapshot, slate.date) : undefined;
   return (
     <>
       {result.snapshot.mode === "live" && <AutoRefresh />}
-      <Dashboard data={result.snapshot} syncFailure={result.syncFailure} today={today} />
+      <Dashboard data={result.snapshot} syncFailure={result.syncFailure} today={today} recapRoster={recapRoster} />
     </>
   );
 }

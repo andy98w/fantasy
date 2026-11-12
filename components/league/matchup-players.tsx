@@ -1,9 +1,10 @@
 "use client";
 import { StickyTable } from "../ui/sticky-table";
 
+import type { RecapRoster } from "@/lib/recap-roster";
 import { useState } from "react";
 import { CATEGORIES, type Player, type Snapshot, type Team } from "@/lib/schema";
-import { matchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups, matchupLineupSlot, matchupPlayerDay } from "@/lib/matchup-players";
+import { matchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups, matchupRowSlot, matchupPlayerDay } from "@/lib/matchup-players";
 import { gameLabel, nbaDate, type TodayData } from "@/lib/nba";
 import { PlayerAvatar } from "./avatars";
 import { PlayerStatus } from "./player-status";
@@ -14,8 +15,8 @@ import { SortableHeader, useTableControls } from "../ui/table-controls";
 import { SearchField } from "../ui/search-field";
 import { Empty, Toolbar, Tabs } from "../ui/primitives";
 
-export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
-  matchup: Snapshot["matchups"][number]; teams: Team[]; players: Player[]; today?: TodayData; onPlayer: (player: Player) => void;
+export function MatchupPlayers({ matchup, teams, players, today, recapRoster, onPlayer }: {
+  matchup: Snapshot["matchups"][number]; teams: Team[]; players: Player[]; today?: TodayData; recapRoster?: RecapRoster; onPlayer: (player: Player) => void;
 }) {
   const [period, setPeriod] = useState<"week" | "today">("today");
   const date = nbaDate(new Date());
@@ -28,12 +29,12 @@ export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
   const displayDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${slateDate}T12:00:00Z`));
   const unavailable = !slate || slate.status === "error";
   const stale = slate?.status === "stale";
-  const source = daily ? todayMatchupPlayers(matchup, players, slate, slateDate) : matchupPlayers(matchup, players);
+  const source = daily ? todayMatchupPlayers(matchup, players, slate, slateDate, recap ? recapRoster : undefined) : matchupPlayers(matchup, players);
   const [team, setTeam] = useState("all");
   const [category, setCategory] = useState("all");
   const control = useTableControls(source.filter(row => team === "all" || String(row.teamId) === team), {
     initialSort: { key: "PTS", descending: true },
-    search: row => `${row.name} ${daily ? matchupLineupSlot(row.player?.slot) : ""} ${row.game ? matchupGameLabel(row.game, stale) : ""} ${statusText(row.player?.status ?? "UNKNOWN")} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
+    search: row => `${row.name} ${daily ? matchupRowSlot(row, recap) : ""} ${row.game ? matchupGameLabel(row.game, stale) : ""} ${statusText(row.player?.status ?? "UNKNOWN")} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
     value: (row, key) => key === "name" ? row.name : key === "status" ? statusText(row.player?.status ?? "UNKNOWN") : key === "game" ? row.game ? matchupGameLabel(row.game, stale) : null : key === "team" ? teams.find(t => t.id === row.teamId)?.name : row.stats[key],
   });
   const rows = control.rows;
@@ -55,10 +56,10 @@ export function MatchupPlayers({ matchup, teams, players, today, onPlayer }: {
       <StickyTable className="data-table weekly-players-table">
         <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{daily && <SortableHeader column="game" sort={control.sort} onSort={control.onSort} descending={false}>Game</SortableHeader>}{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
         {groups.map(group => <tbody key={group.key}>
-          {group.label && <tr className="matchup-lineup-divider"><th scope="rowgroup" colSpan={columns.length + 4} title={recap ? "Current roster slots, not historical lineup credit." : "Based on current fantasy roster slots. Bench and IR NBA stats are shown for reference."}>{group.label}</th></tr>}
+          {group.label && <tr className="matchup-lineup-divider"><th scope="rowgroup" colSpan={columns.length + 4} title={recap ? "Saved fantasy lineup for the displayed date." : "Based on current fantasy roster slots. Bench and IR NBA stats are shown for reference."}>{group.label}</th></tr>}
           {group.rows.map(row => <tr key={`${row.teamId}:${row.playerId}:${row.game?.id ?? "week"}`}>
           <td className="identity-col"><button className="identity" disabled={!row.player} onClick={() => row.player && onPlayer(row.player)}>
-            <PlayerAvatar player={{ id: row.playerId, name: row.name }} /><span><strong>{row.name}</strong><small>{row.player ? `${row.player.nbaTeam} / ${row.player.position}` : ""}{daily && ["bench", "ir"].includes(matchupLineupSlot(row.player?.slot)) && <span className="matchup-slot-label"> · {matchupLineupSlot(row.player?.slot) === "bench" ? "Bench" : "IR"}{recap ? " now" : ""}</span>}</small></span>
+            <PlayerAvatar player={{ id: row.playerId, name: row.name }} /><span><strong>{row.name}</strong><small>{row.player ? `${row.player.nbaTeam} / ${row.player.position}` : ""}{daily && ["bench", "ir"].includes(matchupRowSlot(row, recap)) && <span className="matchup-slot-label"> · {matchupRowSlot(row, recap) === "bench" ? "Bench" : "IR"}</span>}</small></span>
           </button></td>
           <td><PlayerStatus status={row.player?.status} /></td>
           <td title={teams.find(t => t.id === row.teamId)?.name}>{teams.find(t => t.id === row.teamId)?.abbrev}</td>

@@ -7,6 +7,34 @@ import { PostgresBattleStore, VoteConflict } from '../../lib/battle-store';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url) throw new Error('TEST_DATABASE_URL must point to a disposable test PostgreSQL database.');
+
+test('Recap selects the latest explicitly dated lineup and isolates league and season', async () => {
+  const { retainedRecapSnapshot } = await import('../../lib/recap-roster-store');
+  const admin = new Pool({ connectionString: url });
+  const schema = `test_${randomUUID().replaceAll('-', '')}`;
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}` });
+  try {
+    await pool.query(await readFile('db/schema.sql', 'utf8'));
+    for (const [league, season, at, lineupDate, label] of [
+      [1,2027,'2026-11-01T06:59:00Z','2026-11-01','too-early'],
+      [1,2027,'2026-11-01T07:30:00Z','2026-11-01','before-fallback'],
+      [1,2027,'2026-11-02T07:59:00Z','2026-11-01','evening'],
+      [1,2027,'2026-11-02T08:01:00Z','2026-11-01','next-morning-same-lineup'],
+      [1,2027,'2026-11-02T10:00:00Z','2026-11-02','new-lineup'],
+      [2,2027,'2026-11-02T12:00:00Z','2026-11-01','other-league'],
+      [1,2026,'2026-11-02T12:00:00Z','2026-11-01','other-season'],
+      [1,2027,'2026-11-03T08:00:00Z','2026-11-01','too-late'],
+    ]) await pool.query('INSERT INTO league_snapshots(league_id,season,captured_at,payload,raw_payload) VALUES($1,$2,$3,$4,$5)',
+      [league,season,at,{ label, forecastSchedule: { lineupDate, lineups: [] } },{}]);
+    const rows = await retainedRecapSnapshot(pool, 1, 2027, '2026-11-01');
+    assert.deepEqual(rows.rows.map(row => row.payload.label), ['next-morning-same-lineup']);
+    assert.equal((await retainedRecapSnapshot(pool, 1, 2027, '2026-11-04')).rowCount, 0);
+  } finally {
+    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end();
+  }
+});
+
 test('PostgreSQL votes serialize concurrent retries and persist across connections', async () => {
   const admin = new Pool({ connectionString: url });
   const schema = `test_${randomUUID().replaceAll('-', '')}`;

@@ -111,3 +111,25 @@ export async function loadPowerHistory(current: Snapshot, request: import("./mcp
   const rows = await retainedPowerSnapshots(pool, current.league.id, current.league.season, request.from, request.to);
   return extractPowerHistory(rows.rows.map(row => row.payload), current, request, "database");
 }
+
+const recapCache = new Map<string, { expires: number; pending: Promise<import("./recap-roster").RecapRoster | undefined> }>();
+/** Small, dated roster for the last-played slate; never substitutes current slots. */
+export async function loadRecapRoster(current: Snapshot, date: string) {
+  const { recapRosterFromSnapshot } = await import("./recap-roster");
+  const fromCurrent = recapRosterFromSnapshot(current, current, date);
+  if (fromCurrent) return fromCurrent;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !process.env.DATABASE_URL || current.mode !== "live") return;
+  const key = `${current.league.id}:${current.league.season}:${date}`, cached = recapCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.pending;
+  if (recapCache.size >= 8) recapCache.delete(recapCache.keys().next().value!);
+  const pending = (async () => {
+    try {
+      const pool = globalDb.pool ??= createPool({ connectionString: process.env.DATABASE_URL, max: 3, connectionTimeoutMillis: 5000, statement_timeout: 5000 });
+      const { retainedRecapSnapshot } = await import("./recap-roster-store");
+      const result = await retainedRecapSnapshot(pool, current.league.id, current.league.season, date);
+      return recapRosterFromSnapshot(result.rows[0]?.payload, current, date);
+    } catch { return undefined; } // An optional recap cannot take down the league.
+  })();
+  recapCache.set(key, { expires: Date.now() + 60_000, pending });
+  return pending;
+}

@@ -22,6 +22,7 @@ from .history import fetch_history, previous_history
 from .power_history import add_power_history
 from .retention import retention_days, prune_snapshots
 from .daily_calibration import load_calibration
+from .recap import load_recap_rosters
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -96,7 +97,8 @@ def run(args):
                         trades=old.get('trades',[])
                         trade_error='Trade history could not refresh.'
                     transactions, activity_error = load_activity(client, previous, league_id, season)
-                snapshot=normalize(raw,league_id,season,team_id)
+                    snapshot=normalize(raw,league_id,season,team_id)
+                    snapshot['recapRosters'] = load_recap_rosters(client, snapshot, raw, previous)
                 add_power_history(snapshot, previous)
                 try:
                     snapshot['dailyCalibration'] = load_calibration(snapshot, path.parent / 'daily-calibration-cache.json')

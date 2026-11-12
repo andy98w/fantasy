@@ -27,10 +27,11 @@ export default async function Page() {
   const today = result.snapshot.mode === "live" ? await loadToday() : undefined;
   const slate = today ? matchupPlayerDay(today, today.date) : undefined;
   const recapRoster = slate && today && slate.date !== today.date ? await loadRecapRoster(result.snapshot, slate.date) : undefined;
+  const { recapRosters: savedRecaps, ...dashboardData } = result.snapshot;
   return (
     <>
       {result.snapshot.mode === "live" && <AutoRefresh />}
-      <Dashboard data={result.snapshot} syncFailure={result.syncFailure} today={today} recapRoster={recapRoster} />
+      <Dashboard data={dashboardData} syncFailure={result.syncFailure} today={today} recapRoster={recapRoster} />
     </>
   );
 }

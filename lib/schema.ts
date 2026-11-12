@@ -137,6 +137,10 @@ export const snapshotSchema = z.object({
   players: z.array(playerSchema),
   matchups: z.array(matchupSchema),
   forecastSchedule: forecastScheduleSchema.nullable().default(null).catch(null),
+  recapRosters: z.array(z.object({
+    date: z.iso.date(), capturedAt: z.iso.datetime({ offset: true }),
+    lineups: forecastScheduleSchema.shape.lineups.unwrap(), players: z.array(playerSchema),
+  })).max(7).optional().catch(undefined),
   dailyCalibration: z.object({
     version: z.literal("daily-history-v1"), from: z.iso.date(), to: z.iso.date(),
     sampleSize: z.number().int().min(300), gameCount: z.number().int().positive(),

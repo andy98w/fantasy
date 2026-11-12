@@ -14,6 +14,9 @@ test("recap capture requires the same league, season and explicit lineup date", 
   assert.equal(recap.capturedAt, saved.syncedAt);
   assert.deepEqual(recap.players.map(p => p.id), [current.players[0].id]);
   assert.equal(recap.lineups[0].entries[0].slot, "PG");
+  const imported = { ...current, recapRosters: [recap] };
+  assert.deepEqual(recapRosterFromSnapshot(imported, current, date), recap);
+  assert.equal(recapRosterFromSnapshot({ ...imported, league: { ...current.league, id: -1 } }, current, date), undefined);
   for (const invalid of [undefined, {},
     { ...saved, league: { ...saved.league, id: saved.league.id + 1 } },
     { ...saved, league: { ...saved.league, season: saved.league.season - 1 } },

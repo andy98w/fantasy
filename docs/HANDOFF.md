@@ -341,3 +341,8 @@ Slots are only treated as known when the capture is at or after that NBA game's 
 
 
 The live November 11 check found that UTC daily snapshot pruning had retained only a 23:57Z pre-tip roster. `worker/recap.py` now recovers the most recent past NBA slate using ESPN's explicit `mRoster&scoringPeriodId` response, validates league/season/period/team coverage and player identities, and embeds up to seven dated `recapRosters` in subsequent imports. Successful recovered dates are reused without repeated upstream requests; optional failures preserve prior same-league history. This survives snapshot pruning without changing retention policy or inventing historical credit. The web prefers this recovered roster, with retained snapshots as fallback, and only sends the selected date to Dashboard. A read-only live replay confirmed November 11 Brunson=G and Hartenstein=C versus BE for both on November 12. Validation: 179 app tests, 80 worker tests, production build and standalone smoke passed. Both web and worker must deploy and a fresh import must include the recovered roster before verifying active/bench groups live.
+
+
+## November 14 player news spacing
+
+Player-dialog news cards now keep 16px horizontal padding. Their previous `14px 0` override put source/headline text directly beneath the shared 3px inset gold hover/focus accent. League/team news cards already have horizontal padding. Production build (including TypeScript) and standalone smoke passed; verify exact-commit CI/deployment and the highlighted player news card on release.

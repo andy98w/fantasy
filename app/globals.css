@@ -1121,7 +1121,7 @@ input::placeholder {
   margin: 6px 24px 24px;
 }
 .dialog-news .news-feed > a {
-  padding: 14px 0;
+  padding: 14px 16px;
 }
 .setup-screen {
   max-width: 650px;

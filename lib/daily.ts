@@ -35,6 +35,7 @@ export function normalizeBoxscore(payload: unknown, game: NbaGame): DailyLine[] 
       if (!pair || Number(pair[1]) > Number(pair[2])) throw new Error("Invalid shooting stats");
       stats[made] = Number(pair[1]); stats[attempted] = Number(pair[2]);
     }
+    if (/^\d+$/.test(values.fouls ?? "")) stats.PF = Number(values.fouls);
     const id = Number(row.athlete.id);
     if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) throw new Error("Invalid or duplicate player");
     seen.add(id);

@@ -1,10 +1,10 @@
 "use client";
 import { StickyTable } from "../ui/sticky-table";
 import { useEffect, useState } from "react";
-import type { Player } from "@/lib/schema";
+import type { Player, Snapshot } from "@/lib/schema";
 import type { PlayerGames } from "@/lib/player-games";
-import { BOX_COLUMNS } from "@/lib/game-boxscore";
-import { gameLabel, NBA_TIMEZONE, type TodayData, type NbaGame } from "@/lib/nba";
+import { BOX_COLUMNS, type GameBoxscore } from "@/lib/game-boxscore";
+import { gameLabel, nbaDate, NBA_TIMEZONE, type TodayData, type NbaGame } from "@/lib/nba";
 import { Button, Empty } from "../ui/primitives";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { Select } from "../ui/select";
@@ -14,7 +14,7 @@ import { GameDialog } from "./game-dialog";
 
 const columns = BOX_COLUMNS.filter(([key]) => key !== "plusMinus");
 const dateFormat = new Intl.DateTimeFormat("en-US", { timeZone: NBA_TIMEZONE, month: "short", day: "numeric" });
-export function PlayerRecentGames({ playerId, season, players, today }: { playerId: number; season: number; players: Player[]; today?: TodayData }) {
+export function PlayerRecentGames({ playerId, season, players, today, snapshot, gameBoxscore }: { playerId: number; season: number; players: Player[]; today?: TodayData; snapshot: Snapshot; gameBoxscore?: GameBoxscore }) {
   const [data, setData] = useState<PlayerGames | null>(null);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NbaGame | null>(null);
@@ -31,7 +31,26 @@ export function PlayerRecentGames({ playerId, season, players, today }: { player
   }, [playerId, season, retry]);
   const [result, setResult] = useState("all");
   const player = players.find(p => p.id === playerId);
-  const { current, history } = player ? playerGameHistory(player, data?.games ?? [], today) : { current: null, history: data?.games ?? [] };
+  const { current: dailyCurrent, history: dailyHistory } = player ? playerGameHistory(player, data?.games ?? [], today) : { current: null, history: data?.games ?? [] };
+  // The open game's own feed has the freshest stats (including fouls). Only
+  // pin today's started game; a historical box score must not replace it.
+  const boxPlayer = gameBoxscore?.teams.flatMap(team => team.players).find(row => row.id === playerId);
+  const boxGame = gameBoxscore?.game;
+  const useBox = boxGame && ["live", "final", "suspended"].includes(boxGame.state)
+    && nbaDate(new Date(boxGame.startsAt)) === today?.date && boxPlayer && !boxPlayer.didNotPlay;
+  const home = gameBoxscore?.teams.find(team => team.players.some(row => row.id === playerId))?.id === boxGame?.home.id;
+  const ownScore = boxGame && (home ? boxGame.home : boxGame.away).score;
+  const opponentScore = boxGame && (home ? boxGame.away : boxGame.home).score;
+  const boxResult = boxGame?.state === "final" && ownScore != null && opponentScore != null
+    ? ownScore > opponentScore ? "W" : ownScore < opponentScore ? "L" : "T" : "—";
+  const logged = data?.games.find(row => row.game.id === boxGame?.id);
+  const current = useBox ? {
+    ...(boxGame.state === "final" && logged ? logged : {
+      game: boxGame, opponent: `${home ? "vs" : "@"} ${(home ? boxGame.away : boxGame.home).abbrev}`,
+      result: boxResult, stats: boxPlayer.stats,
+    }), stale: !!gameBoxscore?.stale,
+  } : dailyCurrent;
+  const history = dailyHistory.filter(row => row.game.id !== current?.game.id);
   const control = useTableControls(history.filter(row => result === "all" || row.result === result), {
     initialSort: { key: "date", descending: true },
     search: row => `${dateFormat.format(new Date(row.game.startsAt))} ${row.opponent} ${row.game.home.name} ${row.game.away.name} ${row.result}`,
@@ -60,6 +79,6 @@ export function PlayerRecentGames({ playerId, season, players, today }: { player
       </div>
       {control.rows.length > limit && <Button variant="quiet" onClick={() => setLimit((value) => value + 10)}>Older games</Button>}
     </>}
-    {selected && <GameDialog key={selected.id} game={selected} players={players} onClose={() => setSelected(null)} />}
+    {selected && <GameDialog key={selected.id} game={selected} snapshot={snapshot} today={today} onClose={() => setSelected(null)} />}
   </section>;
 }

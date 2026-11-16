@@ -7,21 +7,27 @@ import { NewsFeed } from "./news-feed";
 import { Button } from "../ui/primitives";
 import { PlayerInjuryOutlook } from "./player-injury";
 import { PlayerRecentGames } from "./player-games";
+import type { GameBoxscore } from "@/lib/game-boxscore";
 import type { TodayData } from "@/lib/nba";
 import { PixelIcon } from "../ui/pixel-icon";
 export function PlayerDialog({
   player,
+  identity,
+  gameBoxscore,
   data,
   today,
   onClose,
 }: {
   player: Player | null;
+  identity?: { id: number; name: string; nbaTeam: string };
+  gameBoxscore?: GameBoxscore;
   data: Snapshot;
   today?: TodayData;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const open = player !== null;
+  const profile = player ?? identity;
+  const open = !!profile;
   useEffect(() => {
     if (open) ref.current?.showModal();
     else ref.current?.close();
@@ -31,12 +37,12 @@ export function PlayerDialog({
       ref={ref}
       className="player-dialog player-profile-dialog"
       aria-label="Player details"
-      onCancel={onClose}
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); onClose(); }}
       onClick={(event) => {
         if (event.target === ref.current) onClose();
       }}
     >
-      {player && (
+      {profile && (
         <>
           <div className="dialog-topline" data-sticky-table-bar>
             <span>Player stats</span>
@@ -49,25 +55,25 @@ export function PlayerDialog({
             </Button>
           </div>
           <div className="player-dialog-heading">
-            <PlayerAvatar player={player} large />
+            <PlayerAvatar player={profile} large />
             <div>
               <span className="muted">
-                {player.nbaTeam} / {player.position}
+                {profile.nbaTeam}{player?.position ? ` / ${player.position}` : ""}
               </span>
-              <h2>{player.name}</h2>
+              <h2>{profile.name}</h2>
               <span
-                className={`status-label ${player.status !== "ACTIVE" ? "injured" : ""}`}
+                className={`status-label ${(player?.status ?? "UNKNOWN") !== "ACTIVE" ? "injured" : ""}`}
               >
-                {statusText(player.status)}
+                {statusText(player?.status ?? "UNKNOWN")}
               </span>
             </div>
-            <PowerBadge
+            {player && <PowerBadge
               value={player.power}
               reason={ratingReason(player, data.model.minimumGames)}
-            />
+            />}
           </div>
-          {data.mode === "live" && <PlayerInjuryOutlook key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} status={player.status} />}
-          <div className="player-facts">
+          {data.mode === "live" && <PlayerInjuryOutlook key={`${profile.id}:${data.league.season}`} playerId={profile.id} season={data.league.season} status={player?.status ?? "UNKNOWN"} />}
+          {player && <div className="player-facts">
             <span>
               Rank{" "}
               <strong>{player.rank === null ? "NR" : `#${player.rank}`}</strong>
@@ -78,14 +84,15 @@ export function PlayerDialog({
             <span>
               Category total <strong>{player.zTotal?.toFixed(2) ?? "—"}</strong>
             </span>
-          </div>
-          {player.power === null && (
+          </div>}
+          {player && player.power === null && (
             <p className="inline-notice">
               Unrated: {ratingReason(player, data.model.minimumGames)}.
             </p>
           )}
-          <PlayerRecentGames key={`${player.id}:${data.league.season}`} playerId={player.id} season={data.league.season} players={data.players} today={today} />
-          <div className="contribution-header">
+          <PlayerRecentGames key={`${profile.id}:${data.league.season}`} playerId={profile.id} season={data.league.season} players={data.players} snapshot={data} today={today} gameBoxscore={gameBoxscore} />
+          {!player && <p className="inline-notice">Season ratings unavailable for this player.</p>}
+          {player && <><div className="contribution-header">
             <h3>Category value</h3>
             <span>Per game / Value</span>
           </div>
@@ -120,12 +127,13 @@ export function PlayerDialog({
               );
             })}
           </div>
-          {data.news.some((item) => item.playerIds.includes(player.id)) && (
+          </>}
+          {data.news.some((item) => item.playerIds.includes(profile.id)) && (
             <div className="dialog-news">
               <h3>News</h3>
               <NewsFeed
                 items={data.news.filter((item) =>
-                  item.playerIds.includes(player.id),
+                  item.playerIds.includes(profile.id),
                 )}
                 limit={3}
               />

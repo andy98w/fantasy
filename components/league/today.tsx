@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CATEGORIES, type Category, type Player } from "@/lib/schema";
+import { CATEGORIES, type Category, type Player, type Snapshot } from "@/lib/schema";
 import { availableToday, gameLabel, nbaDate, NBA_TIMEZONE, playerStrengths, type NbaGame, type TodayData } from "@/lib/nba";
 import { MotionNumber } from "../ui/motion";
 import { Panel, Tabs, Empty, ResultCount } from "../ui/primitives";
@@ -28,8 +28,8 @@ function GameCard({ game, onOpen }: { game: NbaGame; onOpen: () => void }) {
   );
 }
 
-export function Today({ data, players, minimumGames, onPlayer }: {
-  data?: TodayData; players: Player[]; minimumGames: number; onPlayer: (player: Player) => void;
+export function Today({ data, players, minimumGames, onPlayer, snapshot }: {
+  data?: TodayData; snapshot: Snapshot; players: Player[]; minimumGames: number; onPlayer: (player: Player) => void;
 }) {
   const [selectedGame, setSelectedGame] = useState<NbaGame | null>(null);
   const [tab, setTab] = useState<"games" | "available">("games");
@@ -88,7 +88,7 @@ export function Today({ data, players, minimumGames, onPlayer }: {
             </div>
           </>}
         </>}
-      {selectedGame && <GameDialog key={selectedGame.id} game={selectedGame} players={players} onClose={() => setSelectedGame(null)} />}
+      {selectedGame && <GameDialog key={selectedGame.id} game={selectedGame} snapshot={snapshot} today={data} onClose={() => setSelectedGame(null)} />}
     </Panel>
   );
 }

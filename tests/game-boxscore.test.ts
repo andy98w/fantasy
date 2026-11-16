@@ -4,6 +4,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { normalizeGameBoxscore, validGameId } from "../lib/game-boxscore";
 import { createGameBoxscoreLoader } from "../lib/game-boxscore-loader";
+import { PlayerDialog } from "../components/league/player-dialog";
+import { snapshotSchema } from "../lib/schema";
+import demo from "../lib/demo.json";
 import { BoxscoreTable } from "../components/league/game-dialog";
 
 const id = "401909277";
@@ -156,4 +159,42 @@ test("on-court flags stay unknown for breaks, finals, missing flags and inconsis
     assert.ok(result.teams[0].players.every(player => player.onCourt === undefined));
     assert.equal(result.teams[0].players[0].stats.points, "5");
   }
+});
+
+test("box-score identities expose one accessible profile button and render personal fouls, preserving unknowns", () => {
+  const data = fixture();
+  const group = data.boxscore.players[0].statistics[0];
+  group.keys.push("fouls");
+  group.athletes[0].stats.push("3");
+  group.totals.push("15");
+  const result = normalizeGameBoxscore(data, id, at);
+  assert.equal(result.teams[0].players[0].stats.fouls, "3");
+  assert.equal(result.teams[0].totals.fouls, "15");
+  const html = renderToStaticMarkup(createElement(BoxscoreTable, {
+    team: result.game.home, box: result.teams[0], onPlayer: () => {},
+  }));
+  assert.match(html, /aria-label="View Anthony Davis player details" aria-haspopup="dialog"/);
+  assert.match(html, /aria-label="View Anthony Gill player details" aria-haspopup="dialog"/);
+  assert.match(html, />PF</);
+  assert.match(html, /boxscore-profile-link[^>]*>.*?<img.*?Anthony Davis/s);
+  assert.equal(normalizeGameBoxscore(fixture(), id, at).teams[0].players[0].stats.fouls, undefined);
+});
+
+
+test("unlisted box-score players still get a profile and current game without fabricated season ratings", () => {
+  const data = snapshotSchema.parse(demo);
+  const gameBoxscore = normalizeGameBoxscore(fixture("in"), id, at);
+  const props = {
+    player: null, identity: { id: 6583, name: "Anthony Davis", nbaTeam: "WAS" },
+    data: { ...data, players: [] }, gameBoxscore,
+    today: { date: "2026-10-30", fetchedAt: at, status: "ready" as const, games: [gameBoxscore.game] }, onClose: () => {},
+  };
+  const html = renderToStaticMarkup(createElement(PlayerDialog, props));
+  assert.match(html, /Anthony Davis/);
+  assert.match(html, /Season ratings unavailable/);
+  assert.match(html, /8-18/);
+  assert.match(html, /Live/);
+  assert.doesNotMatch(html, /Category total/);
+  const old = renderToStaticMarkup(createElement(PlayerDialog, { ...props, today: { ...props.today, date: "2026-11-01" } }));
+  assert.doesNotMatch(old, /8-18/);
 });

@@ -363,3 +363,11 @@ NBA game box scores now mark the current five with a compact teal On court badge
 The normalizer only exposes onCourt when ESPN reports STATUS_IN_PROGRESS, every team row has an explicit active boolean, exactly five are active, and none of those five is DNP/ejected. Missing/inconsistent lineups and breaks/finals remain unknown. The dialog suppresses badges after a failed refresh or stale response. No extra requests or guessed substitution reconstruction.
 
 Validation: 184 app tests, production build with TypeScript and standalone smoke passed. Live local Hawks–Bucks validation confirmed five badges per team, including reserves. Verify exact-commit CI, Railway and the hosted UI before claiming release.
+
+## November 15 box-score profiles and personal fouls
+
+NBA box-score player names and photos are one keyboard-accessible button opening the existing player profile above the game dialog. The game stays mounted; closing the profile restores the clicked button's focus and exact dialog scroll position, preserving searches, sorts and lineup filters. This also works through player profile → recent game → another player. Escape closes only the top dialog. Players absent from the fantasy snapshot still get identity, injury/news and available game history, with season ratings explicitly unavailable rather than fabricated.
+
+Box scores and recent games now include PF (personal fouls), including team totals where provided. The daily feed carries optional PF without making it required for fantasy stats; missing fouls remain unknown and the nine-category model is unchanged. Profiles opened from today's game use that dialog's freshest box-score row while retaining final-log corrections and avoiding duplicate/current rows from historical games. Stale data stays labeled.
+
+Validation: 186 app tests, production build with TypeScript and standalone smoke passed. Browser checks covered live OKC–SAC PF, name/photo profile buttons, nested game/player dialogs, Escape, and exact scroll/search/focus restoration (168.5px before and after). Verify exact-commit CI and hosted UI before claiming deployment.

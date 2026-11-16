@@ -9,7 +9,7 @@ export const BOX_COLUMNS = [
   ["threePointFieldGoalsMade-threePointFieldGoalsAttempted", "3PT"],
   ["freeThrowsMade-freeThrowsAttempted", "FT"],
   ["rebounds", "REB"], ["assists", "AST"], ["steals", "STL"],
-  ["blocks", "BLK"], ["turnovers", "TO"], ["plusMinus", "+/−"],
+  ["blocks", "BLK"], ["turnovers", "TO"], ["fouls", "PF"], ["plusMinus", "+/−"],
 ] as const;
 export type BoxPlayer = { id: number; name: string; starter: boolean; onCourt?: boolean; didNotPlay: boolean; reason: string; stats: Record<string, string> };
 export type BoxTeam = { id: string; players: BoxPlayer[]; totals: Record<string, string> };

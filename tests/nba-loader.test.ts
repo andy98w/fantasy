@@ -45,7 +45,7 @@ test("cold morning load keeps yesterday's stats separate from today's schedule a
   const data = snapshotSchema.parse(demo);
   const html = renderToStaticMarkup(createElement(DailyPerformers, { data, today: result, onPlayer: () => {} }));
   assert.match(html, /Last game day’s performers/); assert.match(html, /Oct 29 · PT/);
-  const today = renderToStaticMarkup(createElement(Today, { data: result, players: [], minimumGames: 3, onPlayer: () => {} }));
+  const today = renderToStaticMarkup(createElement(Today, { snapshot: data, data: result, players: [], minimumGames: 3, onPlayer: () => {} }));
   assert.match(today, /Oct 30/); assert.doesNotMatch(today, /Final/);
 });
 

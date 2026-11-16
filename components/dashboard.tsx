@@ -250,7 +250,7 @@ export default function Dashboard({
             </div>
             <aside className="league-sidebar" aria-label="League news and today's games">
               <Panel title="Roster news"><NewsFeed items={news} limit={6} /></Panel>
-              <Today data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
+              <Today snapshot={data} data={today} players={data.players} minimumGames={data.model.minimumGames} onPlayer={(player) => setSelectedId(player.id)} />
             </aside>
           </div>
         )}

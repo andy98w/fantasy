@@ -18,7 +18,7 @@ export function playerGameHistory(player: Pick<Player, "id" | "nbaTeam">, histor
   if (line) {
     const seconds = Math.round(line.minutes * 60);
     stats.minutes = seconds % 60 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` : String(seconds / 60);
-    for (const [key, cat] of Object.entries({ points: "PTS", rebounds: "REB", assists: "AST", steals: "STL", blocks: "BLK", turnovers: "TO" })) {
+    for (const [key, cat] of Object.entries({ points: "PTS", rebounds: "REB", assists: "AST", steals: "STL", blocks: "BLK", turnovers: "TO", fouls: "PF" })) {
       if (Number.isFinite(line.stats[cat])) stats[key] = String(line.stats[cat]);
     }
     for (const [key, made, attempted] of [

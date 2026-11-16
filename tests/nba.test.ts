@@ -94,7 +94,7 @@ test("category filters rank measured positive contributions, including inverted 
 });
 
 test("Today shows score failure separately from an empty schedule", () => {
-  const render = (data: TodayData) => renderToStaticMarkup(createElement(Today, { data, players: [], minimumGames: 3, onPlayer: () => {} }));
+  const render = (data: TodayData) => renderToStaticMarkup(createElement(Today, { snapshot: snapshotSchema.parse(demo), data, players: [], minimumGames: 3, onPlayer: () => {} }));
   const data: TodayData = { date, fetchedAt: `${date}T20:00:00Z`, status: "error", games: [] };
   assert.match(render(data), /Scores unavailable/);
   assert.doesNotMatch(render(data), /No NBA games/);

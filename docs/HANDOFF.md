@@ -346,3 +346,12 @@ The live November 11 check found that UTC daily snapshot pruning had retained on
 ## November 14 player news spacing
 
 Player-dialog news cards now keep 16px horizontal padding. Their previous `14px 0` override put source/headline text directly beneath the shared 3px inset gold hover/focus accent. League/team news cards already have horizontal padding. Production build (including TypeScript) and standalone smoke passed; verify exact-commit CI/deployment and the highlighted player news card on release.
+
+
+## November 15 game play-by-play tab
+
+Game dialogs now offer Box score and Play-by-play below the shared scoreboard. The new feed defaults to newest first, supports quarter/overtime filtering and oldest-first order, includes all ESPN event types (shots, free throws, turnovers, fouls, substitutions and period markers), and displays clock/team/away-home score per event. Scoring rows have a restrained teal accent. The existing box score and shot chart remain in Box score. Mobile wraps descriptions without horizontal overflow; no new nested scroll area.
+
+`lib/play-by-play.ts` normalizes the existing game-summary payload, validates periods/clocks/team identities, preserves missing scores as unknown, deduplicates IDs and orders same-clock events by source sequence. Missing feeds and partial malformed data remain explicit. No new upstream requests: `GameBoxscore.playByPlay` shares the existing bounded loader, stale fallback and 30-second visible-dialog polling. Refresh does not reset the selected view or filters.
+
+Validation: 182 app tests, production build with TypeScript and standalone smoke passed. Browser checks covered the real November 15 IND–PHI final (480 plays), Q1 filtering, oldest-first jump ball at 0–0, and 390px mobile layout. Verify exact-commit CI and Railway plus the live hosted tab before claiming deployment.

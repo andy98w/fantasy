@@ -1593,7 +1593,31 @@ button.today-game { width: 100%; text-align: left; color: var(--text); }
 .boxscore-table .boxscore-reason { text-align: left; color: var(--muted); font-size: 12px; }
 .boxscore-table tfoot { border-top: 1px solid var(--line); background: var(--surface-raised); font-weight: 600; }
 .boxscore-table tfoot th { padding-left: 20px; }
+.game-view-tabs { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.play-feed { padding: 20px 24px 24px; }
+.play-feed-controls { display: flex; gap: 12px; margin-bottom: 20px; }
+.play-feed-controls > * { width: 200px; max-width: 50%; }
+.play-feed-period + .play-feed-period { margin-top: 28px; }
+.play-feed-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px; background: var(--surface-deep); border-bottom: 1px solid var(--line); }
+.play-feed-heading h3 { font: 500 18px var(--pixel); color: var(--gold); }
+.play-feed-heading > span { width: 88px; text-align: center; font-size: 11px; color: var(--muted); }
+.play-feed ol { list-style: none; margin: 0; padding: 0; }
+.play-feed li { display: grid; grid-template-columns: 48px 26px minmax(0, 1fr) 88px; gap: 12px; align-items: start; padding: 14px; border-bottom: 1px solid var(--line-soft); font-size: 13px; line-height: 1.55; }
+.play-feed li.play-scoring { background: #7cd9c408; box-shadow: inset 2px 0 var(--teal); }
+.play-clock { font-variant-numeric: tabular-nums; color: var(--muted); }
+.play-team .avatar { width: 24px; height: 24px; }
+.play-feed li p { margin: 0; overflow-wrap: anywhere; }
+.play-score { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+.play-scoring .play-score { color: var(--teal); font-weight: 600; }
 @media (max-width: 650px) {
+  .game-view-tabs { padding: 14px; }
+  .play-feed { padding: 14px 10px; }
+  .play-feed-controls { gap: 8px; }
+  .play-feed-controls > * { width: calc(50% - 4px); }
+  .play-feed li { grid-template-columns: 40px minmax(0, 1fr) 76px; gap: 8px; padding: 12px 10px; font-size: 12px; }
+  .play-team { display: none; }
+  .play-feed-heading { padding: 10px; }
+  .play-feed-heading > span { width: 76px; }
   .boxscore-scoreboard { gap: 14px; padding: 20px 14px; }
   .boxscore-side { grid-template-columns: auto 1fr; gap: 8px; font-size: 12px; }
   .boxscore-side strong { grid-column: 1 / -1; text-align: center; }

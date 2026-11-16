@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { BOX_COLUMNS, type BoxTeam, type GameBoxscore } from "@/lib/game-boxscore";
 import { gameLabel, NBA_TIMEZONE, type NbaGame, type NbaTeam } from "@/lib/nba";
 import { NbaAvatar, PlayerAvatar } from "./avatars";
-import { Button, Empty } from "../ui/primitives";
+import { Button, Empty, Tabs } from "../ui/primitives";
 import { PixelIcon } from "../ui/pixel-icon";
 import { SortableHeader, TableToolbar, TableEmpty, useTableControls } from "../ui/table-controls";
 import { Select } from "../ui/select";
@@ -15,6 +15,7 @@ import { statusText } from "./format";
 import { PlayerStatus } from "./player-status";
 import { ShotChart } from "./shot-chart";
 import { MotionNumber } from "../ui/motion";
+import { PlayByPlay } from "./play-by-play";
 
 type CurrentPlayers = Pick<Player, "id" | "status">[];
 
@@ -60,6 +61,7 @@ export function GameDialog({ game: initialGame, players, onClose }: { game: NbaG
   const [data, setData] = useState<GameBoxscore | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"box" | "plays">("box");
   useEffect(() => {
     dialog.current?.showModal();
     const overflow = document.body.style.overflow;
@@ -102,19 +104,22 @@ export function GameDialog({ game: initialGame, players, onClose }: { game: NbaG
   const game = data?.game ?? initialGame;
   const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: NBA_TIMEZONE }).format(new Date(game.startsAt));
   const hasStats = data?.teams.some((team) => team.players.length > 0);
-  return <dialog ref={dialog} className="player-dialog game-dialog" aria-label={`${game.away.name} at ${game.home.name} box score`}
+  return <dialog ref={dialog} className="player-dialog game-dialog" aria-label={`${game.away.name} at ${game.home.name} game details`}
     onCancel={(event) => { event.stopPropagation(); onClose(); }} onClick={(event) => { if (event.target === dialog.current) onClose(); }}>
-    <div className="dialog-topline" data-sticky-table-bar><span>Box score</span><Button variant="quiet" aria-label="Close box score" onClick={onClose}><PixelIcon name="close" size={16} /></Button></div>
+    <div className="dialog-topline" data-sticky-table-bar><span>Game details</span><Button variant="quiet" aria-label="Close game details" onClick={onClose}><PixelIcon name="close" size={16} /></Button></div>
     <div className="boxscore-scoreboard">
       {[game.away, game.home].map((team) => <div className="boxscore-side" key={team.id}>
         <NbaAvatar team={team} /><span>{team.name}</span><strong><MotionNumber>{team.score ?? "—"}</MotionNumber></strong>
       </div>)}
       <div className={`boxscore-status ${game.state === "live" ? "positive-text" : ""}`}>{date} · {gameLabel(game)}{game.state === "scheduled" ? " PT" : ""}</div>
     </div>
-    {error && <p className="today-stale" role="status">{data ? "Stats may be out of date. Reconnecting…" : "Box score unavailable. Retrying…"}</p>}
+    <div className="game-view-tabs"><Tabs label="Game details" value={view} onChange={setView} options={[{ value: "box", label: "Box score" }, { value: "plays", label: "Play-by-play" }]} /></div>
+    {error && <p className="today-stale" role="status">{data ? "Game data may be out of date. Reconnecting…" : "Game data unavailable. Retrying…"}</p>}
+    {view === "plays" ? loading ? <Empty>Loading play-by-play…</Empty> : <PlayByPlay key={game.id} report={data?.playByPlay} game={game} /> : <>
     {loading ? <Empty>Loading box score…</Empty>
       : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} players={players} box={data?.teams.find((box) => box.id === team.id)} />)
       : !error && <Empty>{game.state === "scheduled" ? "Stats appear when the game starts." : game.state === "postponed" || game.state === "cancelled" ? gameLabel(game) : "Box score not available yet."}</Empty>}
     {data?.shotReport && <ShotChart report={data.shotReport} teams={[game.away, game.home]} />}
+    </>}
   </dialog>;
 }

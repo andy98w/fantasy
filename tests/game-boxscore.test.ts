@@ -109,3 +109,51 @@ test("live updates refresh after 20 seconds and failed first fetches are throttl
   now += 21_000; await load(id); assert.equal(calls, 3);
   await assert.rejects(load("invalid")); assert.equal(calls, 3);
 });
+
+function liveLineup() {
+  const data = fixture("in");
+  data.header.competitions[0].status.type.name = "STATUS_IN_PROGRESS";
+  const athletes = Array.from({ length: 6 }, (_, index) => ({
+    athlete: { id: String(100 + index), displayName: `Player ${index}` },
+    starter: index < 5, active: index > 0 as boolean | undefined,
+    didNotPlay: false, ejected: false, reason: "", stats: ["12", "5", "2-4", "0"],
+  }));
+  data.boxscore.players[0].statistics[0].athletes = athletes;
+  return { data, athletes };
+}
+
+test("live on-court badges follow the confirmed five, including reserves, without changing row order or injury status", () => {
+  const { data } = liveLineup();
+  const result = normalizeGameBoxscore(data, id, at);
+  assert.deepEqual(result.teams[0].players.map(player => player.onCourt), [false, true, true, true, true, true]);
+  const props = { team: result.game.home, box: result.teams[0], players: [{ id: 105, status: "ACTIVE" }] };
+  const html = renderToStaticMarkup(createElement(BoxscoreTable, { ...props, showOnCourt: true }));
+  assert.equal((html.match(/>On court</g) ?? []).length, 5);
+  const rows = html.match(/<tr[^>]*>.*?<\/tr>/g)!;
+  assert.doesNotMatch(rows.find(row => row.includes("Player 0"))!, /On court/);
+  assert.match(rows.find(row => row.includes("Player 5"))!, /On court.*Healthy/);
+  assert.ok(html.indexOf("Player 0") < html.indexOf("Player 5"));
+  assert.match(html, /Starters/);
+  assert.match(html, /Bench/);
+  // The dialog disables this gate when a refresh fails or returns stale data.
+  assert.doesNotMatch(renderToStaticMarkup(createElement(BoxscoreTable, { ...props, showOnCourt: false })), /On court/);
+});
+
+test("on-court flags stay unknown for breaks, finals, missing flags and inconsistent lineups", () => {
+  const variants = [
+    ({ data }: ReturnType<typeof liveLineup>) => { data.header.competitions[0].status.type.name = "STATUS_HALFTIME"; },
+    ({ data }: ReturnType<typeof liveLineup>) => { data.header.competitions[0].status.type.state = "post"; },
+    ({ athletes }: ReturnType<typeof liveLineup>) => { athletes[0].active = undefined; },
+    ({ athletes }: ReturnType<typeof liveLineup>) => { athletes[0].active = true; },
+    ({ athletes }: ReturnType<typeof liveLineup>) => { athletes[1].active = false; },
+    ({ athletes }: ReturnType<typeof liveLineup>) => { athletes[1].didNotPlay = true; },
+    ({ athletes }: ReturnType<typeof liveLineup>) => { athletes[1].ejected = true; },
+  ];
+  for (const mutate of variants) {
+    const fixture = liveLineup();
+    mutate(fixture);
+    const result = normalizeGameBoxscore(fixture.data, id, at);
+    assert.ok(result.teams[0].players.every(player => player.onCourt === undefined));
+    assert.equal(result.teams[0].players[0].stats.points, "5");
+  }
+});

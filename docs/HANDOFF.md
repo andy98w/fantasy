@@ -355,3 +355,11 @@ Game dialogs now offer Box score and Play-by-play below the shared scoreboard. T
 `lib/play-by-play.ts` normalizes the existing game-summary payload, validates periods/clocks/team identities, preserves missing scores as unknown, deduplicates IDs and orders same-clock events by source sequence. Missing feeds and partial malformed data remain explicit. No new upstream requests: `GameBoxscore.playByPlay` shares the existing bounded loader, stale fallback and 30-second visible-dialog polling. Refresh does not reset the selected view or filters.
 
 Validation: 182 app tests, production build with TypeScript and standalone smoke passed. Browser checks covered the real November 15 IND–PHI final (480 plays), Q1 filtering, oldest-first jump ball at 0–0, and 390px mobile layout. Verify exact-commit CI and Railway plus the live hosted tab before claiming deployment.
+
+## November 15 live on-court badges
+
+NBA game box scores now mark the current five with a compact teal On court badge beside the player name. ESPN's `active` flag is separate from `starter`; reserves can be on court while starters sit. Existing row order, Starters/Bench sections, sorting and injury status remain unchanged. Badges update through the existing 30-second dialog poll.
+
+The normalizer only exposes onCourt when ESPN reports STATUS_IN_PROGRESS, every team row has an explicit active boolean, exactly five are active, and none of those five is DNP/ejected. Missing/inconsistent lineups and breaks/finals remain unknown. The dialog suppresses badges after a failed refresh or stale response. No extra requests or guessed substitution reconstruction.
+
+Validation: 184 app tests, production build with TypeScript and standalone smoke passed. Live local Hawks–Bucks validation confirmed five badges per team, including reserves. Verify exact-commit CI, Railway and the hosted UI before claiming release.

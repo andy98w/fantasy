@@ -11,7 +11,7 @@ export const BOX_COLUMNS = [
   ["rebounds", "REB"], ["assists", "AST"], ["steals", "STL"],
   ["blocks", "BLK"], ["turnovers", "TO"], ["plusMinus", "+/−"],
 ] as const;
-export type BoxPlayer = { id: number; name: string; starter: boolean; didNotPlay: boolean; reason: string; stats: Record<string, string> };
+export type BoxPlayer = { id: number; name: string; starter: boolean; onCourt?: boolean; didNotPlay: boolean; reason: string; stats: Record<string, string> };
 export type BoxTeam = { id: string; players: BoxPlayer[]; totals: Record<string, string> };
 export type GameBoxscore = { game: NbaGame; teams: BoxTeam[]; fetchedAt: string; stale: boolean; shotReport?: ShotReport; playByPlay?: PlayByPlayReport };
 export const validGameId = (id: string) => /^\d{6,12}$/.test(id);
@@ -32,6 +32,7 @@ const summarySchema = z.object({
       keys: z.array(z.string()), totals: z.array(z.string()).optional(),
       athletes: z.array(z.object({
         athlete: z.object({ id: z.string().regex(/^\d+$/), displayName: z.string().min(1) }),
+        active: z.boolean().optional().catch(undefined), ejected: z.boolean().optional().catch(undefined),
         starter: z.boolean().optional(), didNotPlay: z.boolean().optional(),
         reason: z.string().optional(), stats: z.array(z.string()),
       })),
@@ -52,11 +53,19 @@ export function normalizeGameBoxscore(payload: unknown, id: string, fetchedAt: s
     } })),
   }] }] }, nbaDate(start));
   if (game.home.id === game.away.id) throw new Error("Duplicate game teams");
+  // ESPN's live active flag is distinct from the starting lineup. Do not infer
+  // a current five during breaks or from incomplete/inconsistent flags.
+  const status = z.object({ type: z.object({ name: z.string() }) }).safeParse(competition.status);
+  const inProgress = game.state === "live" && status.success && status.data.type.name === "STATUS_IN_PROGRESS";
   const teamIds = new Set<string>();
   const playerIds = new Set<number>();
   const teams = (data.boxscore?.players ?? []).map((team): BoxTeam => {
     if (![game.home.id, game.away.id].includes(team.team.id) || teamIds.has(team.team.id)) throw new Error("Invalid box score team");
     teamIds.add(team.team.id);
+    const lineup = team.statistics.flatMap(group => group.athletes);
+    const knownLineup = inProgress && lineup.every(row => typeof row.active === "boolean")
+      && lineup.filter(row => row.active).length === 5
+      && lineup.every(row => !row.active || (!row.didNotPlay && !row.ejected));
     const totals: Record<string, string> = {};
     const players = team.statistics.flatMap((group) => {
       const values = (stats: string[]) => Object.fromEntries(group.keys.map((key, index) => [key, stats[index]?.trim() || "—"]));
@@ -66,6 +75,7 @@ export function normalizeGameBoxscore(payload: unknown, id: string, fetchedAt: s
         if (!Number.isSafeInteger(playerId) || playerIds.has(playerId)) throw new Error("Duplicate or invalid box score player");
         playerIds.add(playerId);
         return { id: playerId, name: row.athlete.displayName, starter: row.starter ?? false,
+          onCourt: knownLineup ? row.active : undefined,
           didNotPlay: row.didNotPlay ?? false, reason: row.didNotPlay ? row.reason ?? "" : "",
           stats: values(row.stats) };
       });

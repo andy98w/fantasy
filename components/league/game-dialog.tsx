@@ -19,7 +19,7 @@ import { PlayByPlay } from "./play-by-play";
 
 type CurrentPlayers = Pick<Player, "id" | "status">[];
 
-export function BoxscoreTable({ team, box, players = [] }: { team: NbaTeam; box?: BoxTeam; players?: CurrentPlayers }) {
+export function BoxscoreTable({ team, box, players = [], showOnCourt = false }: { team: NbaTeam; box?: BoxTeam; players?: CurrentPlayers; showOnCourt?: boolean }) {
   const statuses = new Map(players.map(player => [String(player.id), player.status]));
   const [role, setRole] = useState("all");
   const control = useTableControls((box?.players ?? []).filter(player => role === "all" || (role === "starters" ? player.starter : role === "bench" ? !player.starter : !player.didNotPlay)), {
@@ -34,9 +34,9 @@ export function BoxscoreTable({ team, box, players = [] }: { team: NbaTeam; box?
       </TableToolbar><div className="table-scroll" tabIndex={0} role="region" aria-label={`${team.abbrev} player stats`}>
         <StickyTable className="data-table boxscore-table">
           <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false}>Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader>{BOX_COLUMNS.map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
-          <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 2} /> : control.sort ? <BoxscoreGroup players={control.rows} statuses={statuses} /> : [true, false].map((starter) => {
+          <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 2} /> : control.sort ? <BoxscoreGroup players={control.rows} statuses={statuses} showOnCourt={showOnCourt} /> : [true, false].map((starter) => {
             const players = control.rows.filter((player) => player.starter === starter);
-            return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} statuses={statuses} label={starter ? "Starters" : "Bench"} />;
+            return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} statuses={statuses} showOnCourt={showOnCourt} label={starter ? "Starters" : "Bench"} />;
           })}</tbody>
           {Object.keys(box.totals).length > 0 && <tfoot><tr><th scope="row">Team total</th><td />{BOX_COLUMNS.map(([key]) => <td key={key}>{box.totals[key] ?? "—"}</td>)}</tr></tfoot>}
         </StickyTable>
@@ -44,11 +44,11 @@ export function BoxscoreTable({ team, box, players = [] }: { team: NbaTeam; box?
   </section>;
 }
 
-function BoxscoreGroup({ players, statuses, label }: { players: BoxTeam["players"]; statuses: Map<string, string>; label?: string }) {
+function BoxscoreGroup({ players, statuses, label, showOnCourt }: { players: BoxTeam["players"]; statuses: Map<string, string>; label?: string; showOnCourt: boolean }) {
   return <>
     {label && <tr className="boxscore-group"><th colSpan={BOX_COLUMNS.length + 2} scope="rowgroup">{label}</th></tr>}
     {players.map((player) => <tr key={player.id} className={player.didNotPlay ? "boxscore-dnp" : undefined}>
-      <th scope="row"><span className="boxscore-player"><PlayerAvatar player={player} /><span>{player.name}</span></span></th>
+      <th scope="row"><span className="boxscore-player"><PlayerAvatar player={player} /><span>{player.name}</span>{showOnCourt && player.onCourt && <span className="on-court-badge">On court</span>}</span></th>
       <td><PlayerStatus status={statuses.get(String(player.id))} /></td>
       {player.didNotPlay ? <td colSpan={BOX_COLUMNS.length} className="boxscore-reason">DNP{player.reason ? ` · ${player.reason.toLowerCase()}` : ""}</td>
         : BOX_COLUMNS.map(([key]) => <td key={key}>{player.stats[key] ?? "—"}</td>)}
@@ -117,7 +117,7 @@ export function GameDialog({ game: initialGame, players, onClose }: { game: NbaG
     {error && <p className="today-stale" role="status">{data ? "Game data may be out of date. Reconnecting…" : "Game data unavailable. Retrying…"}</p>}
     {view === "plays" ? loading ? <Empty>Loading play-by-play…</Empty> : <PlayByPlay key={game.id} report={data?.playByPlay} game={game} /> : <>
     {loading ? <Empty>Loading box score…</Empty>
-      : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} players={players} box={data?.teams.find((box) => box.id === team.id)} />)
+      : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} players={players} showOnCourt={game.state === "live" && !error && !data?.stale} box={data?.teams.find((box) => box.id === team.id)} />)
       : !error && <Empty>{game.state === "scheduled" ? "Stats appear when the game starts." : game.state === "postponed" || game.state === "cancelled" ? gameLabel(game) : "Box score not available yet."}</Empty>}
     {data?.shotReport && <ShotChart report={data.shotReport} teams={[game.away, game.home]} />}
     </>}

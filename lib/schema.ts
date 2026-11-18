@@ -23,6 +23,7 @@ export const playerSchema = z.object({
   slot: z.string().nullable(),
   status: z.string(),
   availability: z.string(),
+  percentRostered: numeric.min(0).max(100).nullable().optional(),
   gamesPlayed: numeric,
   stats,
   previousSeason: z.object({ season: numeric, gamesPlayed: numeric, stats }).nullable().optional(),

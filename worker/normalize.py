@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime, timezone
+import math
 from urllib.parse import urlsplit
 from .espn import SyncError
 from .rankings import rank_players, rank_teams, CATS
@@ -9,6 +10,14 @@ from .forecast import forecast_schedule
 STAT_IDS={'0':'PTS','1':'BLK','2':'STL','3':'AST','6':'REB','11':'TO','13':'FGM','14':'FGA','15':'FTM','16':'FTA','17':'3PM','19':'FG%','20':'FT%','40':'MIN','42':'GP'}
 SLOTS={0:'PG',1:'SG',2:'SF',3:'PF',4:'C',5:'G',6:'F',7:'SG/SF',8:'G/F',9:'PF/C',10:'F/C',11:'UTIL',12:'BE',13:'IR',15:'Rookie'}
 NBA=['FA','ATL','BOS','NOP','CHI','CLE','DAL','DEN','DET','GSW','HOU','IND','LAC','LAL','MIA','MIL','MIN','BKN','NYK','ORL','PHI','PHX','POR','SAC','SAS','OKC','UTA','WAS','TOR','MEM','CHA']
+
+def roster_percentage(player):
+    ownership = player.get('ownership')
+    value = ownership.get('percentOwned') if isinstance(ownership, dict) else None
+    # ESPN supplies 0–100 percentage points. Zero is valid; absent/malformed
+    # metadata must not make a player look universally unrostered.
+    return value if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 100 else None
+
 
 def team_logo(value):
     if not isinstance(value, str): return None
@@ -104,6 +113,7 @@ def normalize(raw, league_id, season, team_id):
             'eligibleSlots':[SLOTS.get(s,str(s)) for s in p.get('eligibleSlots',[])],
             **roster,'status':p.get('injuryStatus','UNKNOWN'),
             'availability':'ROSTERED' if roster['teamId'] is not None else e.get('status','UNKNOWN'),
+            'percentRostered':roster_percentage(p),
             'gamesPlayed':gp,'stats':stats,'previousSeason':previous_season})
     matchups=[]
     for m in raw['scores'].get('schedule',[]):

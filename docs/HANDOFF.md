@@ -371,3 +371,13 @@ NBA box-score player names and photos are one keyboard-accessible button opening
 Box scores and recent games now include PF (personal fouls), including team totals where provided. The daily feed carries optional PF without making it required for fantasy stats; missing fouls remain unknown and the nine-category model is unchanged. Profiles opened from today's game use that dialog's freshest box-score row while retaining final-log corrections and avoiding duplicate/current rows from historical games. Stale data stays labeled.
 
 Validation: 186 app tests, production build with TypeScript and standalone smoke passed. Browser checks covered live OKC–SAC PF, name/photo profile buttons, nested game/player dialogs, Escape, and exact scroll/search/focus restoration (168.5px before and after). Verify exact-commit CI and hosted UI before claiming deployment.
+
+## November 17 roster percentages, discovery and profile ownership
+
+The importer carries ESPN `ownership.percentOwned` as optional `percentRostered` (0–100 percentage points). Missing/invalid values remain null; genuine zero is preserved. Shared player/team roster tables, daily/weekly matchup players and NBA box scores have a sortable % rostered column, using current snapshot metadata even for historical games. The compact MCP player response exposes the same field with explicit units. No new upstream request or migration is needed; both worker and web must deploy, followed by a fresh import.
+
+Players → Sneaky picks defaults to available players, Power 50+, at most 50% rostered and the model's minimum games. Limits are adjustable; existing NBA/position/availability/search filters and pinned comparisons still apply. The sortable discovery score is Power × (1 − rostered% / 100), bounded rather than dividing by near-zero ownership. It is a heuristic, not a projection; injuries remain visible and unknown ownership never qualifies. Power and ESPN-wide ownership are separate from this league's owner/availability.
+
+Every shared player popup now shows the full current fantasy-team name and logo under the player name, or Free agent/Waivers. Missing identities/owners are explicitly unavailable. Known ESPN roster percentage appears alongside ownership.
+
+Validation: 191 app tests and 95 worker tests passed; production build with TypeScript and standalone smoke passed. Browser checks verified percentage sorting, thresholds, pins, profile ownership, and 390px responsive layout. Read-only live import supplied percentages for all 1,101 players. Verify exact-commit CI, Railway and fresh hosted percentage data before claiming release.

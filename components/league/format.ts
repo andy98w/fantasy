@@ -1,3 +1,4 @@
+import { sneakyScore } from "@/lib/sneaky-picks";
 import { compareTableValues } from "@/lib/table";
 import type { Player, Team } from "@/lib/schema";
 export const stat = (value: number | null | undefined, category: string) =>
@@ -33,7 +34,7 @@ export const ratingReason = (player: Player, minimum: number) =>
     : "Incomplete statistics";
 export type Sort = { key: string; descending: boolean };
 export function sortPlayers(players: Player[], sort: Sort, teams: Team[] = []) {
-  const value = (p: Player) => sort.key === "name" ? p.name : sort.key === "rank" ? p.rank : sort.key === "team" ? teams.find(t => t.id === p.teamId)?.abbrev ?? (p.availability === "WAIVERS" ? "Waivers" : p.availability === "FREEAGENT" ? "FA" : null) : sort.key === "status" ? statusText(p.status) : sort.key === "power" ? p.zTotal : sort.key === "powerChange7d" ? p.powerChange7d : p.stats[sort.key];
+  const value = (p: Player) => sort.key === "name" ? p.name : sort.key === "rank" ? p.rank : sort.key === "team" ? teams.find(t => t.id === p.teamId)?.abbrev ?? (p.availability === "WAIVERS" ? "Waivers" : p.availability === "FREEAGENT" ? "FA" : null) : sort.key === "status" ? statusText(p.status) : sort.key === "power" ? p.zTotal : sort.key === "powerChange7d" ? p.powerChange7d : sort.key === "percentRostered" ? p.percentRostered : sort.key === "sneakyScore" ? sneakyScore(p) : p.stats[sort.key];
   return [...players].sort((a, b) => compareTableValues(value(a), value(b), sort.descending) || a.id - b.id);
 }
 export const dateLabel = (date: string) =>

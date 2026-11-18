@@ -6,6 +6,8 @@ import { SortableHeader, TableToolbar } from "../ui/table-controls";
 import { CATEGORIES, type Player, type Team } from "@/lib/schema";
 import { PlayerAvatar, PowerBadge } from "./avatars";
 import { ratingReason, stat, statusText, type Sort } from "./format";
+import { sneakyScore } from "@/lib/sneaky-picks";
+import { RosteredPercent, ROSTERED_TITLE } from "./rostered-percent";
 import { PlayerStatus } from "./player-status";
 import { PowerChange } from "./power-movers";
 import { Button, Empty } from "../ui/primitives";
@@ -22,6 +24,7 @@ export function PlayerTable({
   baselineAt,
   searchable = true,
   pinning,
+  sneaky = false,
 }: {
   players: Player[];
   teams: Team[];
@@ -34,6 +37,7 @@ export function PlayerTable({
   trends?: boolean;
   baselineAt?: string | null;
   searchable?: boolean;
+  sneaky?: boolean;
   pinning?: {
     players: Player[];
     onToggle: (id: Player["id"]) => void;
@@ -65,7 +69,7 @@ export function PlayerTable({
             <SortableHeader column="name" sort={sort} onSort={onSort} descending={false} className="identity-col">Player</SortableHeader>
             <SortableHeader column="status" sort={sort} onSort={onSort} descending={false}>Status</SortableHeader>
             <SortableHeader column="rank" sort={sort} onSort={onSort} descending={false}>Rank</SortableHeader>
-            {["power", ...(trends ? ["powerChange7d"] : []), ...categories].map(key => <SortableHeader key={key} column={key} sort={sort} onSort={onSort} descending={key !== "TO"}>{key === "power" ? "Power" : key === "powerChange7d" ? "7d change" : key}</SortableHeader>)}
+            {["power", "percentRostered", ...(sneaky ? ["sneakyScore"] : []), ...(trends ? ["powerChange7d"] : []), ...categories].map(key => <SortableHeader key={key} column={key} sort={sort} onSort={onSort} descending={key !== "TO"} title={key === "percentRostered" ? ROSTERED_TITLE : key === "sneakyScore" ? "Power × (1 − rostered% / 100). A discovery score, not projected production." : undefined}>{key === "percentRostered" ? "% rostered" : key === "sneakyScore" ? "Sneaky score" : key === "power" ? "Power" : key === "powerChange7d" ? "7d change" : key}</SortableHeader>)}
             {ownership && <SortableHeader column="team" sort={sort} onSort={onSort} descending={false}>Team</SortableHeader>}
           </tr>
         </thead>
@@ -73,7 +77,7 @@ export function PlayerTable({
           {rows.map((player, index) => (
             <Fragment key={player.id}>
             {!!pinned.length && index === pinned.length && <tr className="player-pins-divider">
-              <th colSpan={4 + categories.length + Number(trends) + Number(ownership)}>Search results</th>
+              <th colSpan={5 + categories.length + Number(trends) + Number(ownership) + Number(sneaky)}>Search results</th>
             </tr>}
             <tr className={pinnedIds.has(player.id) ? "player-pinned" : undefined}>
               <td className="identity-col">
@@ -119,6 +123,8 @@ export function PlayerTable({
                   reason={ratingReason(player, minimumGames)}
                 />
               </td>
+              <td><RosteredPercent value={player.percentRostered} /></td>
+              {sneaky && <td className="sneaky-score">{sneakyScore(player)?.toFixed(1) ?? "—"}</td>}
               {trends && <td><PowerChange player={player} baselineAt={baselineAt} /></td>}
               {categories.map((category) => (
                 <td key={category}>{stat(player.stats[category], category)}</td>

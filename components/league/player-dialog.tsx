@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { CATEGORIES, type Player, type Snapshot } from "@/lib/schema";
-import { PlayerAvatar, PowerBadge } from "./avatars";
+import { PlayerAvatar, PowerBadge, TeamAvatar } from "./avatars";
 import { ratingReason, stat, statusText } from "./format";
 import { NewsFeed } from "./news-feed";
 import { Button } from "../ui/primitives";
@@ -10,6 +10,7 @@ import { PlayerRecentGames } from "./player-games";
 import type { GameBoxscore } from "@/lib/game-boxscore";
 import type { TodayData } from "@/lib/nba";
 import { PixelIcon } from "../ui/pixel-icon";
+import { RosteredPercent } from "./rostered-percent";
 export function PlayerDialog({
   player,
   identity,
@@ -27,6 +28,8 @@ export function PlayerDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const profile = player ?? identity;
+  const owner = data.teams.find((team) => team.id === player?.teamId);
+  const ownership = owner?.name ?? (player?.availability === "FREEAGENT" ? "Free agent" : player?.availability === "WAIVERS" ? "Waivers" : "Ownership unavailable");
   const open = !!profile;
   useEffect(() => {
     if (open) ref.current?.showModal();
@@ -61,6 +64,11 @@ export function PlayerDialog({
                 {profile.nbaTeam}{player?.position ? ` / ${player.position}` : ""}
               </span>
               <h2>{profile.name}</h2>
+              <div className="player-profile-ownership" aria-label="Fantasy team">
+                {owner && <TeamAvatar team={owner} />}
+                <span>{ownership}</span>
+                {player?.percentRostered != null && <span className="muted">· <RosteredPercent value={player.percentRostered} /> rostered</span>}
+              </div>
               <span
                 className={`status-label ${(player?.status ?? "UNKNOWN") !== "ACTIVE" ? "injured" : ""}`}
               >

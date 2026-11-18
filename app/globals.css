@@ -1027,6 +1027,16 @@ input::placeholder {
   font-size: 30px;
   margin: 4px 0 8px;
 }
+.player-profile-ownership {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.player-profile-ownership .avatar { width: 22px; height: 22px; flex-shrink: 0; }
 .player-dialog-heading .muted {
   font-size: 11px;
 }
@@ -1690,3 +1700,15 @@ th[aria-sort="ascending"] .sort-arrow, th[aria-sort="descending"] .sort-arrow { 
 
 .player-games-table .current-player-game > * { border-bottom: 2px solid var(--gold); }
 .player-games-table button .current-game-status { color: var(--gold); }
+
+/* Player discovery shares the same controls and table rhythm as the roster. */
+.player-view-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
+.sneaky-filters { display: flex; flex-wrap: wrap; gap: 10px; }
+.sneaky-filters .select-trigger { min-width: 160px; }
+.sneaky-score { color: var(--teal); font-weight: 600; }
+@media (max-width: 650px) {
+  .player-view-controls, .sneaky-filters { align-items: stretch; }
+  .sneaky-filters { width: 100%; }
+  .sneaky-filters > * { flex: 1; min-width: 0; }
+  .sneaky-filters .select-trigger { min-width: 0; }
+}

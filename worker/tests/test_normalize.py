@@ -101,3 +101,17 @@ def test_previous_season_actuals_are_separate_from_current_stats_and_projections
     assert result['previousSeason']['stats']['FG%'] == .6
     p['stats'].append({'seasonId':2027,'statSourceId':0,'statSplitTypeId':0,'stats':{'42':1,'0':7}})
     assert normalize(raw,123,2027,3)['players'][0]['stats']['PTS'] == 7
+
+@pytest.mark.parametrize('value,expected', [(0,0),(0.02,0.02),(57.83,57.83),(100,100),(None,None),(-1,None),(101,None),('50',None),(True,None),(float('nan'),None),(float('inf'),None)])
+def test_espn_roster_percentage_preserves_zero_and_rejects_invalid_metadata(value, expected):
+    raw=fixture()
+    raw['players'][0]['player']['ownership']={'percentOwned':value}
+    player=normalize(raw,123,2027,3)['players'][0]
+    assert player['percentRostered']==expected
+    assert player['teamId']==3 and player['availability']=='ROSTERED'
+
+@pytest.mark.parametrize('ownership', [None, {}, [], 'unavailable'])
+def test_missing_roster_percentage_is_unknown(ownership):
+    raw=fixture()
+    raw['players'][0]['player']['ownership']=ownership
+    assert normalize(raw,123,2027,3)['players'][0]['percentRostered'] is None

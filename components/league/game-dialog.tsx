@@ -12,20 +12,22 @@ import { Select } from "../ui/select";
 import { statSortValue } from "@/lib/table";
 import type { Player, Snapshot } from "@/lib/schema";
 import { statusText } from "./format";
+import { RosteredPercent, ROSTERED_TITLE } from "./rostered-percent";
 import { PlayerStatus } from "./player-status";
 import { ShotChart } from "./shot-chart";
 import { MotionNumber } from "../ui/motion";
 import { PlayByPlay } from "./play-by-play";
 import { PlayerDialog } from "./player-dialog";
 
-type CurrentPlayers = Pick<Player, "id" | "status">[];
+type CurrentPlayers = Pick<Player, "id" | "status" | "percentRostered">[];
 
 export function BoxscoreTable({ team, box, players = [], showOnCourt = false, onPlayer }: { team: NbaTeam; box?: BoxTeam; players?: CurrentPlayers; showOnCourt?: boolean; onPlayer?: (player: BoxPlayer, trigger: HTMLButtonElement) => void }) {
+  const rostered = new Map(players.map(player => [player.id, player.percentRostered]));
   const statuses = new Map(players.map(player => [String(player.id), player.status]));
   const [role, setRole] = useState("all");
   const control = useTableControls((box?.players ?? []).filter(player => role === "all" || (role === "starters" ? player.starter : role === "bench" ? !player.starter : !player.didNotPlay)), {
     search: player => `${player.name} ${statusText(statuses.get(String(player.id)) ?? "UNKNOWN")} ${player.didNotPlay ? "DNP " + player.reason : ""}`,
-    value: (player, key) => key === "name" ? player.name : key === "status" ? statusText(statuses.get(String(player.id)) ?? "UNKNOWN") : player.didNotPlay ? null : statSortValue(player.stats[key]),
+    value: (player, key) => key === "percentRostered" ? rostered.get(player.id) : key === "name" ? player.name : key === "status" ? statusText(statuses.get(String(player.id)) ?? "UNKNOWN") : player.didNotPlay ? null : statSortValue(player.stats[key]),
   });
   return <section className="boxscore-team" aria-label={`${team.name} box score`}>
     <h3><NbaAvatar team={team} />{team.name}</h3>
@@ -34,23 +36,24 @@ export function BoxscoreTable({ team, box, players = [], showOnCourt = false, on
         <Select label={`${team.abbrev} lineup`} value={role} onChange={setRole} options={[{ value: "all", label: "All players" }, { value: "starters", label: "Starters" }, { value: "bench", label: "Bench" }, { value: "played", label: "Played" }]} />
       </TableToolbar><div className="table-scroll" tabIndex={0} role="region" aria-label={`${team.abbrev} player stats`}>
         <StickyTable className="data-table boxscore-table">
-          <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false}>Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader>{BOX_COLUMNS.map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
-          <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 2} /> : control.sort ? <BoxscoreGroup players={control.rows} statuses={statuses} showOnCourt={showOnCourt} onPlayer={onPlayer} /> : [true, false].map((starter) => {
+          <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false}>Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="percentRostered" sort={control.sort} onSort={control.onSort} title={ROSTERED_TITLE}>% rostered</SortableHeader>{BOX_COLUMNS.map(([key, label]) => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "turnovers"} title={key.includes("Made-") ? "Sort by makes, then attempts" : undefined}>{label}</SortableHeader>)}</tr></thead>
+          <tbody>{!control.rows.length ? <TableEmpty columns={BOX_COLUMNS.length + 3} /> : control.sort ? <BoxscoreGroup players={control.rows} statuses={statuses} rostered={rostered} showOnCourt={showOnCourt} onPlayer={onPlayer} /> : [true, false].map((starter) => {
             const players = control.rows.filter((player) => player.starter === starter);
-            return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} statuses={statuses} showOnCourt={showOnCourt} onPlayer={onPlayer} label={starter ? "Starters" : "Bench"} />;
+            return players.length > 0 && <BoxscoreGroup key={String(starter)} players={players} statuses={statuses} rostered={rostered} showOnCourt={showOnCourt} onPlayer={onPlayer} label={starter ? "Starters" : "Bench"} />;
           })}</tbody>
-          {Object.keys(box.totals).length > 0 && <tfoot><tr><th scope="row">Team total</th><td />{BOX_COLUMNS.map(([key]) => <td key={key}>{box.totals[key] ?? "—"}</td>)}</tr></tfoot>}
+          {Object.keys(box.totals).length > 0 && <tfoot><tr><th scope="row">Team total</th><td /><td />{BOX_COLUMNS.map(([key]) => <td key={key}>{box.totals[key] ?? "—"}</td>)}</tr></tfoot>}
         </StickyTable>
       </div></>}
   </section>;
 }
 
-function BoxscoreGroup({ players, statuses, label, showOnCourt, onPlayer }: { players: BoxTeam["players"]; statuses: Map<string, string>; label?: string; showOnCourt: boolean; onPlayer?: (player: BoxPlayer, trigger: HTMLButtonElement) => void }) {
+function BoxscoreGroup({ players, statuses, rostered, label, showOnCourt, onPlayer }: { players: BoxTeam["players"]; statuses: Map<string, string>; rostered: Map<number, number | null | undefined>; label?: string; showOnCourt: boolean; onPlayer?: (player: BoxPlayer, trigger: HTMLButtonElement) => void }) {
   return <>
-    {label && <tr className="boxscore-group"><th colSpan={BOX_COLUMNS.length + 2} scope="rowgroup">{label}</th></tr>}
+    {label && <tr className="boxscore-group"><th colSpan={BOX_COLUMNS.length + 3} scope="rowgroup">{label}</th></tr>}
     {players.map((player) => <tr key={player.id} className={player.didNotPlay ? "boxscore-dnp" : undefined}>
       <th scope="row"><span className="boxscore-player">{onPlayer ? <button type="button" className="boxscore-profile-link" aria-label={`View ${player.name} player details`} aria-haspopup="dialog" onClick={event => onPlayer(player, event.currentTarget)}><PlayerAvatar player={player} /><span>{player.name}</span></button> : <><PlayerAvatar player={player} /><span>{player.name}</span></>}{showOnCourt && player.onCourt && <span className="on-court-badge">On court</span>}</span></th>
       <td><PlayerStatus status={statuses.get(String(player.id))} /></td>
+      <td><RosteredPercent value={rostered.get(player.id)} /></td>
       {player.didNotPlay ? <td colSpan={BOX_COLUMNS.length} className="boxscore-reason">DNP{player.reason ? ` · ${player.reason.toLowerCase()}` : ""}</td>
         : BOX_COLUMNS.map(([key]) => <td key={key}>{player.stats[key] ?? "—"}</td>)}
     </tr>)}

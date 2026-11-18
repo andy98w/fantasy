@@ -10,6 +10,8 @@ import { PlayerTable } from "./league/player-table";
 import { PlayerAnalysis } from "./league/player-analysis";
 import { PlayerDialog } from "./league/player-dialog";
 import { PowerMovers } from "./league/power-movers";
+import { isSneakyPick } from "@/lib/sneaky-picks";
+import { Select } from "./ui/select";
 import { PlayerFilters } from "./league/player-filters";
 import { TeamSelect } from "./league/team-select";
 import {
@@ -30,6 +32,7 @@ import { NewsFeed } from "./league/news-feed";
 import { sortPlayers, type Sort } from "./league/format";
 import {
   Button,
+  Tabs,
   Panel,
   Toolbar,
   ResultCount,
@@ -56,6 +59,9 @@ export default function Dashboard({
   const [nbaTeam, setNbaTeam] = useState("all");
   const [availability, setAvailability] = useState("all");
   const [sort, setSort] = useState<Sort>({ key: "power", descending: true });
+  const [playerView, setPlayerView] = useState<"all" | "sneaky">("all");
+  const [maxRostered, setMaxRostered] = useState(50);
+  const [minPower, setMinPower] = useState(50);
   const [pinnedIds, setPinnedIds] = useState<Player["id"][]>([]);
   const [selectedId, setSelectedId] = useState<Player["id"] | null>(null);
   const selected =
@@ -97,6 +103,7 @@ export default function Dashboard({
     };
   }, [data.teams, data.matchups]);
   const go = (value: View, details: { teamId?: number | null; matchupId?: number } = {}) => {
+    if (value !== "players" && sort.key === "sneakyScore") setSort({ key: "power", descending: true });
     const matchup = data.matchups.find(m => m.id === details.matchupId);
     const hash = dashboardHash(value, { ...details, period: matchup?.period });
     const route = dashboardRoute(hash, data)!;
@@ -127,6 +134,7 @@ export default function Dashboard({
       sortPlayers(
         data.players.filter(
           (player) =>
+            (playerView !== "sneaky" || isSneakyPick(player, maxRostered, minPower, data.model.minimumGames)) &&
             player.name.toLowerCase().includes(query.toLowerCase()) &&
             (position === "all" || player.eligibleSlots.includes(position)) &&
             (nbaTeam === "all" || nbaAbbrev(player.nbaTeam) === nbaTeam) &&
@@ -139,7 +147,7 @@ export default function Dashboard({
         ),
         sort, data.teams,
       ),
-    [data.players, data.teams, query, position, nbaTeam, availability, sort],
+    [data.players, data.teams, data.model.minimumGames, query, position, nbaTeam, availability, sort, playerView, maxRostered, minPower],
   );
   const pinnedPlayers = useMemo(
     () => sortPlayers(data.players.filter(player => pinnedIds.includes(player.id)), sort, data.teams),
@@ -316,6 +324,19 @@ export default function Dashboard({
         )}
         {view === "players" && (
           <>
+            <div className="player-view-controls">
+              <Tabs label="Player views" value={playerView} onChange={value => {
+                setPlayerView(value);
+                setAvailability(value === "sneaky" ? "available" : "all");
+                setSort({ key: value === "sneaky" ? "sneakyScore" : "power", descending: true });
+              }} options={[{ value: "all", label: "All players" }, { value: "sneaky", label: "Sneaky picks" }]} />
+              {playerView === "sneaky" && <div className="sneaky-filters">
+                <Select label="Maximum ESPN roster percentage" value={String(maxRostered)} onChange={value => setMaxRostered(Number(value))}
+                  options={[10, 25, 50, 75, 100].map(value => ({ value: String(value), label: `≤${value}% rostered` }))} />
+                <Select label="Minimum player power" value={String(minPower)} onChange={value => setMinPower(Number(value))}
+                  options={[25, 50, 75].map(value => ({ value: String(value), label: `Power ${value}+` }))} />
+              </div>}
+            </div>
             <PlayerFilters
               teams={data.teams}
               query={query}
@@ -332,12 +353,15 @@ export default function Dashboard({
                 setQuery("");
                 setPosition("all");
                 setNbaTeam("all");
-                setAvailability("all");
+                setAvailability(playerView === "sneaky" ? "available" : "all");
+                setMaxRostered(50);
+                setMinPower(50);
               }}
             />
-            <PowerMovers players={visiblePlayers} teams={data.teams} baselineAt={data.powerBaselineAt} onSelect={tableProps.onSelect} />
+            {playerView === "all" && <PowerMovers players={visiblePlayers} teams={data.teams} baselineAt={data.powerBaselineAt} onSelect={tableProps.onSelect} />}
+            {playerView === "sneaky" && !data.players.some(player => player.percentRostered != null) && <p className="inline-notice">ESPN roster percentages are not available yet. They’ll appear after the next player sync.</p>}
             <Panel>
-              <PlayerTable searchable={false} players={visiblePlayers} {...tableProps} ownership trends baselineAt={data.powerBaselineAt}
+              <PlayerTable searchable={false} players={visiblePlayers} {...tableProps} ownership sneaky={playerView === "sneaky"} trends={playerView === "all"} baselineAt={data.powerBaselineAt}
                 pinning={{ players: pinnedPlayers, onToggle: togglePin, onClear: () => setPinnedIds([]) }} />
             </Panel>
           </>

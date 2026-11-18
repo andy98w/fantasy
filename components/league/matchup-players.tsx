@@ -7,6 +7,7 @@ import { CATEGORIES, type Player, type Snapshot, type Team } from "@/lib/schema"
 import { matchupPlayers, todayMatchupPlayers, matchupGameLabel, matchupPlayerGroups, matchupRowSlot, matchupPlayerDay } from "@/lib/matchup-players";
 import { gameLabel, nbaDate, type TodayData } from "@/lib/nba";
 import { PlayerAvatar } from "./avatars";
+import { RosteredPercent, ROSTERED_TITLE } from "./rostered-percent";
 import { PlayerStatus } from "./player-status";
 import { stat, statusText } from "./format";
 import { TeamSelect } from "./team-select";
@@ -35,7 +36,7 @@ export function MatchupPlayers({ matchup, teams, players, today, recapRoster, on
   const control = useTableControls(source.filter(row => team === "all" || String(row.teamId) === team), {
     initialSort: { key: "PTS", descending: true },
     search: row => `${row.name} ${daily ? matchupRowSlot(row, recap) : ""} ${row.game ? matchupGameLabel(row.game, stale) : ""} ${statusText(row.player?.status ?? "UNKNOWN")} ${teams.find(t => t.id === row.teamId)?.name ?? ""}`,
-    value: (row, key) => key === "name" ? row.name : key === "status" ? statusText(row.player?.status ?? "UNKNOWN") : key === "game" ? row.game ? matchupGameLabel(row.game, stale) : null : key === "team" ? teams.find(t => t.id === row.teamId)?.name : row.stats[key],
+    value: (row, key) => key === "percentRostered" ? players.find(p => p.id === row.playerId)?.percentRostered : key === "name" ? row.name : key === "status" ? statusText(row.player?.status ?? "UNKNOWN") : key === "game" ? row.game ? matchupGameLabel(row.game, stale) : null : key === "team" ? teams.find(t => t.id === row.teamId)?.name : row.stats[key],
   });
   const rows = control.rows;
   const groups = matchupPlayerGroups(rows, daily, recap);
@@ -54,14 +55,15 @@ export function MatchupPlayers({ matchup, teams, players, today, recapRoster, on
     </Toolbar>
     <div className="table-scroll" tabIndex={0} role="region" aria-label={daily ? `${dayLabel} player table` : "Weekly player table"}>
       <StickyTable className="data-table weekly-players-table">
-        <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{daily && <SortableHeader column="game" sort={control.sort} onSort={control.onSort} descending={false}>Game</SortableHeader>}{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
+        <thead><tr><SortableHeader column="name" sort={control.sort} onSort={control.onSort} descending={false} className="identity-col">Player</SortableHeader><SortableHeader column="status" sort={control.sort} onSort={control.onSort} descending={false}>Current status</SortableHeader><SortableHeader column="percentRostered" sort={control.sort} onSort={control.onSort} title={ROSTERED_TITLE}>% rostered</SortableHeader><SortableHeader column="team" sort={control.sort} onSort={control.onSort} descending={false}>Team</SortableHeader>{daily && <SortableHeader column="game" sort={control.sort} onSort={control.onSort} descending={false}>Game</SortableHeader>}{columns.map(key => <SortableHeader key={key} column={key} sort={control.sort} onSort={control.onSort} descending={key !== "TO"}>{key}</SortableHeader>)}</tr></thead>
         {groups.map(group => <tbody key={group.key}>
-          {group.label && <tr className="matchup-lineup-divider"><th scope="rowgroup" colSpan={columns.length + 4} title={recap ? "Saved fantasy lineup for the displayed date." : "Based on current fantasy roster slots. Bench and IR NBA stats are shown for reference."}>{group.label}</th></tr>}
+          {group.label && <tr className="matchup-lineup-divider"><th scope="rowgroup" colSpan={columns.length + 4 + Number(daily)} title={recap ? "Saved fantasy lineup for the displayed date." : "Based on current fantasy roster slots. Bench and IR NBA stats are shown for reference."}>{group.label}</th></tr>}
           {group.rows.map(row => <tr key={`${row.teamId}:${row.playerId}:${row.game?.id ?? "week"}`}>
           <td className="identity-col"><button className="identity" disabled={!row.player} onClick={() => row.player && onPlayer(row.player)}>
             <PlayerAvatar player={{ id: row.playerId, name: row.name }} /><span><strong>{row.name}</strong><small>{row.player ? `${row.player.nbaTeam} / ${row.player.position}` : ""}{daily && ["bench", "ir"].includes(matchupRowSlot(row, recap)) && <span className="matchup-slot-label"> · {matchupRowSlot(row, recap) === "bench" ? "Bench" : "IR"}</span>}</small></span>
           </button></td>
           <td><PlayerStatus status={row.player?.status} /></td>
+          <td><RosteredPercent value={players.find(p => p.id === row.playerId)?.percentRostered} /></td>
           <td title={teams.find(t => t.id === row.teamId)?.name}>{teams.find(t => t.id === row.teamId)?.abbrev}</td>
           {daily && <td>{row.game && <span className={`matchup-game-state ${row.game.state === "live" && !stale ? "live" : ""}`} title="NBA game status"><span>{matchupGameLabel(row.game, stale)}</span>{row.game.state === "live" && <small>{gameLabel(row.game)}</small>}</span>}</td>}
           {columns.map(key => <td key={key}>{stat(row.stats[key], key)}{(key === "FG%" || key === "FT%") && row.stats[key === "FG%" ? "FGA" : "FTA"] != null && <small className="weekly-shooting">{stat(row.stats[key === "FG%" ? "FGM" : "FTM"], "")}/{stat(row.stats[key === "FG%" ? "FGA" : "FTA"], "")}</small>}</td>)}

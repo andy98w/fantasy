@@ -381,3 +381,9 @@ Players → Sneaky picks defaults to available players, Power 50+, at most 50% r
 Every shared player popup now shows the full current fantasy-team name and logo under the player name, or Free agent/Waivers. Missing identities/owners are explicitly unavailable. Known ESPN roster percentage appears alongside ownership.
 
 Validation: 191 app tests and 95 worker tests passed; production build with TypeScript and standalone smoke passed. Browser checks verified percentage sorting, thresholds, pins, profile ownership, and 390px responsive layout. Read-only live import supplied percentages for all 1,101 players. Verify exact-commit CI, Railway and fresh hosted percentage data before claiming release.
+
+## November 17 box-score team switcher
+
+Game details → Box score now shows one team's table at a time, with away/home abbreviation buttons beside the Box score / Play-by-play controls. Switching teams remounts the table so the previous team's search/sort cannot hide the new roster. Team selection survives feed polling, player popup open/close and switching to Play-by-play and back; opening another game starts with its away team. The shared scoreboard and full-game shot chart remain unchanged. Controls wrap on mobile.
+
+Production build/TypeScript and standalone smoke passed. Browser checks covered NYK ↔ TOR, nested player profiles, view switching with selected-team preservation and 390px layout without page/dialog overflow. Verify exact-commit CI and Railway before claiming live release.

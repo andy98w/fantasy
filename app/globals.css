@@ -1608,7 +1608,7 @@ button.today-game { width: 100%; text-align: left; color: var(--text); }
 .boxscore-table .boxscore-reason { text-align: left; color: var(--muted); font-size: 12px; }
 .boxscore-table tfoot { border-top: 1px solid var(--line); background: var(--surface-raised); font-weight: 600; }
 .boxscore-table tfoot th { padding-left: 20px; }
-.game-view-tabs { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.game-view-tabs { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--line); }
 .play-feed { padding: 20px 24px 24px; }
 .play-feed-controls { display: flex; gap: 12px; margin-bottom: 20px; }
 .play-feed-controls > * { width: 200px; max-width: 50%; }

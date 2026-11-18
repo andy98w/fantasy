@@ -76,6 +76,7 @@ export function GameDialog({ game: initialGame, snapshot, today, onClose }: { ga
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"box" | "plays">("box");
+  const [teamSide, setTeamSide] = useState<"away" | "home">("away");
   useEffect(() => {
     dialog.current?.showModal();
     const overflow = document.body.style.overflow;
@@ -116,6 +117,7 @@ export function GameDialog({ game: initialGame, snapshot, today, onClose }: { ga
     };
   }, [initialGame.id]);
   const game = data?.game ?? initialGame;
+  const boxTeam = game[teamSide];
   const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: NBA_TIMEZONE }).format(new Date(game.startsAt));
   const hasStats = data?.teams.some((team) => team.players.length > 0);
   return <><dialog ref={dialog} className="player-dialog game-dialog" aria-label={`${game.away.name} at ${game.home.name} game details`}
@@ -127,11 +129,14 @@ export function GameDialog({ game: initialGame, snapshot, today, onClose }: { ga
       </div>)}
       <div className={`boxscore-status ${game.state === "live" ? "positive-text" : ""}`}>{date} · {gameLabel(game)}{game.state === "scheduled" ? " PT" : ""}</div>
     </div>
-    <div className="game-view-tabs"><Tabs label="Game details" value={view} onChange={setView} options={[{ value: "box", label: "Box score" }, { value: "plays", label: "Play-by-play" }]} /></div>
+    <div className="game-view-tabs">
+      <Tabs label="Game details" value={view} onChange={setView} options={[{ value: "box", label: "Box score" }, { value: "plays", label: "Play-by-play" }]} />
+      {view === "box" && <Tabs label="Box score team" value={teamSide} onChange={setTeamSide} options={[{ value: "away", label: game.away.abbrev }, { value: "home", label: game.home.abbrev }]} />}
+    </div>
     {error && <p className="today-stale" role="status">{data ? "Game data may be out of date. Reconnecting…" : "Game data unavailable. Retrying…"}</p>}
     {view === "plays" ? loading ? <Empty>Loading play-by-play…</Empty> : <PlayByPlay key={game.id} report={data?.playByPlay} game={game} /> : <>
     {loading ? <Empty>Loading box score…</Empty>
-      : hasStats ? [game.away, game.home].map((team) => <BoxscoreTable key={team.id} team={team} players={players} onPlayer={(player, trigger) => { profileReturn.current = { trigger, scrollTop: dialog.current?.scrollTop ?? 0 }; setSelectedPlayer({ id: player.id, name: player.name, nbaTeam: team.abbrev }); }} showOnCourt={game.state === "live" && !error && !data?.stale} box={data?.teams.find((box) => box.id === team.id)} />)
+      : hasStats ? <BoxscoreTable key={boxTeam.id} team={boxTeam} players={players} onPlayer={(player, trigger) => { profileReturn.current = { trigger, scrollTop: dialog.current?.scrollTop ?? 0 }; setSelectedPlayer({ id: player.id, name: player.name, nbaTeam: boxTeam.abbrev }); }} showOnCourt={game.state === "live" && !error && !data?.stale} box={data?.teams.find((box) => box.id === boxTeam.id)} />
       : !error && <Empty>{game.state === "scheduled" ? "Stats appear when the game starts." : game.state === "postponed" || game.state === "cancelled" ? gameLabel(game) : "Box score not available yet."}</Empty>}
     {data?.shotReport && <ShotChart report={data.shotReport} teams={[game.away, game.home]} />}
     </>}

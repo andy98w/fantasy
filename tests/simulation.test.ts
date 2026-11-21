@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -14,7 +14,7 @@ test("simulation replay is deterministic and scrubbing cannot reveal future box 
   const first = game.plays[0];
   assert.equal(simulationState(game, first.end - .01).completed.length, 0);
   assert.deepEqual(simulationState(game, first.end).lines, first.lines);
-  const final = simulationState(game, game.duration);
+  const final = simulationState(game, game.playbackDuration);
   assert.equal(final.completed.length, game.plays.length);
   assert.deepEqual(simulationState(game, 0).score, [0, 0]);
 });
@@ -23,8 +23,8 @@ test("exhibition score, shot accounting and rebounds stay consistent across diff
   const outcomes = new Set<string>();
   for (let seed = 0; seed < 100; seed++) {
     const game = simulate(teams, 300, seed);
-    assert.equal(game.plays.at(-1)?.end, 300);
-    const final = simulationState(game, 300);
+    assert.equal(game.plays.at(-1)?.gameEnd, 300);
+    const final = simulationState(game, game.playbackDuration);
     for (const side of [0, 1]) assert.equal(final.score[side], final.lines.slice(side*5, side*5+5).reduce((sum, l) => sum+l.pts, 0));
     for (const l of final.lines) {
       assert.equal(l.pts, 2*l.fgm + l.tpm + l.ftm);
@@ -38,7 +38,7 @@ test("exhibition score, shot accounting and rebounds stay consistent across diff
     assert.equal(total("blk"), game.plays.filter(p => p.outcome === "blocked").length);
     assert.ok(total("ast") <= total("fgm"));
     game.plays.forEach(p => { outcomes.add(p.outcome); assert.ok(p.end > p.start); });
-    for (let t = 0; t <= game.duration; t += 3) {
+    for (let t = 0; t <= game.playbackDuration; t += 3) {
       const frame = courtFrame(game, t);
       assert.equal(frame.spots.length, 10);
       for (const p of [...frame.spots, frame.ball]) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 94 && p.y >= 0 && p.y <= 50);
@@ -83,9 +83,10 @@ test("shot decisions value space and account for nearby rim protection", () => {
 test("non-shooters avoid threes and play decisions stay attached to the actual defenders", () => {
   const noThrees = (team: typeof players) => team.map(p=>({...p,stats:{...p.stats,"3PM":0}}));
   const nonShooters: typeof teams = [noThrees(teams[0]), noThrees(teams[1])];
+  let attempts=0, threes=0;
   for (let seed=0;seed<20;seed++) {
     const game = simulate(nonShooters,300,seed);
-    assert.ok(game.plays.every(p=>!p.three));
+    attempts+=game.plays.length; threes+=game.plays.filter(p=>p.three).length;
     for (const play of game.plays) {
       assert.ok(play.shotChance >= .12 && play.shotChance <= .82);
       assert.equal(Math.floor(play.handler/5),play.side);
@@ -94,10 +95,11 @@ test("non-shooters avoid threes and play decisions stay attached to the actual d
       if (play.passer !== null) assert.notEqual(play.passer,play.shooter);
     }
   }
+  assert.ok(threes/attempts < .06); // Physical end-clock shots may be outside the arc; non-shooters still overwhelmingly stay inside.
 });
 
 test("fouls appear at the whistle and free throws reveal one attempt at a time", () => {
-  const game = simulate(teams,600,11);
+  const game = Array.from({length:10},(_,seed)=>simulate(teams,600,seed)).find(g=>g.plays.some(p=>p.outcome==="foul"))!;
   const foul = game.plays.find(p=>p.outcome === "foul");
   assert.ok(foul);
   const at = (progress:number) => foul.start+(foul.end-foul.start)*progress;
@@ -134,4 +136,79 @@ test("live shot results and totals agree before a possession finishes", () => {
     assert.deepEqual(state.score,play.score);
     assert.deepEqual(state.lines,play.lines);
   }
+});
+
+
+test("free throws stop the game clock while the replay and shot stats continue", () => {
+  const game=Array.from({length:10},(_,seed)=>simulate(teams,600,seed)).find(g=>g.plays.some(p=>p.outcome==="foul"))!;
+  const foul=game.plays.find(p=>p.outcome==="foul")!;
+  const at=(t:number)=>foul.start+(foul.end-foul.start)*t;
+  assert.ok(game.playbackDuration>game.duration);
+  assert.ok(gameElapsed(game,at(.4))<gameElapsed(game,at(.55)));
+  for(const t of [.55,.65,.8,.96,.999]) assert.equal(gameElapsed(game,at(t)),foul.gameEnd);
+  assert.equal(simulationState(game,at(.96)).lines[foul.shooter].fta,simulationState(game,at(.54)).lines[foul.shooter].fta+foul.freeThrows.length);
+  const next=game.plays[game.plays.indexOf(foul)+1];
+  assert.equal(gameElapsed(game,next.start),foul.gameEnd);
+  assert.ok(gameElapsed(game,next.start+1)>foul.gameEnd);
+  assert.equal(gameElapsed(game,game.playbackDuration),600);
+});
+
+test("defenders follow drives and a blocked lane changes the attack before the shot", () => {
+  const ps=players.map(simulationPlayer);
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const intent={shooter:0,shot:{x:86,y:24},three:false,action:"drive" as const,chance:.6,value:1.2};
+  const defended=resolvePossession(ps,0,0,setup,setup,intent,3.5);
+  assert.ok(defended.frames.some(f=>f.phase.includes("contains")));
+  assert.ok(defended.frames.some(f=>f.phase.includes("Pull-up") || f.phase==="Kick-out"));
+  assert.ok(Math.hypot(defended.to[5].x-setup[5].x,defended.to[5].y-setup[5].y)>2);
+  const open=setup.map(p=>({...p}));for(let i=5;i<10;i++)open[i]={x:40,y:3+(i-5)*10};
+  const unguarded=resolvePossession(ps,0,0,open,open,intent,3.5);
+  const forward=(plan:typeof defended)=>Math.max(...plan.frames.map(f=>f.spots[0].x));
+  assert.ok(forward(unguarded)>forward(defended)+3);
+});
+
+test("moving bodies stay separated and shot odds use the positions shown on court",()=>{
+  for(let seed=0;seed<12;seed++) {
+    const game=simulate(teams,120,seed);
+    for(const play of game.plays) {
+      for(const frame of play.frames) for(let i=0;i<10;i++) for(let j=i+1;j<10;j++) {
+        assert.ok(Math.hypot(frame.spots[i].x-frame.spots[j].x,frame.spots[i].y-frame.spots[j].y)>3.7);
+      }
+      const defenders=game.players.map((player,i)=>({player,spot:play.to[i],i})).filter(d=>Math.floor(d.i/5)!==play.side);
+      assert.equal(play.shotChance,shotQuality(game.players[play.shooter],play.shot,defenders,play.side,play.three).chance);
+      assert.ok(play.passAt<play.passEnd && play.passEnd<=.55);
+      assert.equal(courtFrame(game,play.start+(play.end-play.start)*.54).spots.length,10);
+    }
+  }
+});
+
+
+test("drives can draw help and pass out before defenders recover",()=>{
+  let helped=false, kicked=false, retained=false;
+  for(let seed=0;seed<15;seed++) for(const play of simulate(teams,120,seed).plays) {
+    const phases=play.frames.map(f=>f.phase);
+    helped ||= phases.includes("Help defense");
+    if(phases.includes("Kick-out")) {
+      kicked=true; assert.notEqual(play.handler,play.shooter); assert.equal(play.passer,play.handler);
+      assert.ok(play.passAt>=.11 && play.passEnd>play.passAt);
+    }
+    retained ||= play.action==="drive" || (phases.some(p=>p.includes("contains")) && play.action==="pull-up");
+  }
+  assert.ok(helped && kicked && retained);
+});
+
+
+test("games open at center court and the clock starts at the tap",()=>{
+  const game=simulate(teams,120,7), tip=game.tip;
+  assert.deepEqual(courtFrame(game,0).ball,{x:47,y:25});
+  assert.equal(courtFrame(game,0).event?.title,"TIP-OFF");
+  assert.equal(gameElapsed(game,0),0);assert.equal(gameElapsed(game,tip.contact-.01),0);
+  assert.ok(gameElapsed(game,tip.contact+.1)>0);
+  assert.equal(game.plays[0].side,tip.winner);
+  const before=courtFrame(game,tip.duration-.00001),after=courtFrame(game,tip.duration);
+  before.spots.forEach((p,i)=>assert.ok(Math.hypot(p.x-after.spots[i].x,p.y-after.spots[i].y)<.01));
+  assert.ok(Math.hypot(before.ball.x-after.ball.x,before.ball.y-after.ball.y)<.01);
+  assert.equal(gameElapsed(game,tip.duration),game.plays[0].gameStart);
+  assert.deepEqual(simulationState(game,tip.duration).score,[0,0]);
 });

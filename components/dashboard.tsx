@@ -224,7 +224,7 @@ export default function Dashboard({
             Data is {minutes} minutes old.
           </Notice>
         ) : null}
-        <PageHeading
+        {view !== "simulate" && <PageHeading
           title={
             view === "connection"
               ? "Connection"
@@ -248,7 +248,7 @@ export default function Dashboard({
                     : `${minutes}m ago`}
             </button>
           }
-        />
+        />}
         {(["players", "team"] as View[]).includes(view) && (
           <RankingHelp model={data.model} />
         )}

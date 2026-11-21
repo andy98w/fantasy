@@ -417,3 +417,13 @@ The Phaser scene now reads the shared animation clock every frame instead of rec
 Court events show foul/defender, numbered free throws and shooter, makes, misses, blocks, turnovers and rebounds. Shooting fouls move players into lane positions and animate each FT separately. Team foul counts appear under team names; PF remains in the box score. Partial box scores now reveal fouls at the whistle and shots/FT outcomes as they resolve, without leaking future outcomes when seeking. The simulated exhibition clock still follows playback time, including free-throw sequences; it is not a regulation stopped-clock rules engine. No changes to probabilities, lineup eligibility or fantasy calculations.
 
 Validation: 200 tests include foul/FT timing, partial-stat reconciliation, no future result leakage and exact player/ball continuity at possession boundaries. Browser checks covered a real-player foul, FT 1/2 lane setup, pause, and 390px mobile overlay without overflow.
+
+## November 20 reactive defense, tip-off and stopped free-throw clock
+
+Possessions now store deterministic 30 Hz steering frames. Defenders track assignments with a short reaction delay, contain drives and send help; blocked lanes can become kick-outs or pull-ups. Local avoidance and symmetric body separation keep players apart. Shooting outcomes use the actual positions reached on court, and the renderer interpolates the same stored trajectory. This supersedes the independent endpoint animation described above. Movement remains generic basketball heuristics, not measured player speed or a full playbook: no screens, handoffs or post-ups yet.
+
+Each game begins with two jumpers at center court, a ball toss and a tap to the first ball handler. The game clock starts at the tap. Playback and game time are separate: the clock freezes at a shooting-foul whistle through the free throws, while replay, individual attempts and scores advance. A missed final FT's brief rebound animation is included in that dead-ball interval; the next possession resumes the clock. This is still an exhibition rather than a complete regulation clock/rules engine.
+
+Removed the large Simulate heading and Exhibition / step-counter line from setup and playback. Navigation remains. No fantasy ratings, projections, MCP or upstream data changes.
+
+Validation: 14 simulation tests cover deterministic replay, accounting, separation, defensive branching, actual-position shot odds, tip-off continuity and stopped FT clocks. Browser checks confirmed center-court opening and a clock frozen at 5:55 across both free throws as score/replay advanced. All 205 app tests, production build with TypeScript and standalone smoke passed. Verify exact-commit CI and Railway deployment before claiming release.

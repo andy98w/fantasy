@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper, matchDefenders, mismatchEdge, readScreen, rememberAttacks, planMismatchResponse } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper, matchDefenders, mismatchEdge, readScreen, rememberAttacks, planMismatchResponse, readExtraPass } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -287,8 +287,8 @@ test("drives can draw help and pass out before defenders recover",()=>{
     const phases=play.frames.map(f=>f.phase);
     helped ||= phases.includes("Help defense");
     if(phases.includes("Kick-out") && !play.fastBreak) {
-      kicked=true; assert.notEqual(play.handler,play.shooter); assert.equal(play.passer,play.handler);
-      assert.ok(play.passAt>=.11 && play.passEnd>play.passAt);
+      kicked=true; assert.equal(play.passes[0].from,play.handler); assert.equal(play.passer,play.passes.at(-1)!.from);
+      assert.ok(play.passes[0].end>play.passes[0].start);
     }
     retained ||= play.action==="drive" || (phases.some(p=>p.includes("contains")) && play.action==="pull-up");
   }
@@ -538,7 +538,7 @@ test("screen reads vary between handler, roller and kick-out without replacing t
     completed++;
     finishes.add(play.shooter===play.handler?"handler":play.shooter===play.screen.screener?"screener":"kick-out");
     assert.ok(play.passEnd>play.passAt);
-    if(play.passer!==null && !play.fastBreak)assert.equal(play.passer,play.handler);
+    if(play.passer!==null)assert.equal(play.passer,play.passes.at(-1)!.from);
   }
   assert.deepEqual([...finishes].sort(),["handler","kick-out","screener"]);
   assert.equal(modes.size,2);assert.equal(coverage.size,2);assert.equal(sides.size,2);
@@ -561,10 +561,10 @@ test("handoffs exchange at close range and off-ball screens plant before the rec
     assert.ok(use>6 && finish>use,`${kind} must set, use, and finish the action`);
     const planted=result.frames[use].spots[screener],earlier=result.frames[use-5].spots[screener];
     assert.ok(Math.hypot(planted.x-earlier.x,planted.y-earlier.y)<.3);
-    assert.equal(result.shooter,receiver);
-    const passFrame=result.frames[Math.floor(result.passAt/.55*(result.frames.length-1))];
+    assert.equal(result.passes[0].to,receiver);
+    const passFrame=result.frames.find(f=>f.at!>=result.passes[0].start)!;
     if(kind==="handoff")assert.ok(Math.hypot(passFrame.spots[receiver].x-passFrame.spots[handler].x,passFrame.spots[receiver].y-passFrame.spots[handler].y)<5.5,"A handoff cannot be a long-distance pass");
-    else assert.ok(result.passAt/.55*(result.frames.length-1)>=use,"Pass follows the screen");
+    else assert.ok(result.passes[0].start>=result.frames[use].at!,"Pass follows the screen");
     const after=result.frames.at(-1)!.spots[receiver];
     assert.ok(Math.hypot(after.x-passFrame.spots[receiver].x,after.y-passFrame.spots[receiver].y)>2,"Receiver continues moving after the exchange");
   }
@@ -882,4 +882,85 @@ test("denied handoffs abandon blocked waypoints before the clock and keep the re
     if(p.frames.some(f=>f.phase.startsWith("Route denied")))denied++;
   }
   assert.ok(handoffs>15 && denied>0);
+});
+
+
+test("extra-pass reads prefer a better opening, but reject blocked lanes and late-clock swings",()=>{
+  const {guard,wing,rim}=mismatchFixture();
+  const roster=[guard,{...wing,threeShare:.7,threePct:.5},wing,wing,rim,guard,wing,wing,wing,rim];
+  const spots=[{x:70,y:25},{x:64,y:8},{x:80,y:44},{x:85,y:16},{x:84,y:32},
+    {x:74,y:25},{x:77,y:7},{x:81,y:40},{x:87,y:19},{x:86,y:29}];
+  const read=readExtraPass(roster,0,0,spots,5);
+  assert.equal(read?.receiver,1);
+  assert.equal(readExtraPass(roster,0,0,spots,read!.duration+.3),null,"Leave time for the catch and release");
+  const blocked=spots.map((p,i)=>i===6?{x:67,y:16.5}:p);
+  assert.equal(readExtraPass(roster,0,0,blocked,5),null,"Do not swing through an occupied passing lane");
+  const open=spots.map((p,i)=>i===0?{x:87,y:25}:i>=5?{x:40,y:4+i*4}:p);
+  assert.equal(readExtraPass(roster.map((p,i)=>i===0?{...p,twoPct:.72}:p),0,0,open,10),null,"An open rim finish needs no extra pass");
+  const mirror=spots.slice(5).concat(spots.slice(0)).map(p=>({x:94-p.x,y:p.y}));
+  assert.equal(readExtraPass(roster.slice(5).concat(roster.slice(0)),1,5,mirror,5)?.receiver,6);
+});
+
+test("double-team outlets can swing again with real catches, recovering defenders and the same clock",()=>{
+  const {guard,rim,wing:base}=mismatchFixture(),wing={...base,threeShare:.6,twoPct:.5,threePct:.4};
+  const roster=[guard,{...wing,twoPct:.55,threePct:.36},{...wing,twoPct:.49,threePct:.48},
+    {...wing,twoPct:.52,threePct:.45},{...wing,twoPct:.42,threePct:.38},rim,wing,wing,wing,guard];
+  const spots=[{x:75,y:25},{x:73.7,y:12.5},{x:65.2,y:39.1},{x:68,y:13.8},{x:79.2,y:23.6},
+    {x:79,y:25},{x:67.9,y:5.9},{x:72.6,y:46.8},{x:66.3,y:9.2},{x:70,y:15}];
+  for(const side of [0,1] as const) {
+    const id=(i:number)=>(i+side*5)%10;
+    const points=side?spots.slice(5).concat(spots.slice(0)).map(p=>({x:94-p.x,y:p.y})):spots;
+    const ps=side?roster.slice(5).concat(roster.slice(0)):roster;
+    const history=[[{attacker:id(0),defender:id(5)}],[{attacker:id(0),defender:id(5)}]];
+    const result=resolvePossession(ps,side,id(0),points,points,{shooter:id(0),shot:{x:side?9:85,y:28},three:false,action:"drive",chance:0,value:0},23.8,history);
+    assert.ok(result.responses.some(r=>r.kind==="double"));
+    assert.deepEqual(result.passes.map(p=>[p.from,p.to]),[[id(0),id(1)],[id(1),id(4)]]);
+    assert.equal(result.passer,id(1));assert.equal(result.shooter,id(4));
+    assert.ok(result.ready && result.seconds<23.8);
+    assert.ok(result.frames.some(f=>f.phase==="Double team · Swing pass"));
+    for(const pass of result.passes) {
+      const caught=result.frames.find(f=>f.at!>=pass.end)!;
+      assert.equal(caught.carrier,pass.to);
+      assert.deepEqual(caught.ball,caught.spots[pass.to]);
+    }
+    assert.ok(result.passes[1].start>result.passes[0].end);
+    for(let n=1;n<result.frames.length;n++) {
+      const a=result.frames[n-1],b=result.frames[n];
+      assert.ok(b.at!>a.at!);
+      assert.ok(Math.hypot(a.ball!.x-b.ball!.x,a.ball!.y-b.ball!.y)<3,"Every pass travels continuously");
+      for(let i=0;i<10;i++)assert.ok(Math.hypot(a.spots[i].x-b.spots[i].x,a.spots[i].y-b.spots[i].y)<.8);
+    }
+    assert.deepEqual(result.frames.at(-1)!.ball,result.to[result.shooter]);
+    const swingStart=result.frames.find(f=>f.at!>=result.passes[1].start)!;
+    const closeout=result.responses[0].defender;
+    assert.ok(Math.hypot(swingStart.spots[closeout].x-result.to[closeout].x,swingStart.spots[closeout].y-result.to[closeout].y)>.5,"Defense recovers during the swing");
+  }
+});
+
+test("multi-pass replay preserves each receiver and credits only the final passer on makes",()=>{
+  let madeSwings=0,settledSwings=0;
+  for(let seed=0;seed<8;seed++) {
+    const game=simulate(teams,600,seed);
+    for(const play of game.plays) {
+      if(play.passes.length<2)continue;
+      if(play.fastBreak?.result==="settled")settledSwings++;
+      for(const pass of play.passes) {
+        // Sample just after the recorded catch; the ball stays with that receiver
+        // until another pass starts, including fast-break-to-half-court handoffs.
+        const at=pass.end+.04;
+        if(at>=play.approachSeconds || play.passes.some(p=>p.start>pass.start&&p.start<=at))continue;
+        const view=courtFrame(game,play.start+at);
+        assert.ok(Math.hypot(view.ball.x-view.spots[pass.to].x,view.ball.y-view.spots[pass.to].y)<.15);
+      }
+      if(play.outcome!=="made" || play.passer===null)continue;
+      madeSwings++;
+      assert.equal(play.passer,play.passes.at(-1)!.from);
+      assert.equal(play.shooter,play.passes.at(-1)!.to);
+      const before=simulationState(game,play.start+.001),after=simulationState(game,play.end-.001);
+      assert.equal(after.lines[play.passer].ast-before.lines[play.passer].ast,1);
+      assert.equal(after.lines.reduce((n,l,i)=>n+l.ast-before.lines[i].ast,0),1,"One assist, not one per pass");
+      assert.ok(play.approachSeconds<=Math.min(play.shotClockStart,game.duration-play.gameStart));
+    }
+  }
+  assert.ok(madeSwings>0 && settledSwings>0);
 });

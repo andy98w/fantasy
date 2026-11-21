@@ -7,6 +7,7 @@ export type SimPlayer = { id: number; name: string; nbaTeam: string; position: s
 export type ScreenPlan = { screener:number; mode:"roll"|"pop"; coverage:"switch"|"drop"; direction:-1|1 };
 export type MovementPlan = { kind:"handoff"|"off-ball-screen"; receiver:number; screener:number; direction:-1|1 };
 export type FastBreak = { trigger:"steal"|"rebound"; result:"rim"|"pull-up"|"settled"; passes:number };
+export type SimPass = { from:number; to:number; start:number; end:number };
 export type MatchupAttack = { attacker:number; defender:number };
 export type DefenseHistory = MatchupAttack[][];
 export type DefensiveResponse = { kind:"switch-back"|"double"; carrier:number; original:number; defender:number; leaving:number };
@@ -15,7 +16,7 @@ export type SimPlay = {
   start: number; end: number; approachSeconds:number; gameStart: number; gameEnd: number; side: Side; handler: number; shooter: number; passer: number | null;
   defender: number; rebounder: number | null; outcome: "made" | "missed" | "blocked" | "turnover" | "foul" | "violation" | "expired";
   action: "drive" | "pull-up" | "catch-and-shoot" | "cut"; shotChance: number;
-  attacks:MatchupAttack[]; responses:DefensiveResponse[];
+  attacks:MatchupAttack[]; responses:DefensiveResponse[]; passes:SimPass[];
   screen?:ScreenPlan; movement?:MovementPlan; fastBreak?:FastBreak; stolen:boolean; shotClockStart:number;
   three: boolean; points: number; text: string; score: [number, number]; lines: SimLine[];
   from: Point[]; to: Point[]; shot: Point; freeThrows: boolean[];
@@ -368,6 +369,28 @@ export function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Po
   return candidates[selected];
 }
 export type MotionFrame = { spots: Point[]; phase: string; at?:number; ball?:Point; carrier?:number };
+/** An extra pass must improve the current shot enough to pay for flight time and
+ * lane risk. No mandatory pass count: a good open look ends the read immediately. */
+export function readExtraPass(players:SimPlayer[], side:Side, carrier:number, spots:Point[], secondsLeft:number, previous:number|null=null) {
+  const defense=indices((1-side) as Side), hoop=basket(side);
+  const defenders=defense.map(i=>({spot:spots[i],player:players[i]}));
+  const isThree=(p:Point)=>distanceTo(p,hoop)>=23.75 || Math.abs(p.y-25)>=22;
+  const own=shotQuality(players[carrier],spots[carrier],defenders,side,isThree(spots[carrier]));
+  const choices=indices(side).filter(i=>i!==carrier).map(i=>{
+    const from=spots[carrier], to=spots[i], length=distanceTo(from,to), duration=clamp(length/55,.25,.8);
+    const dx=to.x-from.x,dy=to.y-from.y,squared=dx*dx+dy*dy;
+    const laneGap=Math.min(...defense.map(d=>{
+      const t=clamp(((spots[d].x-from.x)*dx+(spots[d].y-from.y)*dy)/Math.max(1,squared),0,1);
+      return distanceTo(spots[d],{x:from.x+dx*t,y:from.y+dy*t});
+    }));
+    const three=isThree(to), q=shotQuality(players[i],to,defenders,side,three);
+    const cost=.045+length*.003/Math.sqrt(players[carrier].passing)+Math.max(0,6-laneGap)*.035;
+    return {receiver:i,duration,value:q.expected-cost,usable:length>5 && length<48 && laneGap>3.3 &&
+      q.nearest>4.5 && (!three || players[i].threeShare>.25) && secondsLeft>duration+.35};
+  }).filter(c=>c.usable && c.value>own.expected+(c.receiver===previous ? .18 : .07)).sort((a,b)=>b.value-a.value);
+  return choices[0]??null;
+}
+
 /** Fixed-step steering. No outcome is sampled until this possession has played out. */
 export function resolvePossession(players:SimPlayer[], side:Side, handler:number, setup:Point[], start:Point[], intent:ShotIntent, seconds:number, history:DefenseHistory=[]) {
   const offense=indices(side), defense=indices((1-side) as Side), hoop=basket(side);
@@ -625,8 +648,8 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
         goals[r.original]=approach(ball,hoop,4.2);
         goals[r.defender]={x:clamp(ball.x-dy/length*flank*4.3,2,92),y:clamp(ball.y+dx/length*flank*4.3,2,48)};
         phase="Double team";
-        // Existing replay supports one pass: a handler can punish the double;
-        // a receiver who already caught it can still take their actual-position shot.
+        // The initial outlet starts the catch-and-read chain below. Receivers
+        // can then punish the recovering defense with another pass.
         if(r.carrier===handler && !passed && elapsed-responseAt>.25 && distanceTo(spots[r.defender],ball)<8 && seconds-elapsed>.65) {
           const defenders=defense.map(i=>({spot:spots[i],player:players[i]}));
           const ownThree=distanceTo(ball,hoop)>=23.75 || Math.abs(ball.y-25)>=22;
@@ -656,12 +679,61 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
     // than waiting for a random possession timer after reaching the shot spot.
     const hasBall=shooter===handler || elapsed>=passEndSeconds;
     const arrived=distanceTo(spots[shooter],target)<1 || (action==="drive" && distanceTo(spots[shooter],hoop)<7);
-    readyFor=attacking && screenStage==="done" && movementStage==="done" && hasBall && arrived ? readyFor+dt : 0;
+    const canSwing=shooter!==handler && hasBall && elapsed>=passEndSeconds+.12 && !arrived &&
+      readExtraPass(players,side,shooter,spots,seconds-elapsed,handler)!==null;
+    readyFor=attacking && screenStage==="done" && movementStage==="done" && hasBall && (arrived || canSwing) ? readyFor+dt : 0;
     if(readyFor>=.12) {usedSeconds=elapsed;break;}
+  }
+  // Store the first action's ball explicitly before extending it. Replay must not
+  // reinterpret an earlier pass as going straight to the eventual final shooter.
+  const passes:SimPass[]=[];
+  let passer:number|null=null;
+  if(shooter!==handler && passEndSeconds<=usedSeconds) {
+    passes.push({from:handler,to:shooter,start:passStartSeconds,end:passEndSeconds});passer=handler;
+  }
+  const releaseFrame=frames[Math.min(frames.length-1,Math.floor(passStartSeconds/dt))];
+  const releaseBall={...releaseFrame.spots[handler]};
+  frames.forEach((frame,n)=>{
+    const at=n*dt;
+    frame.at=at;
+    frame.carrier=shooter===handler || at<passEndSeconds?handler:shooter;
+    frame.ball=shooter===handler || at<passStartSeconds?{...frame.spots[handler]}:
+      at>=passEndSeconds?{...frame.spots[shooter]}:lerp(releaseBall,frame.spots[shooter],(at-passStartSeconds)/(passEndSeconds-passStartSeconds));
+  });
+  // Catch, read, and optionally swing again while the defense closes out. Each
+  // pass consumes real time in the SAME possession; no new setup or clock reset.
+  for(let extra=0;readyFor>=.12 && extra<4;extra++) {
+    const read=readExtraPass(players,side,shooter,spots,seconds-usedSeconds,passer);
+    if(!read)break;
+    const from=shooter, receiver=read.receiver, begin=usedSeconds, end=begin+read.duration;
+    const launch={...spots[from]}, catchSpot={...spots[receiver]}, origins=spots.map(p=>({...p}));
+    const settle=end+.15, count=Math.ceil((settle-begin)/dt), swingDt=(settle-begin)/count;
+    for(let tick=1;tick<=count;tick++) {
+      const elapsed=begin+tick*swingDt, goals=origins.map(p=>({...p}));
+      for(const i of offense)if(i!==receiver) {
+        // Small purposeful relocations keep the next passing angle available.
+        const local=facing(origins[i],side), perimeter=playerStyle(players[i]).perimeter;
+        goals[i]=facing({x:clamp(local.x+(perimeter>.45?-2:1),4,90),y:clamp(local.y+(local.y<25?-2:2),3,47)},side);
+      }
+      goals[receiver]=catchSpot;
+      const markBall=elapsed-begin>.2?receiver:from;
+      for(const i of offense) {
+        const defender=assignments.get(i)!;
+        goals[defender]=approach(spots[i],hoop,defensiveGap(players[defender],players[i],i===markBall));
+      }
+      const moved=moveBodies(spots,velocities,goals,spots.map((_,i)=>defense.includes(i)?11:14),swingDt);
+      spots=moved.spots;velocities=moved.velocities;
+      const caught=elapsed>=end;
+      frames.push({spots:spots.map(p=>({...p})),at:elapsed,carrier:caught?receiver:from,
+        ball:caught?{...spots[receiver]}:lerp(launch,spots[receiver],(elapsed-begin)/read.duration),
+        phase:caught?"Catch · Read the defense":response?.kind==="double"?"Double team · Swing pass":"Extra pass"});
+    }
+    passes.push({from,to:receiver,start:begin,end});
+    usedSeconds=settle;passer=from;shooter=receiver;action="catch-and-shoot";
   }
   const shot={...spots[shooter]}, dist=distanceTo(shot,hoop);
   const three=dist>=23.75 || Math.abs(shot.y-25)>=22;
-  return {shooter,shot,three,action,to:spots,frames,onBall,helper,attacks,responses,seconds:usedSeconds,ready:readyFor>=.12,
+  return {shooter,shot,three,action,to:spots,frames,onBall,helper,attacks,responses,passes,passer,seconds:usedSeconds,ready:readyFor>=.12,
     passAt:Math.min(.53,passStartSeconds/usedSeconds*.55),passEnd:Math.min(.55,passEndSeconds/usedSeconds*.55)};
 }
 
@@ -723,6 +795,7 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
   let flight:{from:Point;to:Point;receiver:number;start:number;end:number;phase:string}|null=null;
   const lanes=new Map([...offense].filter(i=>i!==owner).sort((a,b)=>start[a].y-start[b].y).map((i,n)=>[i,[7,17,34,44][n]]));
   const frames:MotionFrame[]=[{spots:spots.map(p=>({...p})),ball:{...ball},carrier,at:0,phase:trigger==="steal"?"Fast break · Push":"Rebound · Look upcourt"}];
+  const passLog:SimPass[]=[];
   let result:FastBreak["result"]="settled";
   let roles:TransitionRoles|undefined;
   const laneClear=(from:Point,to:Point)=>defense.every(i=>{
@@ -762,7 +835,7 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
     spots=moved.spots;velocities=moved.velocities;
     if(flight) {
       ball=lerp(flight.from,spots[flight.receiver],(elapsed-flight.start)/(flight.end-flight.start));
-      if(elapsed>=flight.end) {lastPasser=carrier;carrier=flight.receiver;flight=null;ball={...spots[carrier]};nextRead=elapsed+.2;}
+      if(elapsed>=flight.end) {passLog.push({from:carrier,to:flight.receiver,start:flight.start,end:flight.end});lastPasser=carrier;carrier=flight.receiver;flight=null;ball={...spots[carrier]};nextRead=elapsed+.2;}
     } else ball={...spots[carrier]};
     let finish=false, settle=false;
     if(!flight && elapsed>=nextRead && elapsed<limit) {
@@ -800,7 +873,7 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
     const shot={...spots[carrier]}, three=distanceTo(shot,hoop)>=23.75;
     return {shooter:carrier,shot,three,action:three?"pull-up" as const:"drive" as const,to:spots,frames,
       onBall:roles!.stopper,helper:roles!.rim,attacks:[] as MatchupAttack[],responses:[] as DefensiveResponse[],
-      seconds:elapsed,ready:true,passAt:.1,passEnd:.2,passer:lastPasser,
+      seconds:elapsed,ready:true,passAt:.1,passEnd:.2,passer:lastPasser,passes:passLog,
       fastBreak:{trigger,result,passes},screen:undefined,movement:undefined};
   }
   // The push finishes any pass while everyone keeps running, then flows into a set.
@@ -810,13 +883,11 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
   const offset=elapsed;
   half.frames.forEach((frame,n)=>{
     if(n===0)return;
-    const progress=n/(half.frames.length-1)*.55;
-    const at=offset+n/(half.frames.length-1)*half.seconds;
-    const ball=progress<half.passAt?frame.spots[carrier]:progress>=half.passEnd?frame.spots[half.shooter]:lerp(frame.spots[carrier],frame.spots[half.shooter],(progress-half.passAt)/(half.passEnd-half.passAt));
-    frames.push({...frame,at,ball:{...ball},carrier:progress<half.passEnd?carrier:half.shooter,
+    frames.push({...frame,at:offset+frame.at!,
       phase:n<15?"Fast break covered · Flow into offense":frame.phase});
   });
-  return {...half,frames,seconds:offset+half.seconds,passer:half.shooter===carrier?null:carrier,
+  return {...half,frames,seconds:offset+half.seconds,
+    passes:[...passLog,...half.passes.map(p=>({...p,start:p.start+offset,end:p.end+offset}))],
     fastBreak:{trigger,result,passes},screen:intent.screen,movement:intent.movement};
 }
 
@@ -953,7 +1024,7 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     const clockExpired=!motion.ready || remaining<=.2;
     const approachSeconds=clockExpired?Math.min(remaining,shotClockStart):motion.seconds;
     const { shooter, shot, three, action, to } = motion;
-    const passer = transition ? transition.passer : handler !== shooter ? handler : null;
+    const passer = motion.passer;
     let defender = [...defense].sort((a,b) => distanceTo(to[a],shot)-distanceTo(to[b],shot))[0];
     const p = players[shooter], d = players[defender];
     const distance = distanceTo(shot,basket(side));
@@ -1022,7 +1093,7 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     const play:SimPlay={ start:playback, end, approachSeconds, shotClockStart, gameStart:clock, gameEnd, side, handler, shooter, passer, defender, rebounder, outcome, stolen, action,
       screen:transition?transition.screen:decision.screen,movement:transition?transition.movement:decision.movement,fastBreak:transition?.fastBreak,shotChance, three, points, text,
       score: [...score], lines: lines.map(l => ({ ...l })), from:from ?? setup, to, shot, freeThrows,
-      attacks:motion.attacks,responses:motion.responses,frames:motion.frames,finishFrames:[],onBall:motion.onBall,helper:motion.helper,passAt:motion.passAt,passEnd:motion.passEnd };
+      attacks:motion.attacks,responses:motion.responses,passes:motion.passes,frames:motion.frames,finishFrames:[],onBall:motion.onBall,helper:motion.helper,passAt:motion.passAt,passEnd:motion.passEnd };
     if(outcome!=="foul")play.finishFrames=rebounder===null?followThrough:finishPossession(players,play,finishSeconds);
     if(outcome==="violation" || outcome==="expired" || (outcome==="turnover" && !stolen))play.finishFrames=[{spots:to,phase:outcome==="violation"?"Shot clock violation":outcome==="turnover"?"Out of bounds":"Final"}];
     plays.push(play);

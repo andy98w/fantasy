@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper, matchDefenders, mismatchEdge, readScreen } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -729,4 +729,84 @@ test("blocks require a reachable contest and can credit the rim helper",()=>{
     }
   }
   assert.ok(checked>0);
+});
+
+const mismatchFixture=()=>{
+  const base=simulationPlayer(players[0]);
+  const guard={...base,position:"PG",passing:9,usage:24,rebound:3,steal:3,block:.1,threeShare:.35,twoPct:.55,threePct:.35};
+  const rim={...base,position:"C",passing:2,usage:16,rebound:14,steal:.3,block:3,threeShare:.05,twoPct:.55,threePct:.25};
+  const wing={...guard,position:"SF",passing:3,steal:1,threeShare:.3,twoPct:.42,threePct:.25};
+  const roster=[guard,wing,wing,wing,rim,guard,wing,wing,wing,rim];
+  const spots=[{x:75,y:25},{x:63,y:4},{x:65,y:45},{x:62,y:15},{x:82,y:8},
+    {x:79,y:25},{x:67,y:4},{x:69,y:45},{x:66,y:15},{x:85,y:8}];
+  return {guard,rim,wing,roster,spots,assignments:matchDefenders(0,0,spots)};
+};
+
+test("offense attacks the actual switched matchup and feeds an interior mismatch",()=>{
+  const {roster,spots,assignments,guard,rim}=mismatchFixture();
+  assert.equal(new Set(assignments.values()).size,5);
+  const switched=roster.map((p,i)=>i===5?rim:i===9?guard:p);
+  const normal=readScreen(roster,0,0,spots,assignments,8);
+  const hunt=readScreen(switched,0,0,spots,assignments,8);
+  assert.equal(normal.action,"pull-up");assert.equal(hunt.action,"drive");
+  assert.equal(hunt.shooter,0);assert.ok(hunt.shot.x>spots[0].x+5);
+  assert.notEqual(readScreen(switched,0,0,spots,assignments,2).action,"drive","Do not start a new hunt with no time");
+  const sealSpots=spots.map((p,i)=>i===4?{x:84,y:18}:i===9?{x:87,y:18}:p);
+  assert.equal(readScreen(switched,0,0,sealSpots,assignments,2).shooter,4);
+  assert.equal(readScreen(roster,0,0,sealSpots,assignments,2).shooter,0);
+  const mirrorSpots=spots.slice(5).concat(spots.slice(0)).map(p=>({x:94-p.x,y:p.y}));
+  const mirror=readScreen(switched.slice(5).concat(switched.slice(0)),1,5,mirrorSpots,matchDefenders(1,5,mirrorSpots),8);
+  assert.equal(mirror.action,hunt.action);assert.equal(mirror.shooter,hunt.shooter+5);
+  assert.ok(Math.abs(mirror.shot.x-(94-hunt.shot.x))<1e-9);
+  assert.ok(Math.abs(mirror.value-hunt.value)<1e-9);
+});
+
+test("mismatch hunting respects help, open teammates, real shot odds and missing perimeter options",()=>{
+  const {roster,spots,assignments,guard,rim,wing}=mismatchFixture();
+  const switched=roster.map((p,i)=>i===5?rim:i===9?guard:p), target={x:85,y:28};
+  const edge=mismatchEdge(switched,0,0,5,spots,"drive",target);
+  const helpSpots=spots.map((p,i)=>i===9?{x:85,y:26}:p), helpRoster=switched.map((p,i)=>i===9?rim:p);
+  const helpEdge=mismatchEdge(helpRoster,0,0,5,helpSpots,"drive",target);
+  assert.ok(edge>.15 && edge<=.34 && helpEdge<edge*.6);
+  assert.equal(mismatchEdge(switched,0,0,5,spots.map((p,i)=>i===5?{x:40,y:25}:p),"drive",target),0);
+  const open=switched.map((p,i)=>i===1?{...wing,threePct:.5,threeShare:.7}:p);
+  const openSpots=spots.map((p,i)=>i===6?{x:75,y:5}:p);
+  assert.equal(readScreen(open,0,0,openSpots,assignments,8).shooter,1,"Open shooter beats hunting a guarded mismatch");
+  const read=readScreen(switched,0,0,spots,assignments,8);
+  assert.equal(read.chance,shotQuality(switched[read.shooter],read.shot,switched.slice(5).map((player,i)=>({player,spot:spots[i+5]})),0,read.three).chance);
+  const nonshooters=roster.map(p=>({...p,threeShare:0})), distant=spots.map((p,i)=>i<5?{x:30,y:5+i*9}:p);
+  const late=readScreen(nonshooters,0,0,distant,matchDefenders(0,0,distant),1);
+  assert.equal(late.shooter,0);assert.deepEqual(late.shot,distant[0]);
+});
+
+test("matched defenders change seeded play choices and screen coverage changes the ensuing motion",()=>{
+  const {roster,spots,guard,rim}=mismatchFixture();
+  const sample=(ps:typeof roster)=>{
+    let state=2718;
+    const rng=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+    return Array.from({length:1200},()=>chooseShot(ps,0,0,spots,rng));
+  };
+  const normal=sample(roster), hunt=sample(roster.map((p,i)=>i===5?rim:i===9?guard:p));
+  const drives=(a:typeof normal)=>a.filter(p=>!p.screen&&!p.movement&&p.action==="drive").length;
+  assert.ok(drives(hunt)>drives(normal)*1.15,"Same offense/positions/random draws must react to the changed defender");
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  // Two equally capable screeners: change only which opponent each can bring up.
+  const screenRoster=[guard,{...rim,threeShare:.3},roster[1],roster[1],{...rim,threeShare:.3},guard,rim,roster[1],roster[1],guard];
+  const screenCounts=(ps:typeof roster)=>{
+    let state=2718;
+    const rng=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+    const choices=Array.from({length:2000},()=>chooseShot(ps,0,0,setup,rng));
+    return [1,4].map(i=>choices.filter(p=>p.screen?.screener===i).length);
+  };
+  const first=screenCounts(screenRoster),second=screenCounts(screenRoster.map((p,i)=>i===6?guard:i===9?rim:p));
+  assert.ok(first[0]>second[0]*1.2 && second[1]>first[1]*1.2,"Screen calls seek a new advantage rather than randomizing the screener");
+  const run=(coverage:"switch"|"drop")=>resolvePossession(roster,0,0,setup,setup,{shooter:0,shot:{x:78,y:25},three:false,action:"drive",chance:0,value:0,
+    screen:{screener:4,mode:"roll",coverage,direction:1}},23.8);
+  const switched=run("switch"),dropped=run("drop");
+  const lastRead=switched.frames.findLastIndex(f=>f.phase==="Pick-and-roll");
+  assert.ok(lastRead>0 && switched.frames.slice(lastRead+1).some(f=>f.phase==="Defender contains drive"),"Read the switched big, then continue attacking through real movement");
+  assert.ok(switched.frames.some(f=>f.phase==="Kick-out"),"A hunt can draw help and become a pass");
+  assert.notDeepEqual(switched.to,dropped.to);
+  assert.ok(switched.ready && dropped.ready);
 });

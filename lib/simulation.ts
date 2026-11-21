@@ -87,6 +87,71 @@ export function screenSwitchChance(onBall:SimPlayer, screenerDefender:SimPlayer)
   const a=defensiveStyle(onBall),b=defensiveStyle(screenerDefender);
   return clamp(.25+(a.pressure+b.pressure)*.25-b.rim*.4,.1,.65);
 }
+/** Use the same one-to-one assignments for planning and motion. */
+export function matchDefenders(side:Side, handler:number, spots:Point[]) {
+  const assignments=new Map<number,number>(), available=indices((1-side) as Side);
+  for(const i of [handler,...indices(side).filter(i=>i!==handler)]) {
+    available.sort((a,b)=>distanceTo(spots[a],spots[i])-distanceTo(spots[b],spots[i]));
+    assignments.set(i,available.shift()!);
+  }
+  return assignments;
+}
+/** A bounded decision preference, never a shooting-percentage bonus. Positions and
+ * box scores only suggest matchups; they do not measure speed, size or strength. */
+export function mismatchEdge(players:SimPlayer[], side:Side, attacker:number, defender:number,
+  spots:Point[], action:SimPlay["action"], shot:Point) {
+  if(distanceTo(spots[attacker],spots[defender])>10)return 0; // Already open, not a matchup to hunt.
+  const a=playerStyle(players[attacker]), d=defensiveStyle(players[defender]);
+  const distance=distanceTo(shot,basket(side));
+  let edge=0;
+  if(action==="drive" && !isBig(players[attacker]) && isBig(players[defender])) {
+    edge=.34*a.creation*(1-d.pressure); // Creator can test a paint-oriented defender outside.
+  } else if(distance<12 && isBig(players[attacker]) && !isBig(players[defender])) {
+    edge=.32*a.interior*(1-d.rim); // Interior catch/seal against a perimeter defender.
+  } else if(action==="pull-up" && a.perimeter>.45 && isBig(players[defender])) {
+    edge=.16*a.pullUp*d.rim;
+  }
+  if(action==="drive" || distance<12) {
+    const from=spots[attacker], dx=shot.x-from.x, dy=shot.y-from.y, length=dx*dx+dy*dy;
+    const help=indices((1-side) as Side).filter(i=>i!==defender).reduce((sum,i)=>{
+      const t=length?clamp(((spots[i].x-from.x)*dx+(spots[i].y-from.y)*dy)/length,0,1):0;
+      const lane={x:from.x+t*dx,y:from.y+t*dy};
+      return sum+Math.max(0,1-distanceTo(spots[i],lane)/10)*defensiveStyle(players[i]).help;
+    },0);
+    edge*=clamp(1-help,0,1);
+  }
+  return clamp(edge,0,.34);
+}
+/** Re-read the actual coverage after a screen. An open catch can still beat a
+ * mismatch; another drive needs both time and a useful matchup. */
+export function readScreen(players:SimPlayer[], side:Side, handler:number, spots:Point[],
+  assignments:Map<number,number>, secondsLeft:number):ShotIntent {
+  const hoop=basket(side), defenders=indices((1-side) as Side).map(i=>({spot:spots[i],player:players[i]}));
+  const options:ShotIntent[]=[];
+  const offer=(i:number,shot:Point,action:SimPlay["action"])=>{
+    const three=distanceTo(shot,hoop)>=23.75 || Math.abs(shot.y-25)>=22;
+    if(three && players[i].threeShare<=.25)return;
+    const q=shotQuality(players[i],shot,defenders,side,three);
+    const passCost=i===handler?0:.04+distanceTo(spots[handler],shot)*.003/Math.sqrt(players[handler].passing);
+    const travel=distanceTo(spots[i],shot);
+    const edge=mismatchEdge(players,side,i,assignments.get(i)!,spots,action,shot);
+    options.push({shooter:i,shot:{...shot},action,three,chance:q.chance,value:q.expected-passCost-travel*.018+edge});
+  };
+  for(const i of indices(side)) {
+    const near=distanceTo(spots[i],hoop)<10;
+    offer(i,spots[i],near?"cut":i===handler?"pull-up":"catch-and-shoot");
+  }
+  if(secondsLeft>3) {
+    const target=facing({x:85,y:spots[handler].y<25?22:28},side);
+    if(mismatchEdge(players,side,handler,assignments.get(handler)!,spots,"drive",target)>.08)offer(handler,target,"drive");
+  }
+  if(!options.length) { // Late clock with five non-shooters: still use the actual ball holder.
+    const shot={...spots[handler]}, three=distanceTo(shot,hoop)>=23.75 || Math.abs(shot.y-25)>=22;
+    const q=shotQuality(players[handler],shot,defenders,side,three);
+    return {shooter:handler,shot,three,action:"pull-up",chance:q.chance,value:q.expected};
+  }
+  return options.sort((a,b)=>b.value-a.value)[0];
+}
 export function selectHelper(players:SimPlayer[], side:Side, carrier:number, spots:Point[], assignments:Map<number,number>) {
   const hoop=basket(side), onBall=assignments.get(carrier), ball=spots[carrier];
   const candidates=indices((1-side) as Side).filter(i=>i!==onBall).filter(i=>{
@@ -202,6 +267,7 @@ export function shotQuality(player: SimPlayer, shot: Point, defenders: {spot:Poi
 export function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], rng:()=>number):ShotIntent {
   const defense = indices((1-side) as Side), hoop = basket(side);
   const defenders = defense.map(i => ({spot:to[i],player:players[i]}));
+  const assignments=matchDefenders(side,handler,to);
   const candidates: {shooter:number; shot:Point; three:boolean; action:SimPlay["action"]; chance:number; value:number}[] = [];
   const offer = (shooter:number, shot:Point, three:boolean, action:SimPlay["action"]) => {
     const quality = shotQuality(players[shooter],shot,defenders,side,three);
@@ -212,7 +278,7 @@ export function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Po
     const preference=action==="drive"?.18*(1-style.perimeter)+.1*style.creation
       :action==="pull-up"?.22*style.pullUp
       :three?.22*style.relocation:.16*style.interior;
-    candidates.push({shooter,shot,three,action,chance:quality.chance,value:quality.expected-passCost+preference});
+    candidates.push({shooter,shot,three,action,chance:quality.chance,value:quality.expected-passCost+preference+mismatchEdge(players,side,shooter,assignments.get(shooter)!,to,action,shot)});
   };
   for (const i of indices(side)) {
     const p = players[i];
@@ -230,11 +296,24 @@ export function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Po
   const selected = pick(candidates.map((_,i)=>i), i => Math.exp(candidates[i].value*5) * Math.pow(players[candidates[i].shooter].usage,.35), rng);
   const teammates=indices(side).filter(i=>i!==handler), handlerStyle=playerStyle(players[handler]);
   const screenFit=Math.max(...teammates.map(i=>playerStyle(players[i]).screening));
-  if(rng()<clamp(.14+.28*handlerStyle.creation+.15*screenFit-.2*handlerStyle.hub,.14,.57)) {
-    const screener=pick(teammates,i=>Math.pow(playerStyle(players[i]).screening,2),rng);
+  const onBall=assignments.get(handler)!;
+  const driveTarget=facing({x:85,y:25},side);
+  const currentEdge=mismatchEdge(players,side,handler,onBall,to,"drive",driveTarget);
+  const switchGain=(i:number)=>{
+    const defender=assignments.get(i)!;
+    // Evaluate the potential switched matchup at contact distance; don't give a
+    // remote defender credit as if they were already guarding the ball.
+    const switched=to.map(p=>({...p})); switched[defender]={...to[onBall]};switched[onBall]={...to[defender]};
+    const gain=mismatchEdge(players,side,handler,defender,switched,"drive",driveTarget)-currentEdge;
+    const seal=mismatchEdge(players,side,i,onBall,switched,"cut",to[i]);
+    const currentSeal=mismatchEdge(players,side,i,defender,to,"cut",to[i]);
+    return (Math.max(0,gain)+Math.max(0,seal-currentSeal))*screenSwitchChance(players[onBall],players[defender]);
+  };
+  const bestGain=Math.max(...teammates.map(switchGain));
+  if(rng()<clamp(.14+.28*handlerStyle.creation+.15*screenFit-.2*handlerStyle.hub+bestGain*.6-currentEdge*.25,.12,.65)) {
+    const screener=pick(teammates,i=>Math.pow(playerStyle(players[i]).screening,2)*(1+switchGain(i)*8),rng);
     const mode=players[screener].threeShare>.3 && rng()<playerStyle(players[screener]).perimeter*.8 ? "pop" : "roll";
-    const onBall=[...defense].sort((a,b)=>distanceTo(to[a],to[handler])-distanceTo(to[b],to[handler]))[0];
-    const screenDefender=defense.filter(i=>i!==onBall).sort((a,b)=>distanceTo(to[a],to[screener])-distanceTo(to[b],to[screener]))[0];
+    const screenDefender=assignments.get(screener)!;
     const switchChance=screenSwitchChance(players[onBall],players[screenDefender]);
     return {shooter:handler,shot:facing({x:78,y:25},side),three:false,action:"drive",chance:0,value:0,
       screen:{screener,mode,coverage:rng()<switchChance?"switch":"drop",direction:rng()<.5?-1:1}};
@@ -253,11 +332,7 @@ export type MotionFrame = { spots: Point[]; phase: string; at?:number; ball?:Poi
 /** Fixed-step steering. No outcome is sampled until this possession has played out. */
 export function resolvePossession(players:SimPlayer[], side:Side, handler:number, setup:Point[], start:Point[], intent:ShotIntent, seconds:number) {
   const offense=indices(side), defense=indices((1-side) as Side), hoop=basket(side);
-  const assignments=new Map<number,number>(), available=[...defense];
-  for (const i of [handler,...offense.filter(i=>i!==handler)]) {
-    available.sort((a,b)=>distanceTo(setup[a],setup[i])-distanceTo(setup[b],setup[i]));
-    assignments.set(i,available.shift()!);
-  }
+  const assignments=matchDefenders(side,handler,setup);
   const onBall=assignments.get(handler)!;
   const screen=intent.screen, movementPlan=intent.movement;
   let movementStage:"setup"|"using"|"finish"|"done"=movementPlan?"setup":"done";
@@ -307,7 +382,8 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
       }
       phase=action==="drive" ? "Driving" : action==="pull-up" ? "Pull-up" : action==="cut" ? "Cutting" : passed ? "Kick-out" : "Moving the ball";
       if(action==="drive" && screenStage==="done" && !movementPlan) {
-        const h=spots[handler], d=spots[onBall], gap=distanceTo(h,d);
+        const h=spots[handler], mark=assignments.get(handler)!, d=spots[mark], gap=distanceTo(h,d);
+        if(mismatchEdge(players,side,handler,mark,spots,"drive",target)>.08)phase="Attacking mismatch";
         const ahead=(d.x-h.x)*(hoop.x-h.x)+(d.y-h.y)*(hoop.y-h.y)>0;
         // Probe around the defender's outside shoulder, never straight through their body.
         goals[handler]=ahead && gap<7 ? {x:d.x+(side===0?3:-3),y:clamp(d.y+driveSide*4.5,4,46)} : target;
@@ -381,17 +457,11 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
           goals[screenDefender!]=facing({x:79+defensiveStyle(players[screenDefender!]).rim*4,y:25+dir*3},side);
         }
         if(screenStage==="reading" && elapsed-readAt>=1.6) {
-          const defenders=defense.map(i=>({spot:spots[i],player:players[i]}));
-          const options=offense.map(i=>{
-            const spot=spots[i], three=distanceTo(spot,hoop)>=23.75 || Math.abs(spot.y-25)>=22;
-            const q=shotQuality(players[i],spot,defenders,side,three);
-            const passCost=i===handler?0:.04+distanceTo(spots[handler],spot)*.003/Math.sqrt(players[handler].passing);
-            return {i,three,value:q.expected-passCost};
-          }).filter(o=>!o.three || players[o.i].threeShare>.25).sort((a,b)=>b.value-a.value);
-          shooter=options[0]?.i??handler; target={...spots[shooter]};
-          action=distanceTo(target,hoop)<10?"cut":shooter===handler?"pull-up":"catch-and-shoot";
-          passed=shooter!==handler; passStartSeconds=elapsed;passEndSeconds=elapsed+.45;
           if(screen.coverage==="switch") {assignments.set(handler,screenDefender!);assignments.set(s,onBall);}
+          const read=readScreen(players,side,handler,spots,assignments,seconds-elapsed);
+          shooter=read.shooter;target={...read.shot};action=read.action;
+          passed=shooter!==handler;passStartSeconds=elapsed;passEndSeconds=elapsed+.45;
+          contained=0;helper=null;
           screenStage="done";
         }
       }

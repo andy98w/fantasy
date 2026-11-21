@@ -2,9 +2,58 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
+
+test("player tendencies produce distinct perimeter, interior and passing-big routes without name overrides",()=>{
+  const base=simulationPlayer(players[0]);
+  const wing={...base,position:"SG",threeShare:.7,passing:3,rebound:4,usage:20};
+  const big={...base,position:"C",threeShare:.03,passing:2,rebound:14,usage:17};
+  const hub={...big,passing:10};
+  assert.ok(playerStyle(wing).relocation>playerStyle(big).relocation+.4);
+  assert.ok(playerStyle(big).screening>playerStyle(wing).screening+.4);
+  assert.deepEqual(playerStyle(wing),playerStyle({...wing,id:999,name:"Different name",nbaTeam:"XYZ"}));
+  const origin={x:85,y:7};
+  const shooterTarget=supportRoute(wing,origin,0,1,false,false);
+  const rimTarget=supportRoute(big,origin,0,1,false,false);
+  const hubTarget=supportRoute(hub,origin,0,1,false,false);
+  assert.ok(Math.hypot(shooterTarget.x-88.75,shooterTarget.y-25)>23.75,"Shooter lifts behind the arc");
+  assert.ok(Math.hypot(rimTarget.x-88.75,rimTarget.y-25)<12,"Interior player stays available near the basket");
+  assert.ok(hubTarget.x>70 && hubTarget.x<80,"Passing big finds the elbow");
+  for(const p of [wing,big,hub]) {
+    const a=supportRoute(p,origin,0,.6,false,false),b=supportRoute(p,{x:9,y:7},1,.6,false,false);
+    assert.ok(Math.hypot(94-a.x-b.x,a.y-b.y)<1e-9);
+  }
+  const setup=[{x:62,y:25},origin,{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:11},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const intent={shooter:0,shot:{x:80,y:25},three:false,action:"cut" as const,chance:.3,value:.9};
+  const run=(profile:typeof base)=>resolvePossession(players.map((p,i)=>i===1?profile:simulationPlayer(p)),0,0,setup,setup,intent,8);
+  const shooterMotion=run(wing),hubMotion=run(hub);
+  assert.ok(Math.hypot(shooterMotion.to[1].x-hubMotion.to[1].x,shooterMotion.to[1].y-hubMotion.to[1].y)>5,"Profiles must change stored court movement, not just labels");
+});
+
+test("play selection favors moving shooters, rolling bigs, stretch pops and passing-hub handoffs",()=>{
+  const base=simulationPlayer(players[0]);
+  const creator={...base,position:"PG",passing:9,usage:24,rebound:4,threeShare:.4};
+  const wing={...base,position:"SG",passing:3,usage:20,rebound:4,threeShare:.7};
+  const big={...base,position:"C",passing:2,usage:18,rebound:14,threeShare:.02};
+  const spot=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const sample=(handler:typeof base,screener:typeof base)=>{
+    let state=2718;
+    const rng=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+    const roster=[handler,wing,{...wing,threeShare:.02},{...wing,threeShare:.25},screener,...players.slice(5).map(simulationPlayer)];
+    return Array.from({length:1200},()=>chooseShot(roster,0,0,spot,rng));
+  };
+  const normal=sample(creator,big),stretch=sample(creator,{...big,threeShare:.6});
+  const hub=sample({...big,passing:10},big);
+  assert.ok(normal.filter(p=>p.movement?.receiver===1).length>normal.filter(p=>p.movement?.receiver===2).length*2,"Moving shooter gets more designed catches than non-shooter");
+  assert.ok(normal.filter(p=>p.screen?.screener===4).length>normal.filter(p=>p.screen?.screener===1).length*3,"Big sets more ball screens than guard");
+  assert.equal(normal.filter(p=>p.screen?.screener===4 && p.screen.mode==="pop").length,0);
+  assert.ok(stretch.filter(p=>p.screen?.screener===4 && p.screen.mode==="pop").length>100);
+  assert.ok(hub.filter(p=>p.movement?.kind==="handoff").length>normal.filter(p=>p.movement?.kind==="handoff").length*1.5);
+});
 
 test("simulation replay is deterministic and scrubbing cannot reveal future box scores", () => {
   const game = simulate(teams, 120, 42);

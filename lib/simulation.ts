@@ -56,6 +56,42 @@ const facing = (p: Point, side: Side): Point => side === 0 ? p : { x: 94 - p.x, 
 export const basket = (side: Side): Point => facing({ x: 88.75, y: 25 }, side);
 const distanceTo = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const isBig = (p: SimPlayer) => /C|PF/.test(p.position);
+/** Inferred tendencies, not measured tracking or name-based signature animations.
+ * Continuous blends let a passing/shooting big keep both parts of their game. */
+export function playerStyle(p:SimPlayer) {
+  const big=isBig(p), perimeter=clamp(p.threeShare/.65,0,1);
+  const creation=clamp(p.passing/10*.65+p.usage/28*.35,0,1);
+  return {
+    perimeter, creation,
+    relocation:clamp(.15+.85*perimeter*(1-.35*creation),0,1),
+    cutting:clamp(.15+.55*(1-perimeter)+(big?0:.2),0,1),
+    interior:clamp((big?.45:.08)+p.rebound/18*.3+(1-perimeter)*.25,0,1),
+    screening:clamp(.1+(big?.55:0)+p.rebound/15*.3,0,1),
+    hub:big?clamp(p.passing/9,0,1):0,
+    pullUp:perimeter*(.25+.75*creation),
+  };
+}
+/** Choose a basketball destination instead of giving every off-ball player the
+ * same lift. Origins stay fixed for the possession, avoiding frame-to-frame flips. */
+export function supportRoute(p:SimPlayer, origin:Point, side:Side, progress:number, cutter:boolean, driving:boolean) {
+  const style=playerStyle(p), local=facing(origin,side), upper=local.y<25;
+  const movement=clamp(progress*(.65+style.relocation*.7+style.cutting*.25),0,1);
+  let destination:Point;
+  if(cutter) {
+    const crossing={x:83,y:25}, exit={x:85,y:upper?39:11};
+    destination=driving?lerp(local,{x:88,y:upper?10:40},movement)
+      :movement<.55?lerp(local,crossing,movement/.55):lerp(crossing,exit,(movement-.55)/.45);
+  } else if(style.hub>.65) {
+    destination=lerp(local,{x:75,y:upper?16:34},movement); // Elbow passing outlet.
+  } else if(style.perimeter>.45) {
+    destination=lerp(local,local.x>77?{x:66,y:upper?10:40}:{x:87,y:upper?3:47},movement);
+  } else if(style.interior>.6) {
+    destination=lerp(local,{x:86,y:upper?17:33},movement); // Dunker spot; don't clog the drive.
+  } else {
+    destination=lerp(local,{x:64+5*(1-style.creation),y:upper?12:38},movement);
+  }
+  return facing(destination,side);
+}
 function separateBodies(points:Point[]) {
   for(let iteration=0;iteration<8;iteration++) for(let i=0;i<10;i++) for(let j=i+1;j<10;j++) {
     const d=distanceTo(points[i],points[j]); if(d>=3.9)continue;
@@ -109,7 +145,8 @@ function formation(players: SimPlayer[], side: Side, handler: number, rng: () =>
   const wings = offense.filter(i => i !== handler && i !== big).sort((a,b) => players[b].threeShare - players[a].threeShare);
   const result: Point[] = Array(10);
   result[handler] = facing({ x:62, y:25 }, side);
-  result[big] = facing({ x:84, y:19 + rng()*12 }, side);
+  const bigStyle=playerStyle(players[big]);
+  result[big] = facing({ x:bigStyle.hub>.65?75:bigStyle.perimeter>.55?64:84, y:19 + rng()*12 }, side);
   // Stronger perimeter shooters occupy the corners; non-shooters cut inside.
   const wingSpots = [{x:87,y:3},{x:85,y:47},{x:68,y:8}];
   wings.forEach((i, slot) => { const p = wingSpots[slot]; result[i] = facing(players[i].threeShare > .25 ? p : {x:78 + rng()*4,y:12 + slot*12}, side); });
@@ -133,7 +170,7 @@ export function shotQuality(player: SimPlayer, shot: Point, defenders: {spot:Poi
   const chance = clamp((three ? player.threePct : player.twoPct) + location + .04*(1-contest) - contest*(three ? .13 : .12) - (three ? 0 : protection*.018), .12, .82);
   return { chance, expected: chance*(three ? 3 : 2), nearest };
 }
-function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], rng:()=>number):ShotIntent {
+export function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], rng:()=>number):ShotIntent {
   const defense = indices((1-side) as Side), hoop = basket(side);
   const defenders = defense.map(i => ({spot:to[i],player:players[i]}));
   const candidates: {shooter:number; shot:Point; three:boolean; action:SimPlay["action"]; chance:number; value:number}[] = [];
@@ -142,7 +179,11 @@ function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], 
     const passDistance = distanceTo(to[handler],shot);
     // A long pass is a little riskier; efficient, open shots are worth moving the ball for.
     const passCost = shooter === handler ? 0 : .025 + passDistance*.002/Math.sqrt(players[handler].passing);
-    candidates.push({shooter,shot,three,action,chance:quality.chance,value:quality.expected-passCost});
+    const style=playerStyle(players[shooter]);
+    const preference=action==="drive"?.18*(1-style.perimeter)+.1*style.creation
+      :action==="pull-up"?.22*style.pullUp
+      :three?.22*style.relocation:.16*style.interior;
+    candidates.push({shooter,shot,three,action,chance:quality.chance,value:quality.expected-passCost+preference});
   };
   for (const i of indices(side)) {
     const p = players[i];
@@ -158,18 +199,19 @@ function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], 
   }
   // Soft choice favors expected points without making the same play every time.
   const selected = pick(candidates.map((_,i)=>i), i => Math.exp(candidates[i].value*5) * Math.pow(players[candidates[i].shooter].usage,.35), rng);
-  if(rng()<.42) {
-    const candidates=indices(side).filter(i=>i!==handler);
-    const screener=pick(candidates,i=>players[i].rebound+(isBig(players[i])?8:1),rng);
-    const mode=players[screener].threeShare>.3 && rng()<.55 ? "pop" : "roll";
+  const teammates=indices(side).filter(i=>i!==handler), handlerStyle=playerStyle(players[handler]);
+  const screenFit=Math.max(...teammates.map(i=>playerStyle(players[i]).screening));
+  if(rng()<clamp(.14+.28*handlerStyle.creation+.15*screenFit-.2*handlerStyle.hub,.14,.57)) {
+    const screener=pick(teammates,i=>Math.pow(playerStyle(players[i]).screening,2),rng);
+    const mode=players[screener].threeShare>.3 && rng()<playerStyle(players[screener]).perimeter*.8 ? "pop" : "roll";
     return {shooter:handler,shot:facing({x:78,y:25},side),three:false,action:"drive",chance:0,value:0,
       screen:{screener,mode,coverage:rng()<.35?"switch":"drop",direction:rng()<.5?-1:1}};
   }
-  if(rng()<.5) {
-    const teammates=indices(side).filter(i=>i!==handler);
-    const receiver=pick(teammates,i=>players[i].usage*(.3+players[i].threeShare),rng);
-    const kind=rng()<.5?"handoff":"off-ball-screen";
-    const screener=kind==="handoff"?handler:pick(teammates.filter(i=>i!==receiver),i=>players[i].rebound+(isBig(players[i])?8:1),rng);
+  const movementFit=Math.max(...teammates.map(i=>playerStyle(players[i]).relocation));
+  if(rng()<clamp(.16+.42*movementFit+.18*handlerStyle.hub,.16,.75)) {
+    const receiver=pick(teammates,i=>players[i].usage*(.12+Math.pow(playerStyle(players[i]).relocation,2)),rng);
+    const kind=rng()<.25+.5*handlerStyle.hub?"handoff":"off-ball-screen";
+    const screener=kind==="handoff"?handler:pick(teammates.filter(i=>i!==receiver),i=>Math.pow(playerStyle(players[i]).screening,2),rng);
     return { ...candidates[selected], shooter:receiver, action:"catch-and-shoot",
       movement:{kind,receiver,screener,direction:rng()<.5?-1:1} };
   }
@@ -204,7 +246,8 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
   const steps=Math.max(120,Math.ceil(seconds*30)), dt=seconds/steps;
   const driveSide=intent.shot.y<=25 ? -1 : 1;
   const support=offense.filter(i=>i!==handler && i!==intent.shooter && i!==screen?.screener && i!==movementPlan?.screener);
-  const cutter=[...support].sort((a,b)=>(players[b].rebound*(1-players[b].threeShare))-(players[a].rebound*(1-players[a].threeShare)))[0];
+  const cutter=[...support].filter(i=>playerStyle(players[i]).cutting>.55 && playerStyle(players[i]).hub<.65)
+    .sort((a,b)=>playerStyle(players[b]).cutting-playerStyle(players[a]).cutting)[0];
   const attackStart=Math.min(.2,4.5/seconds);
   let attackTick:number|null=null, readyFor=0, usedSeconds=seconds;
   let passStartSeconds=seconds*.32/.55, passEndSeconds=seconds*.52/.55;
@@ -223,18 +266,12 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
       const movement=clamp((tick-attackTick!)*dt/4.5,0,1);
       for(const i of support) {
         if(i===shooter)continue; // A kick-out receiver holds the chosen catch point.
-        const origin=facing(setup[i],side), upper=origin.y<25;
-        let destination:Point;
-        if(i===cutter) {
-          const crossing={x:82,y:25}, exit={x:85,y:upper?39:11};
-          destination=intent.action==="drive"
-            ? lerp(origin,{x:88,y:upper?10:40},movement)
-            : movement<.55 ? lerp(origin,crossing,movement/.55) : lerp(crossing,exit,(movement-.55)/.45);
-        } else {
-          const destinationY=upper?8:42;
-          destination=lerp(origin,{x:origin.x>80?73:82,y:destinationY},movement);
+        goals[i]=supportRoute(players[i],setup[i],side,movement,i===cutter,intent.action==="drive");
+        if(movementPlan?.kind==="off-ball-screen" && movementStage!=="done") {
+          // Keep the curl lane clear while a teammate uses the screen.
+          const slot=support.indexOf(i), style=playerStyle(players[i]);
+          goals[i]=facing({x:style.perimeter>.45?66+slot*16:84,y:25+direction*(12+slot*6)},side);
         }
-        goals[i]=facing(destination,side);
       }
       phase=action==="drive" ? "Driving" : action==="pull-up" ? "Pull-up" : action==="cut" ? "Cutting" : passed ? "Kick-out" : "Moving the ball";
       if(action==="drive" && screenStage==="done" && !movementPlan) {
@@ -249,7 +286,8 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
         }
         if(helper!==null)phase="Help defense";
         const helpClose=helper!==null && distanceTo(spots[helper],h)<5;
-        if((contained>3.1 || helpClose || progress>.9) && distanceTo(h,hoop)>7) {
+        const patience=3.8-playerStyle(players[handler]).creation*1.4;
+        if((contained>patience || helpClose || progress>.9) && distanceTo(h,hoop)>7) {
           const options=offense.filter(i=>i!==handler).map(i=>{
             const dist=distanceTo(spots[i],hoop), three=dist>=23.75 || Math.abs(spots[i].y-25)>=22;
             const q=shotQuality(players[i],spots[i],defense.map(d=>({spot:spots[d],player:players[d]})),side,three);
@@ -257,10 +295,10 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
           }).filter(o=>(!o.three || players[o.i].threeShare>.25) && o.q.nearest>4.5);
           options.sort((a,b)=>b.q.expected-a.q.expected);
           const finish=shotQuality(players[handler],h,defense.map(i=>({spot:spots[i],player:players[i]})),side,false);
-          if(progress<.86 && options.length && options[0].q.expected > finish.expected+.08) {
+          if(progress<.86 && options.length && options[0].q.expected > finish.expected+.18-playerStyle(players[handler]).creation*.18) {
             shooter=options[0].i; target={...spots[shooter]}; action="catch-and-shoot"; passed=true;
             passStartSeconds=elapsed; passEndSeconds=Math.min(seconds,elapsed+.45); phase="Kick-out";
-          } else if(contained>3.1 || progress>.9) {
+          } else if(contained>patience || progress>.9) {
             shooter=handler; target={...h}; action=distanceTo(h,hoop)<12 ? "drive" : "pull-up"; phase=action==="drive" ? "Finishing through contact" : "Drive stopped · Pull-up";
           }
         }
@@ -366,7 +404,8 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
         phase=kind==="handoff"?"Handoff · Turn the corner":"Curl · Catch";
         goals[receiver]=target;
         goals[receiverDefender]=approach(spots[receiver],hoop,4.2);
-        goals[screener]=facing({x:84,y:25+direction*7},side);
+        const style=playerStyle(players[screener]);
+        goals[screener]=facing(style.perimeter>.55?{x:64,y:25+direction*7}:style.hub>.65?{x:75,y:25+direction*8}:{x:84,y:25+direction*7},side);
         if(distanceTo(spots[receiver],target)<1 || elapsed>seconds-.7) {
           target={...spots[receiver]};action="catch-and-shoot";movementStage="done";
         }
@@ -544,7 +583,7 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
     if(n===0)return;
     const progress=n/(half.frames.length-1)*.55;
     const at=offset+n/(half.frames.length-1)*half.seconds;
-    const ball=progress<half.passAt?frame.spots[carrier]:lerp(frame.spots[carrier],frame.spots[half.shooter],(progress-half.passAt)/(half.passEnd-half.passAt));
+    const ball=progress<half.passAt?frame.spots[carrier]:progress>=half.passEnd?frame.spots[half.shooter]:lerp(frame.spots[carrier],frame.spots[half.shooter],(progress-half.passAt)/(half.passEnd-half.passAt));
     frames.push({...frame,at,ball:{...ball},carrier:progress<half.passEnd?carrier:half.shooter,
       phase:n<15?"Fast break covered · Flow into offense":frame.phase});
   });

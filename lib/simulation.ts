@@ -59,6 +59,44 @@ function separateBodies(points:Point[]) {
   }
   return points;
 }
+/** Arrive gently, then remove closing velocity at contact while preserving sliding.
+ * Positions are never pushed apart during motion: that correction fights steering
+ * and causes the alternating-frame vibration. Initial formations are separated once.
+ */
+export function moveBodies(spots:Point[], velocities:Point[], goals:Point[], speeds:number[], dt:number) {
+  const blend=1-Math.exp(-dt/.14);
+  const nextVelocity=spots.map((p,i)=>{
+    const dx=goals[i].x-p.x, dy=goals[i].y-p.y, distance=Math.hypot(dx,dy);
+    const speed=Math.min(speeds[i],Math.max(0,distance-.04)*4);
+    const desired=distance>0 ? {x:dx/distance*speed,y:dy/distance*speed} : {x:0,y:0};
+    return {x:velocities[i].x+(desired.x-velocities[i].x)*blend,y:velocities[i].y+(desired.y-velocities[i].y)*blend};
+  });
+  // Project onto non-closing contact constraints, including court boundaries.
+  // A small safety margin accommodates interacting contacts without positional snaps.
+  for(let iteration=0;iteration<48;iteration++) {
+    let correctionSize=0;
+    for(let i=0;i<spots.length;i++) for(let j=i+1;j<spots.length;j++) {
+      const dx=spots[j].x-spots[i].x, dy=spots[j].y-spots[i].y, distance=Math.hypot(dx,dy);
+      const nx=distance>0?dx/distance:0, ny=distance>0?dy/distance:1;
+      const closing=(nextVelocity[i].x-nextVelocity[j].x)*nx+(nextVelocity[i].y-nextVelocity[j].y)*ny;
+      const allowed=Math.max(0,distance-3.95)/dt;
+      if(closing>allowed) {
+        const correction=(closing-allowed)/2;
+        correctionSize=Math.max(correctionSize,correction);
+        nextVelocity[i].x-=nx*correction; nextVelocity[i].y-=ny*correction;
+        nextVelocity[j].x+=nx*correction; nextVelocity[j].y+=ny*correction;
+      }
+    }
+    nextVelocity.forEach((v,i)=>{
+      const x=clamp(v.x,(2-spots[i].x)/dt,(92-spots[i].x)/dt);
+      const y=clamp(v.y,(2-spots[i].y)/dt,(48-spots[i].y)/dt);
+      correctionSize=Math.max(correctionSize,Math.abs(x-v.x),Math.abs(y-v.y));
+      v.x=x; v.y=y;
+    });
+    if(correctionSize<.00001)break;
+  }
+  return {spots:spots.map((p,i)=>({x:p.x+nextVelocity[i].x*dt,y:p.y+nextVelocity[i].y*dt})),velocities:nextVelocity};
+}
 function formation(players: SimPlayer[], side: Side, handler: number, rng: () => number) {
   const offense = indices(side), defense = indices((1 - side) as Side);
   const big = [...offense].filter(i => i !== handler).sort((a, b) => (players[b].rebound + (isBig(players[b]) ? 5 : 0)) - (players[a].rebound + (isBig(players[a]) ? 5 : 0)))[0];
@@ -127,6 +165,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
   }
   const onBall=assignments.get(handler)!;
   let spots=start.map(p=>({...p})), shooter=intent.shooter, action=intent.action, target={...intent.shot};
+  let velocities=spots.map(()=>({x:0,y:0}));
   let helper:number|null=null, contained=0, passed=false, passAt=.32, phase="Getting set";
   const frames:MotionFrame[]=[{spots:spots.map(p=>({...p})),phase}];
   const steps=Math.max(120,Math.ceil(seconds*30)), dt=seconds/steps;
@@ -144,10 +183,10 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
         goals[handler]=ahead && gap<7 ? {x:d.x+(side===0?3:-3),y:clamp(d.y+driveSide*4.5,4,46)} : target;
         if(ahead && gap<6) {contained+=dt; phase="Defender contains drive";}
         else contained=Math.max(0,contained-dt*.5);
-        if(distanceTo(h,hoop)<18) {
+        if(helper===null && distanceTo(h,hoop)<18) {
           helper=defense.filter(i=>i!==onBall).sort((a,b)=>distanceTo(spots[a],h)-distanceTo(spots[b],h))[0];
-          phase="Help defense";
         }
+        if(helper!==null)phase="Help defense";
         const helpClose=helper!==null && distanceTo(spots[helper],h)<5;
         if((contained>3.1 || helpClose || progress>.9) && distanceTo(h,hoop)>7) {
           const options=offense.filter(i=>i!==handler).map(i=>{
@@ -172,24 +211,16 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
       const defender=assignments.get(i)!;
       const observed=attacking ? frames[Math.max(0,frames.length-1-Math.round(.25/dt))].spots : spots;
       const attacker=observed[i];
-      const gap=i===handler && action==="drive" ? 3.8 : 4.2;
+      const gap=i===handler && action==="drive" ? 4.2 : 4.5;
       goals[defender]=approach(attacker,hoop,gap);
-      if(attacking && i===shooter && action!=="drive") goals[defender]=approach(attacker,hoop,3.9);
+      if(attacking && i===shooter && action!=="drive") goals[defender]=approach(attacker,hoop,4.2);
     }
     if(attacking && helper!==null && action==="drive") goals[helper]=approach(spots[handler],hoop,4.5);
-    // When the pass leaves, every defender returns to their own assignment.
-    const next=spots.map((p,i)=>{
-      const speed=defense.includes(i) ? attacking ? 7.5 : 16 : i===handler ? 11.5 : 14;
-      let goal=goals[i];
-      // Local avoidance curves around teammates/opponents instead of crossing bodies.
-      let ax=0,ay=0;
-      spots.forEach((other,j)=>{if(i===j)return;const d=distanceTo(p,other);if(d>0 && d<5){const w=(5-d)*1.5;ax+=(p.x-other.x)/d*w;ay+=(p.y-other.y)/d*w;}});
-      goal={x:goal.x+ax,y:goal.y+ay};
-      const moved=approach(p,goal,speed*dt);
-      return {x:clamp(moved.x,2,92),y:clamp(moved.y,2,48)};
-    });
-    // Small steps plus body separation prevent tunnelling; solve symmetrically.
-    separateBodies(next);
+    // Retain actual contact-adjusted velocity so the next tick cannot bounce back.
+    const speeds=spots.map((_,i)=>defense.includes(i) ? attacking ? 11 : 16 : i===handler ? 11.5 : 14);
+    const movement=moveBodies(spots,velocities,goals,speeds,dt);
+    velocities=movement.velocities;
+    const next=movement.spots;
     spots=next; frames.push({spots:spots.map(p=>({...p})),phase});
   }
   const shot={...spots[shooter]}, dist=distanceTo(shot,hoop);

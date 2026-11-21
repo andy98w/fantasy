@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -211,4 +211,51 @@ test("games open at center court and the clock starts at the tap",()=>{
   assert.ok(Math.hypot(before.ball.x-after.ball.x,before.ball.y-after.ball.y)<.01);
   assert.equal(gameElapsed(game,tip.duration),game.plays[0].gameStart);
   assert.deepEqual(simulationState(game,tip.duration).score,[0,0]);
+});
+
+
+test("opposing players settle at contact without bouncing or passing through",()=>{
+  let spots=[{x:40,y:25},{x:44,y:25}], velocities=spots.map(()=>({x:0,y:0}));
+  const goals=[{x:50,y:25},{x:34,y:25}], tail:number[]=[];
+  for(let frame=0;frame<300;frame++) {
+    ({spots,velocities}=moveBodies(spots,velocities,goals,[12,12],1/30));
+    assert.ok(spots[1].x-spots[0].x>=3.94);
+    if(frame>240)tail.push(spots[0].x);
+  }
+  assert.ok(Math.max(...tail)-Math.min(...tail)<.001);
+  assert.ok(velocities.every(v=>Math.hypot(v.x,v.y)<.001));
+});
+
+test("contact preserves sideways movement and a crowded boundary stays stable",()=>{
+  let spots=[{x:40,y:25},{x:43.95,y:25}], velocities=spots.map(()=>({x:0,y:0}));
+  for(let frame=0;frame<90;frame++) {
+    ({spots,velocities}=moveBodies(spots,velocities,[{x:50,y:35},{x:34,y:35}],[12,12],1/30));
+    assert.ok(Math.hypot(spots[0].x-spots[1].x,spots[0].y-spots[1].y)>3.94);
+  }
+  assert.ok(spots.every(p=>p.y>34)); // They slide along contact rather than freezing.
+  spots=[{x:84,y:25},{x:88,y:25},{x:92,y:25}];velocities=spots.map(()=>({x:0,y:0}));
+  const tail:number[]=[];
+  for(let frame=0;frame<300;frame++) {
+    ({spots,velocities}=moveBodies(spots,velocities,spots.map(()=>({x:98,y:25})),[14,14,14],1/30));
+    assert.ok(spots.every(p=>p.x<=92 && p.x>=2));
+    assert.ok(spots[1].x-spots[0].x>3.9 && spots[2].x-spots[1].x>3.9);
+    if(frame>240)tail.push(spots[0].x);
+  }
+  assert.ok(Math.max(...tail)-Math.min(...tail)<.001);
+});
+
+test("crowded possessions avoid repeated abrupt frame reversals",()=>{
+  let reversals=0, movements=0;
+  for(let seed=0;seed<12;seed++) for(const play of simulate(teams,120,seed).plays) {
+    for(let t=2;t<play.frames.length;t++) for(let i=0;i<10;i++) {
+      const [a,b,c]=[t-2,t-1,t].map(n=>play.frames[n].spots[i]);
+      const v={x:b.x-a.x,y:b.y-a.y}, w={x:c.x-b.x,y:c.y-b.y};
+      const speed=Math.hypot(v.x,v.y), nextSpeed=Math.hypot(w.x,w.y);
+      if(speed>.03 && nextSpeed>.03 && v.x*w.x+v.y*w.y<-.5*speed*nextSpeed)reversals++;
+      movements++;
+    }
+  }
+  // Allow real tactical changes, but reject alternating-frame collision vibration.
+  // The previous positional-push solver reversed on nearly half of these samples.
+  assert.ok(reversals/movements<.002,`${reversals} abrupt reversals in ${movements} samples`);
 });

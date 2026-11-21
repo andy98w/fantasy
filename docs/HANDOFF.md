@@ -427,3 +427,9 @@ Each game begins with two jumpers at center court, a ball toss and a tap to the 
 Removed the large Simulate heading and Exhibition / step-counter line from setup and playback. Navigation remains. No fantasy ratings, projections, MCP or upstream data changes.
 
 Validation: 14 simulation tests cover deterministic replay, accounting, separation, defensive branching, actual-position shot odds, tip-off continuity and stopped FT clocks. Browser checks confirmed center-court opening and a clock frozen at 5:55 across both free throws as score/replay advanced. All 205 app tests, production build with TypeScript and standalone smoke passed. Verify exact-commit CI and Railway deployment before claiming release.
+
+## November 20 collision jitter fix
+
+Replaced per-frame repulsive goal offsets and positional separation with damped arrival velocity and iterative non-closing velocity constraints. Bodies slow near their targets, retain sideways motion at contact, and carry their contact-adjusted velocity into the next step. Court boundaries participate in the same solver; initial formations alone use positional separation. Help defenders stay assigned through the drive instead of switching every frame, and defensive pursuit speed preserves containment with the new movement. Stored trajectories still drive both shot odds and rendering; replay/seek stays deterministic.
+
+Added regressions for opposing bodies settling without bouncing, sideways sliding, crowded sideline stability and abrupt direction reversals across twelve games. Existing separation, defensive branches, accounting, stopped-clock and tip-off tests remain. Local browser checks stepped through a contained drive with stable off-ball players and no console errors. All 208 app tests, production build with TypeScript and standalone smoke passed. Verify exact-commit CI/deployment before claiming release.

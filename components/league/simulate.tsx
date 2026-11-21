@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Player } from "@/lib/schema";
 import { canSimulate, courtFrame, simulate, simulationState, type Simulation, type Side } from "@/lib/simulation";
 import { AnalysisPlayerPicker } from "./analysis-player-picker";
@@ -17,11 +17,13 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
   const [game, setGame] = useState<Simulation | null>(null), [time, setTime] = useState(0), [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState("120"), [speed, setSpeed] = useState("2"), [motion, setMotion] = useState(true), [edit, setEdit] = useState<[Side, number] | null>(null);
   const [boxSide, setBoxSide] = useState("0"), elapsed = useRef(0);
+  const [courtReady, setCourtReady] = useState(false);
+  const screen = useRef<HTMLDivElement>(null);
+  const onCourtReady = useCallback(() => { setCourtReady(true); setPlaying(true); screen.current?.scrollIntoView({ block: "start" }); }, []);
+  useEffect(() => { if (game) { screen.current?.scrollIntoView({ block: "start" }); screen.current?.focus({ preventScroll: true }); } }, [game]);
   useEffect(() => { const media = matchMedia("(prefers-reduced-motion: reduce)"); const update = () => setMotion(!media.matches); update(); media.addEventListener("change", update); return () => media.removeEventListener("change", update); }, []);
   const lineups = useMemo(() => ids.map(team => team.map(id => eligible.find(p => p.id === id)).filter((p): p is Player => !!p)) as [Player[], Player[]], [ids, eligible]);
   const ready = lineups.every(t => t.length === 5) && new Set(ids.flat()).size === 10;
-  const preview = useMemo(() => ready ? simulate(lineups, Number(duration), 1) : null, [lineups, ready, duration]);
-  const display = game ?? preview;
   useEffect(() => {
     if (!playing || !game) return;
     let handle = 0, before = performance.now(), lastPaint = before;
@@ -37,42 +39,51 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
     return () => { cancelAnimationFrame(handle); document.removeEventListener("visibilitychange", hide); };
   }, [playing, game, speed]);
   const seek = (value: number) => { elapsed.current = value; setTime(value); };
-  const start = () => { if (!ready) return; setGame(simulate(lineups, Number(duration), crypto.getRandomValues(new Uint32Array(1))[0])); seek(0); setEdit(null); setPlaying(true); };
+  const start = () => { if (!ready) return; setGame(simulate(lineups, Number(duration), crypto.getRandomValues(new Uint32Array(1))[0])); seek(0); setEdit(null); setCourtReady(false); setPlaying(false); };
   if (eligible.length < 10) return <Empty>Simulate needs ten players with at least three games and complete season stats.</Empty>;
-  const snapshot = display ? simulationState(display, time) : null, finished = !!game && time >= game.duration;
-  const current = display ? courtFrame(display, time, motion) : null;
+  const snapshot = game ? simulationState(game, time) : null, finished = !!game && time >= game.duration;
+  const current = game ? courtFrame(game, time, motion) : null;
   const choose = (id: number) => { if (!edit) return; setIds(old => old.map((team, side) => side === edit[0] ? team.map((value, slot) => slot === edit[1] ? id : value) : team)); setEdit(null); };
-  return <div className="simulation">
-    <div className="sim-heading"><span className="sim-exhibition">Exhibition · Beta</span><span className="muted">{game ? "Simulated game" : "Pick your five. Build the other side."}</span></div>
-    <div className="sim-layout">
-      <aside className="sim-lineups" aria-label="Exhibition lineups">
+  return <div className="simulation" ref={screen} tabIndex={-1}>
+    <div className="sim-heading"><span className="sim-exhibition">Exhibition · Beta</span><span className="muted">{game ? "2 / 2 · Watch" : "1 / 2 · Pick your teams"}</span></div>
+    {!game ? <div className="sim-setup">
+      <div className="sim-setup-toolbar"><h2>Build your matchup</h2><div className="sim-setup-actions">
+        <Select label="Exhibition length" value={duration} onChange={setDuration} options={[{value:"120",label:"2-minute game"},{value:"300",label:"5-minute game"},{value:"600",label:"10-minute game"}]} />
+        <Button variant="accent" disabled={!ready} onClick={start}>Watch game →</Button>
+      </div></div>
+      <div className="sim-lineups" aria-label="Exhibition lineups">
         {[0, 1].map(side => <section className={`sim-lineup sim-side-${side}`} key={side}>
-          <h2>{teamNames[side]} <span>5 players</span></h2>
-          {(game ? game.players.slice(side * 5, side * 5 + 5) : lineups[side]).map((p, index) => <div className="sim-roster-row" key={`${side}-${index}`}>
-            <span className="sim-shirt">{index + 1}</span><PlayerAvatar player={p} /><div className="sim-roster-name"><strong>{p.name}</strong><small>{p.nbaTeam} / {p.position}</small></div>
-            {!game && <Button variant="quiet" aria-label={`Replace ${p.name} on ${teamNames[side]}`} onClick={() => setEdit(edit?.[0] === side && edit[1] === index ? null : [side as Side, index])}>↔</Button>}
+          <h2>{teamNames[side]} <span>{lineups[side].length} / 5 players</span></h2>
+          {lineups[side].map((p, index) => <div key={`${side}-${index}`}>
+            <div className="sim-roster-row"><span className="sim-shirt">{index + 1}</span><PlayerAvatar player={p} /><div className="sim-roster-name"><strong>{p.name}</strong><small>{p.nbaTeam} / {p.position}</small></div>
+              <Button variant="quiet" aria-label={`Replace ${p.name} on ${teamNames[side]}`} onClick={() => setEdit(edit?.[0] === side && edit[1] === index ? null : [side as Side, index])}>{edit?.[0] === side && edit[1] === index ? "Cancel" : "Change"}</Button>
+            </div>
+            {edit?.[0] === side && edit[1] === index && <div className="sim-picker"><AnalysisPlayerPicker players={eligible.filter(p => !ids.flat().includes(p.id))} onChange={choose} label={`Find a ${teamNames[side]} player`} /></div>}
           </div>)}
-          {edit?.[0] === side && !game && <div className="sim-picker"><label>Replace slot {edit[1] + 1}</label><AnalysisPlayerPicker players={eligible.filter(p => !ids.flat().includes(p.id))} onChange={choose} label={`Find a ${teamNames[side]} player`} /></div>}
         </section>)}
-        {game ? <Button onClick={() => { setPlaying(false); setGame(null); seek(0); }}>Edit lineups</Button> : <Select label="Exhibition length" value={duration} onChange={setDuration} options={[{value:"120",label:"2-minute game"},{value:"300",label:"5-minute game"},{value:"600",label:"10-minute game"}]} />}
-      </aside>
+      </div>
+    </div> : <>
+      <div className="sim-watch-toolbar"><Button onClick={() => { setPlaying(false); setGame(null); setCourtReady(false); seek(0); }}>← Edit teams</Button><Button disabled={!ready} onClick={start}>New game</Button></div>
       <section className="sim-arena" aria-label="Exhibition game">
         <div className="sim-scoreboard">
           <div className="sim-score-teal"><span>Teal</span><strong>{snapshot?.score[0] ?? 0}</strong></div>
-          <div className="sim-clock"><strong>{clockText(Math.max(0, Number(game?.duration ?? duration) - time))}</strong><span>{finished ? snapshot?.score[0] === snapshot?.score[1] ? "Final · Tie" : "Final" : playing ? "Playing" : game ? "Paused" : "Ready"}</span></div>
+          <div className="sim-clock"><strong>{clockText(Math.max(0, game.duration - time))}</strong><span>{!courtReady ? "Loading court…" : finished ? snapshot?.score[0] === snapshot?.score[1] ? "Final · Tie" : "Final" : playing ? "Playing" : "Paused"}</span></div>
           <div className="sim-score-pink"><strong>{snapshot?.score[1] ?? 0}</strong><span>Pink</span></div>
         </div>
-        {display ? <Court game={display} time={time} motion={motion} /> : <Empty>Complete both lineups to start.</Empty>}
-        <div className="sim-possession"><span className={`sim-possession-dot sim-side-${current?.play.side ?? 0}`} /><span>{!game ? "Ready for tip-off" : finished ? "Game complete" : `${teamNames[current?.play.side ?? 0]} ball · ${current?.phase}`}</span><span>{game ? `Possession ${Math.min((snapshot?.completed.length ?? 0) + 1, game.plays.length)}` : "5 vs 5"}</span></div>
-        {game && snapshot?.completed.at(-1) && <div className="sim-call" aria-live="polite">{snapshot.completed.at(-1)!.text}</div>}
-        <div className="sim-playback">
-          {!game ? <Button variant="accent" disabled={!ready} onClick={start}>Simulate</Button> : <><Button variant="accent" onClick={() => { if (finished) seek(0); setPlaying(p => !p); }}>{finished ? "Replay" : playing ? "Pause" : "Play"}</Button><Button disabled={!ready} onClick={start}>New game</Button><Button variant="quiet" onClick={() => { setPlaying(false); seek(game.duration); }}>Final result</Button></>}
-          <Select label="Playback speed" value={speed} onChange={setSpeed} options={[{value:"1",label:"1× speed"},{value:"2",label:"2× speed"},{value:"4",label:"4× speed"}]} />
-          <label className="sim-motion"><input type="checkbox" checked={motion} onChange={e => setMotion(e.target.checked)} /> Court motion</label>
+        <div className="sim-stage"><Court key={game.seed} game={game} time={time} motion={motion} onReady={onCourtReady} /></div>
+        <div className="sim-transport">
+          <div className="sim-timeline"><input type="range" aria-label="Game timeline" disabled={!courtReady} min={0} max={game.duration} step={.1} value={time} onChange={e => { setPlaying(false); seek(Number(e.target.value)); }} /><span>{clockText(time)} / {clockText(game.duration)}</span></div>
+          <div className="sim-playback">
+            <Button variant="accent" disabled={!courtReady} onClick={() => { if (finished) seek(0); setPlaying(p => !p); }}>{finished ? "Replay" : playing ? "Pause" : "Play"}</Button>
+            <Button variant="quiet" disabled={!courtReady} onClick={() => { setPlaying(false); seek(game.duration); }}>Final result</Button>
+            <Select label="Playback speed" value={speed} onChange={setSpeed} options={[{value:"1",label:"1× speed"},{value:"2",label:"2× speed"},{value:"4",label:"4× speed"}]} />
+            <label className="sim-motion"><input type="checkbox" checked={motion} onChange={e => setMotion(e.target.checked)} /> Court motion</label>
+          </div>
         </div>
-        {game && <div className="sim-timeline"><input type="range" aria-label="Game timeline" min={0} max={game.duration} step={.1} value={time} onChange={e => { setPlaying(false); seek(Number(e.target.value)); }} /><span>{clockText(time)} / {clockText(game.duration)}</span></div>}
       </section>
-    </div>
+      <div className="sim-call" aria-live="polite">{snapshot?.completed.at(-1)?.text ?? `${teamNames[current?.play.side ?? 0]} ball · ${courtReady ? current?.phase : "Ready for tip-off"}`}</div>
+      <div className="sim-cast" aria-label="Players on court">{[0, 1].map(side => <div className={`sim-cast-team sim-side-${side}`} key={side}>{game.players.slice(side * 5, side * 5 + 5).map(p => <button key={p.id} title={p.name} aria-label={`View ${p.name}`} onClick={() => { const original = players.find(v => v.id === p.id); setPlaying(false); if (original) onPlayer(original); }}><PlayerAvatar player={p} /><span>{p.name}</span></button>)}</div>)}</div>
+    </>}
     {game && snapshot && <div className="sim-results">
       <section className="panel sim-box"><div className="panel-heading"><h2>Box score</h2><Tabs label="Simulated box score team" value={boxSide} onChange={setBoxSide} options={[{value:"0",label:"Teal"},{value:"1",label:"Pink"}]} /></div>
         <div className="table-scroll"><table><thead><tr><th>Player</th>{["PTS","REB","AST","STL","BLK","TO","PF","FG","3PT","FT"].map(k => <th key={k}>{k}</th>)}</tr></thead><tbody>{game.players.slice(Number(boxSide)*5, Number(boxSide)*5+5).map((p, i) => { const l = snapshot.lines[Number(boxSide)*5+i]; const original = players.find(v => v.id === p.id); return <tr key={p.id}><td><button className="sim-player-link" onClick={() => { setPlaying(false); if (original) onPlayer(original); }}>{p.name}</button></td>{[l.pts,l.reb,l.ast,l.stl,l.blk,l.to,l.pf,`${l.fgm}/${l.fga}`,`${l.tpm}/${l.tpa}`,`${l.ftm}/${l.fta}`].map((v,j)=><td key={j}>{v}</td>)}</tr>; })}</tbody></table></div>

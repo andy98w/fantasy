@@ -1,26 +1,25 @@
 .simulation { --sim-teal: #7cd9c4; --sim-pink: #ed91aa; }
 .sim-heading { display:flex; align-items:center; gap:18px; margin:-10px 0 22px; }
 .sim-exhibition { color:var(--gold); }
-.sim-layout { display:grid; grid-template-columns: minmax(250px, 310px) minmax(0, 1fr); gap:24px; align-items:start; }
-.sim-lineups { display:grid; gap:16px; min-width:0; }
+.sim-lineups { display:grid; grid-template-columns:1fr 1fr; gap:24px; min-width:0; }
 .sim-lineup { border:2px solid var(--line); background:var(--surface); border-top-color:var(--sim-teal); }
 .sim-lineup.sim-side-1 { border-top-color:var(--sim-pink); }
 .sim-lineup h2 { display:flex; align-items:center; justify-content:space-between; margin:0; padding:10px 14px; font-family:var(--pixel); font-size:22px; color:var(--sim-teal); }
 .sim-lineup.sim-side-1 h2 { color:var(--sim-pink); }
 .sim-lineup h2 span { color:var(--muted); font:12px var(--body); }
-.sim-roster-row { display:flex; align-items:center; gap:9px; padding:8px 12px; border-top:1px solid var(--line-soft); }
-.sim-roster-row .avatar { width:30px; height:34px; flex:0 0 30px; }
-.sim-roster-row .button { padding:5px; min-height:30px; flex:0 0 28px; }
+.sim-roster-row { display:flex; align-items:center; gap:9px; padding:14px 18px; border-top:1px solid var(--line-soft); }
+.sim-roster-row .avatar { width:52px; height:56px; flex:0 0 52px; }
+.sim-roster-row .button { padding:5px; min-height:30px; flex:0 0 auto; }
 .sim-shirt { color:var(--muted); font-size:12px; }
 .sim-roster-name { min-width:0; flex:1; }
-.sim-roster-name strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:13px; font-weight:500; }
+.sim-roster-name strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:16px; font-weight:500; }
 .sim-roster-name small { color:var(--muted); font-size:11px; }
 .sim-picker { padding:12px; border-top:1px solid var(--line); }
 .sim-picker label { display:block; margin-bottom:8px; color:var(--gold); }
 .sim-picker .analysis-picker { min-width:0; }
 .sim-picker .analysis-picker-menu { min-width:260px; z-index:30; }
 .sim-arena { border:2px solid var(--line); background:var(--surface-deep); min-width:0; box-shadow:6px 6px 0 var(--shadow); }
-.sim-scoreboard { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:20px 28px; gap:28px; }
+.sim-scoreboard { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:14px 24px; gap:28px; }
 .sim-score-teal,.sim-score-pink { display:flex; gap:20px; align-items:center; font:26px var(--pixel); }
 .sim-score-teal { color:var(--sim-teal); }
 .sim-score-pink { color:var(--sim-pink); justify-content:flex-end; }
@@ -32,15 +31,11 @@
 .sim-canvas { position:absolute; inset:0; }
 .sim-canvas canvas { display:block; }
 .sim-court-error { position:absolute; inset:0; display:flex; justify-content:center; align-items:center; gap:12px; }
-.sim-possession { display:flex; gap:8px; align-items:center; padding:12px 18px; color:var(--muted); border-bottom:1px solid var(--line-soft); font-size:13px; }
-.sim-possession > span:last-child { margin-left:auto; }
-.sim-possession-dot { width:7px; height:7px; background:var(--sim-teal); }
-.sim-possession-dot.sim-side-1 { background:var(--sim-pink); }
-.sim-playback { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:16px 18px; }
+.sim-playback { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 18px; }
 .sim-playback .select-trigger { width:auto; min-width:115px; }
 .sim-motion { display:flex; align-items:center; gap:7px; color:var(--muted); margin-left:auto; font-size:12px; cursor:pointer; }
 .sim-motion input { accent-color:var(--gold); }
-.sim-timeline { display:flex; align-items:center; gap:16px; padding:0 18px 18px; }
+.sim-timeline { display:flex; align-items:center; gap:16px; padding:10px 18px 0; }
 .sim-timeline input { flex:1; min-width:0; accent-color:var(--gold); cursor:pointer; height:24px; }
 .sim-timeline span { color:var(--muted); font-variant-numeric:tabular-nums; font-size:12px; }
 .sim-results { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:24px; margin-top:28px; }
@@ -62,7 +57,42 @@
 .sim-method { margin-top:24px; color:var(--muted); }
 .sim-method summary { color:var(--gold); cursor:pointer; }
 .sim-method p { max-width:85ch; line-height:1.7; }
-@media(max-width:1100px) { .sim-layout { grid-template-columns:240px minmax(0,1fr); gap:16px; } .sim-results { grid-template-columns:1fr; } .sim-scoreboard { padding:18px; gap:16px; } }
-@media(max-width:760px) { .sim-layout { display:flex; flex-direction:column-reverse; } .sim-arena,.sim-lineups { width:100%; } .sim-lineups { grid-template-columns:1fr 1fr; gap:10px; } .sim-lineups > .button,.sim-lineups > .select-trigger { grid-column:1/-1; } .sim-roster-row { padding:9px 7px; gap:5px; } .sim-roster-row .avatar,.sim-shirt { display:none; } .sim-roster-name strong { font-size:12px; } .sim-heading { gap:10px; font-size:12px; } .sim-scoreboard strong { font-size:30px; } .sim-clock strong { font-size:24px; } .sim-score-teal,.sim-score-pink { gap:10px; font-size:22px; } .sim-playback { padding:12px; gap:8px; } .sim-motion { margin-left:0; } .sim-possession { font-size:11px; padding:10px; } .sim-results .panel-heading { flex-wrap:wrap; gap:12px; } }
 .sim-call { padding:12px 18px; border-bottom:1px solid var(--line-soft); color:var(--text); min-height:46px; font-size:13px; }
-@media(max-width:760px) { .sim-lineup.sim-side-1 .analysis-picker-menu { right:0; left:auto; } .sim-picker .analysis-picker-menu { min-width:260px; max-width:calc(100vw - 60px); } }
+.simulation { outline:none; scroll-margin-top:16px; }
+.sim-setup { max-width:1080px; margin:auto; }
+.sim-setup-toolbar,.sim-setup-actions,.sim-watch-toolbar { display:flex; align-items:center; gap:12px; }
+.sim-setup-toolbar { justify-content:space-between; margin-bottom:24px; }
+.sim-setup-toolbar h2 { margin:0; font:26px var(--pixel); }
+.sim-setup-actions .select-trigger { width:190px; }
+.sim-watch-toolbar { justify-content:space-between; margin-bottom:12px; }
+.sim-stage { display:flex; justify-content:center; background:#101b21; }
+.sim-stage .sim-court { max-width:max(280px, calc((100svh - 340px) * 1.7857)); }
+.sim-transport { border-top:1px solid var(--line); }
+.sim-playback .button { min-width:84px; }
+.sim-cast { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin:16px 0 24px; }
+.sim-cast-team { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; border-top:2px solid var(--sim-teal); padding-top:12px; }
+.sim-cast-team.sim-side-1 { border-color:var(--sim-pink); }
+.sim-cast-team button { display:flex; flex-direction:column; align-items:center; gap:7px; min-width:0; background:none; border:0; color:var(--muted); font:12px var(--body); cursor:pointer; }
+.sim-cast-team .avatar { width:44px; height:48px; }
+.sim-cast-team button:hover { color:var(--gold); }
+.sim-cast-team button span:last-child { width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:1100px) { .sim-results { grid-template-columns:1fr; } }
+@media(max-width:760px) {
+  .sim-setup-toolbar { align-items:stretch; flex-direction:column; }
+  .sim-setup-actions { justify-content:space-between; }
+  .sim-setup-actions .select-trigger { width:auto; min-width:150px; }
+  .sim-lineups { grid-template-columns:1fr; gap:20px; }
+  .sim-roster-row { padding:10px 12px; }
+  .sim-roster-name strong { font-size:14px; }
+  .sim-heading { gap:10px; font-size:12px; }
+  .sim-scoreboard { padding:12px; gap:12px; }
+  .sim-scoreboard strong { font-size:30px; }
+  .sim-clock strong { font-size:24px; }
+  .sim-score-teal,.sim-score-pink { gap:10px; font-size:22px; }
+  .sim-playback { padding:10px; gap:8px; }
+  .sim-motion { margin-left:0; }
+  .sim-results .panel-heading { flex-wrap:wrap; gap:12px; }
+  .sim-cast { grid-template-columns:1fr; gap:12px; }
+  .sim-picker .analysis-picker-menu { min-width:0; width:100%; }
+  .sim-call { padding:12px 0; }
+}

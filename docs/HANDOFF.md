@@ -397,3 +397,9 @@ Phaser 3.90.0 is pinned and loaded only for the court. Rendering is separate fro
 This is an explicitly labeled fictional exhibition, not a forecasting/power model. Season stats inform usage, passing, shooting, steals, blocks and rebounds; shooting has fixed baseline shrinkage. Three-point attempt share is estimated from 3PM because the imported player stats lack 3PA, so individual three-point accuracy is not measured. Movement/defensive positioning are heuristic. Selected players are assumed healthy regardless of current injury status. No substitutions, fatigue, foul-outs, quarters or overtime; ties stand. Existing ratings, MCP, forecasts, ESPN and database contents are unchanged.
 
 Validation includes deterministic replay, seeking without future score leakage, accounting/geometry invariants across 100 seeds, invalid/incomplete lineups and independence from fantasy Power; browser checks cover replacement search, replay, final result, timeline and mobile overflow. Verify the release commit's CI and Railway deployment before claiming it is live.
+
+## November 20 simulation setup and theater
+
+Simulate now opens with two lineup cards and a prominent Watch game action. Starting moves to a separate playback screen, sized to keep the scoreboard, timeline and transport visible together. Edit teams retains the selected players and duration. Playback waits for the Phaser scene to initialize; the court is not loaded during team setup. New games remount and clean up the prior scene.
+
+Court markers use circular ESPN headshots with teal/pink rings instead of names and numbers; missing photos fall back to initials. The ball draws above portraits. A compact clickable roster strip below the theater opens existing profiles and pauses playback. Simulation math is unchanged. Browser checks cover setup/search, start, replay, seeking, final result, retained teams and 390px playback without horizontal overflow.

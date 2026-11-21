@@ -71,6 +71,35 @@ export function playerStyle(p:SimPlayer) {
     pullUp:perimeter*(.25+.75*creation),
   };
 }
+/** Box-score proxies for defensive preferences, not measured defensive ability.
+ * Pressure trades cushion for proximity; rim bias trades perimeter coverage for help. */
+export function defensiveStyle(p:SimPlayer) {
+  const rim=clamp((isBig(p)?.3:.04)+p.block/4*.5+p.rebound/16*.2,0,1);
+  const pressure=clamp(.2+p.steal/3*.6-rim*.25,0,1);
+  return {pressure,rim,help:clamp(.15+rim*.7,0,1)};
+}
+export function defensiveGap(defender:SimPlayer, attacker:SimPlayer, onBall:boolean) {
+  const style=defensiveStyle(defender);
+  return onBall?clamp(5.6-style.pressure*1.8,4,5.6)
+    :clamp(4.3+style.rim*2*(1-playerStyle(attacker).perimeter)-style.pressure*.3,4,6.3);
+}
+export function screenSwitchChance(onBall:SimPlayer, screenerDefender:SimPlayer) {
+  const a=defensiveStyle(onBall),b=defensiveStyle(screenerDefender);
+  return clamp(.25+(a.pressure+b.pressure)*.25-b.rim*.4,.1,.65);
+}
+export function selectHelper(players:SimPlayer[], side:Side, carrier:number, spots:Point[], assignments:Map<number,number>) {
+  const hoop=basket(side), onBall=assignments.get(carrier), ball=spots[carrier];
+  const candidates=indices((1-side) as Side).filter(i=>i!==onBall).filter(i=>{
+    const style=defensiveStyle(players[i]);
+    return distanceTo(ball,hoop)<13+style.help*7 && distanceTo(spots[i],ball)<15;
+  });
+  const cost=(i:number)=>{
+    const mark=[...assignments].find(([,d])=>d===i)?.[0];
+    const leavingShooter=mark===undefined?0:playerStyle(players[mark]).perimeter*4;
+    return distanceTo(spots[i],ball)+leavingShooter-defensiveStyle(players[i]).help*5;
+  };
+  return candidates.sort((a,b)=>cost(a)-cost(b))[0]??null;
+}
 /** Choose a basketball destination instead of giving every off-ball player the
  * same lift. Origins stay fixed for the possession, avoiding frame-to-frame flips. */
 export function supportRoute(p:SimPlayer, origin:Point, side:Side, progress:number, cutter:boolean, driving:boolean) {
@@ -155,7 +184,7 @@ function formation(players: SimPlayer[], side: Side, handler: number, rng: () =>
   for (const i of [big, handler, ...wings]) {
     available.sort((a,b) => Math.abs(players[a].rebound - players[i].rebound) - Math.abs(players[b].rebound - players[i].rebound));
     const defender = available.shift()!, p = result[i], hoop = basket(side), dist = distanceTo(p, hoop);
-    const gap = clamp(4 + rng()*2 - players[defender].steal*.1, 3.9, 6);
+    const gap = defensiveGap(players[defender],players[i],i===handler);
     result[defender] = { x:p.x + (hoop.x-p.x)/dist*gap, y:p.y + (hoop.y-p.y)/dist*gap };
   }
   return separateBodies(result);
@@ -204,8 +233,11 @@ export function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Po
   if(rng()<clamp(.14+.28*handlerStyle.creation+.15*screenFit-.2*handlerStyle.hub,.14,.57)) {
     const screener=pick(teammates,i=>Math.pow(playerStyle(players[i]).screening,2),rng);
     const mode=players[screener].threeShare>.3 && rng()<playerStyle(players[screener]).perimeter*.8 ? "pop" : "roll";
+    const onBall=[...defense].sort((a,b)=>distanceTo(to[a],to[handler])-distanceTo(to[b],to[handler]))[0];
+    const screenDefender=defense.filter(i=>i!==onBall).sort((a,b)=>distanceTo(to[a],to[screener])-distanceTo(to[b],to[screener]))[0];
+    const switchChance=screenSwitchChance(players[onBall],players[screenDefender]);
     return {shooter:handler,shot:facing({x:78,y:25},side),three:false,action:"drive",chance:0,value:0,
-      screen:{screener,mode,coverage:rng()<.35?"switch":"drop",direction:rng()<.5?-1:1}};
+      screen:{screener,mode,coverage:rng()<switchChance?"switch":"drop",direction:rng()<.5?-1:1}};
   }
   const movementFit=Math.max(...teammates.map(i=>playerStyle(players[i]).relocation));
   if(rng()<clamp(.16+.42*movementFit+.18*handlerStyle.hub,.16,.75)) {
@@ -281,9 +313,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
         goals[handler]=ahead && gap<7 ? {x:d.x+(side===0?3:-3),y:clamp(d.y+driveSide*4.5,4,46)} : target;
         if(ahead && gap<6) {contained+=dt; phase="Defender contains drive";}
         else contained=Math.max(0,contained-dt*.5);
-        if(helper===null && distanceTo(h,hoop)<18) {
-          helper=defense.filter(i=>i!==onBall).sort((a,b)=>distanceTo(spots[a],h)-distanceTo(spots[b],h))[0];
-        }
+        if(helper===null)helper=selectHelper(players,side,handler,spots,assignments);
         if(helper!==null)phase="Help defense";
         const helpClose=helper!==null && distanceTo(spots[helper],h)<5;
         const patience=3.8-playerStyle(players[handler]).creation*1.4;
@@ -310,8 +340,10 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
       const defender=assignments.get(i)!;
       const observed=attacking ? frames[Math.max(0,frames.length-1-Math.round(.25/dt))].spots : spots;
       const attacker=observed[i];
-      const gap=i===handler && action==="drive" ? 4.2 : 4.5;
+      const hasBall=i===handler && !passed || i===shooter && elapsed>=passEndSeconds;
+      const gap=defensiveGap(players[defender],players[i],hasBall);
       goals[defender]=approach(attacker,hoop,gap);
+      // Once a shot/catch is imminent even a paint protector must close out.
       if(attacking && i===shooter && action!=="drive") goals[defender]=approach(attacker,hoop,4.2);
     }
     if(attacking && helper!==null && action==="drive") goals[helper]=approach(spots[handler],hoop,4.5);
@@ -346,7 +378,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
           goals[onBall]=chased.y*dir< (origin.y+dir*8)*dir && !turnedCorner
             ? facing({x:origin.x-4.5,y:origin.y+dir*8},side)
             : approach(spots[handler],hoop,3.9);
-          goals[screenDefender!]=facing({x:81,y:25+dir*3},side);
+          goals[screenDefender!]=facing({x:79+defensiveStyle(players[screenDefender!]).rim*4,y:25+dir*3},side);
         }
         if(screenStage==="reading" && elapsed-readAt>=1.6) {
           const defenders=defense.map(i=>({spot:spots[i],player:players[i]}));
@@ -448,19 +480,20 @@ export function transitionDefense(players:SimPlayer[], side:Side, carrier:number
   let roles=previous;
   if(!roles || roles.carrier!==carrier) {
     const stopper=[...defense].sort((a,b)=>{
-      const cost=(i:number)=>distanceTo(facing(spots[i],side),intercept)+Math.max(0,ball.x-facing(spots[i],side).x)*1.5;
+      const cost=(i:number)=>distanceTo(facing(spots[i],side),intercept)+Math.max(0,ball.x-facing(spots[i],side).x)*1.5-defensiveStyle(players[i]).pressure*2.5;
       return cost(a)-cost(b);
     })[0];
     const rim=defense.filter(i=>i!==stopper).sort((a,b)=>
-      distanceTo(spots[a],hoop)-Math.min(3,players[a].block)-distanceTo(spots[b],hoop)+Math.min(3,players[b].block))[0];
+      distanceTo(spots[a],hoop)-defensiveStyle(players[a]).rim*4-distanceTo(spots[b],hoop)+defensiveStyle(players[b]).rim*4)[0];
     roles={carrier,stopper,rim};
   }
   const goals=spots.map(p=>({...p})), stopper=facing(spots[roles.stopper],side);
   // Shade the ball toward its current sideline, staying on the basket side.
-  goals[roles.stopper]=facing({x:intercept.x,y:intercept.y+(ball.y<25?1.5:-1.5)},side);
+  const stopperStyle=defensiveStyle(players[roles.stopper]), rimStyle=defensiveStyle(players[roles.rim]);
+  goals[roles.stopper]=facing({x:clamp(intercept.x+(1-stopperStyle.pressure)*1.5,4,87),y:intercept.y+(ball.y<25?1.5:-1.5)},side);
   const beaten=ball.x>stopper.x+1.5 || distanceTo(spots[roles.stopper],spots[carrier])>7;
-  const helping=ball.x>73 && beaten;
-  const rimGoal=helping?{x:Math.min(87,ball.x+3.5),y:ball.y*.7+25*.3}:{x:85,y:clamp(ball.y,21,29)};
+  const helping=ball.x>77-rimStyle.help*5 && beaten;
+  const rimGoal=helping?{x:Math.min(87,ball.x+3.5),y:ball.y*.7+25*.3}:{x:83+rimStyle.rim*3,y:clamp(ball.y,21,29)};
   goals[roles.rim]=facing(rimGoal,side);
   // Remaining defenders cover the most advanced runners, without duplicating a man.
   const available=defense.filter(i=>i!==roles!.stopper && i!==roles!.rim);

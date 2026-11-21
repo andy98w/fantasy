@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -53,6 +53,51 @@ test("play selection favors moving shooters, rolling bigs, stretch pops and pass
   assert.equal(normal.filter(p=>p.screen?.screener===4 && p.screen.mode==="pop").length,0);
   assert.ok(stretch.filter(p=>p.screen?.screener===4 && p.screen.mode==="pop").length>100);
   assert.ok(hub.filter(p=>p.movement?.kind==="handoff").length>normal.filter(p=>p.movement?.kind==="handoff").length*1.5);
+});
+
+test("defensive profiles change real pressure, paint coverage and transition jobs without name overrides",()=>{
+  const base=simulationPlayer(players[0]);
+  const pressure={...base,position:"PG",steal:3,block:.1,rebound:3};
+  const rim={...base,position:"C",steal:.4,block:4,rebound:15};
+  assert.ok(defensiveStyle(pressure).pressure>defensiveStyle(rim).pressure+.5);
+  assert.ok(defensiveStyle(rim).rim>defensiveStyle(pressure).rim+.7);
+  assert.deepEqual(defensiveStyle(rim),defensiveStyle({...rim,name:"Other",id:999}));
+  assert.ok(defensiveGap(pressure,base,true)<defensiveGap(rim,base,true)-1);
+  assert.ok(screenSwitchChance(pressure,pressure)>screenSwitchChance(pressure,rim)+.3);
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:68,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const roster=players.map(simulationPlayer);
+  const run=(profile:typeof base)=>resolvePossession(roster.map((p,i)=>i===5?profile:p),0,0,setup,setup,
+    {shooter:1,shot:setup[1],three:true,action:"catch-and-shoot",chance:.3,value:.9},3);
+  const tight=run(pressure),deep=run(rim);
+  assert.ok(deep.to[5].x-tight.to[5].x>.5,"Cushion must change stored defender movement");
+  const spots=[{x:65,y:25},{x:60,y:5},{x:55,y:45},{x:45,y:10},{x:30,y:40},
+    {x:72,y:21},{x:72,y:29},{x:40,y:4},{x:40,y:46},{x:30,y:25}];
+  roster[5]=pressure;roster[6]=rim;
+  const a=transitionDefense(roster,0,0,spots,{x:10,y:0});
+  assert.equal(a.roles.stopper,5);assert.equal(a.roles.rim,6);
+  roster[5]=rim;roster[6]=pressure;
+  const b=transitionDefense(roster,0,0,spots,{x:10,y:0});
+  assert.equal(b.roles.stopper,6);assert.equal(b.roles.rim,5);
+  // Role preferences cannot teleport a far-away specialist over a reachable defender.
+  spots[5]={x:20,y:25};
+  assert.equal(transitionDefense(roster,0,0,spots,{x:10,y:0}).roles.stopper,6);
+});
+
+test("help defense favors nearby rim protection but accounts for leaving shooters",()=>{
+  const ps=players.map(simulationPlayer);
+  const rim={...ps[6],position:"C",steal:.4,block:4,rebound:15};
+  ps[6]=rim;ps[7]=rim;
+  ps[1]={...ps[1],threeShare:.75};ps[2]={...ps[2],threeShare:0};
+  const spots=[{x:76,y:25},{x:86,y:4},{x:86,y:46},{x:60,y:4},{x:60,y:46},
+    {x:79,y:25},{x:83,y:19},{x:83,y:31},{x:60,y:10},{x:60,y:40}];
+  const assignments=new Map([[0,5],[1,6],[2,7],[3,8],[4,9]]);
+  assert.equal(selectHelper(ps,0,0,spots,assignments),7,"Help off the non-shooter when reach is equal");
+  assert.ok(defensiveGap(rim,ps[2],false)>defensiveGap(rim,ps[1],false)+1,"Paint bias should not abandon a perimeter threat");
+  spots[7]={x:40,y:25};
+  assert.equal(selectHelper(ps,0,0,spots,assignments),6,"Distance overrides preferred help assignment");
+  spots[0]={x:60,y:25};
+  assert.equal(selectHelper(ps,0,0,spots,assignments),null,"Do not collapse on a distant ball handler");
 });
 
 test("simulation replay is deterministic and scrubbing cannot reveal future box scores", () => {
@@ -215,7 +260,9 @@ test("defenders follow drives and a blocked lane changes the attack before the s
   const open=setup.map(p=>({...p}));for(let i=5;i<10;i++)open[i]={x:40,y:3+(i-5)*10};
   const unguarded=resolvePossession(ps,0,0,open,open,intent,3.5);
   const forward=(plan:typeof defended)=>Math.max(...plan.frames.map(f=>f.spots[0].x));
-  assert.ok(forward(unguarded)>forward(defended)+3);
+  assert.ok(forward(unguarded)>forward(defended));
+  assert.ok(defended.seconds>unguarded.seconds+.5,"Containment delays the attempt even when the helper rotates from deeper in the paint");
+  assert.ok(defended.shooter!==0 || defended.action==="pull-up","A covered drive must pass out or settle for a jumper");
 });
 
 test("moving bodies stay separated and shot odds use the positions shown on court",()=>{

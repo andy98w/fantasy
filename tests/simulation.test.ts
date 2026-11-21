@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -290,7 +290,7 @@ test("shots keep off-ball players moving while the ball follows its fixed releas
       const early=at(.55),late=courtFrame(game,replayTime(play,.55)+1);
       const movers=early.spots.filter((p,i)=>i!==play.shooter && Math.hypot(p.x-late.spots[i].x,p.y-late.spots[i].y)>1);
       assert.ok(movers.length>=4,`Only ${movers.length} players moved during shot flight`);
-      const flight=(.8-shotRelease(play))/(.88-shotRelease(play)),hoop={x:play.side===0?88.75:5.25,y:25};
+      const flight=(.8-shotRelease(play))/(.88-shotRelease(play)),hoop=play.outcome==="blocked"?{x:play.shot.x+(play.to[play.defender].x-play.shot.x)*.65,y:play.shot.y+(play.to[play.defender].y-play.shot.y)*.65}:{x:play.side===0?88.75:5.25,y:25};
       const ball=at(.8).ball;
       assert.ok(Math.hypot(ball.x-(play.shot.x+(hoop.x-play.shot.x)*flight),ball.y-(play.shot.y+(hoop.y-play.shot.y)*flight))<.00001);
       for(const boundary of [.55,.65,.72,.88,.98]) {
@@ -304,11 +304,11 @@ test("shots keep off-ball players moving while the ball follows its fixed releas
 });
 
 
-test("rebound winners come from teammates within reach of the rim",()=>{
+test("rebound winners come from teammates within reach of the loose ball",()=>{
   for(let seed=0;seed<12;seed++) {
     const game=simulate(teams,120,seed);
     for(const play of game.plays.filter(p=>p.rebounder!==null && p.outcome!=="foul")) {
-      const frame=courtFrame(game,replayTime(play,.875)),hoop={x:play.side===0?88.75:5.25,y:25};
+      const frame=courtFrame(game,replayTime(play,.875)),hoop=play.outcome==="blocked"?{x:play.shot.x+(play.to[play.defender].x-play.shot.x)*.65,y:play.shot.y+(play.to[play.defender].y-play.shot.y)*.65}:{x:play.side===0?88.75:5.25,y:25};
       const distance=(i:number)=>Math.hypot(frame.spots[i].x-hoop.x,frame.spots[i].y-hoop.y);
       const side=Math.floor(play.rebounder!/5),team=Array.from({length:5},(_,i)=>side*5+i);
       assert.ok(distance(play.rebounder!)<=Math.min(...team.map(distance))+5.5);
@@ -477,7 +477,7 @@ test("handoffs exchange at close range and off-ball screens plant before the rec
 test("possession clock resets on control, pauses on dead balls, and legal shots beat the buzzer",()=>{
   const seen=new Set<string>();
   for(let seed=0;seed<100;seed++) {
-    const game=simulate(teams,120,seed);
+    const game=simulate(teams,seed===41?300:120,seed);
     assert.equal(shotClock(game,0),24);
     for(const inbound of game.inbounds)assert.equal(shotClock(game,(inbound.start+inbound.end)/2),24);
     for(const play of game.plays) {
@@ -514,10 +514,10 @@ test("possession clock resets on control, pauses on dead balls, and legal shots 
   assert.deepEqual([...seen].sort(),["defensive rebound","foul","offensive rebound","violation"]);
 });
 
-test("fast breaks exploit a two-on-one, outlet from the rebounder, and settle against recovered defense",()=>{
+test("fast breaks exploit an open runner, outlet from the rebounder, and settle against recovered defense",()=>{
   const ps=players.map(simulationPlayer);
   const open=[{x:50,y:18},{x:65,y:35},{x:20,y:7},{x:20,y:30},{x:25,y:44},
-    {x:72,y:25},{x:35,y:8},{x:30,y:42},{x:10,y:15},{x:10,y:36}];
+    {x:50,y:25},{x:35,y:8},{x:30,y:42},{x:10,y:15},{x:10,y:36}];
   const rebound=[{x:8,y:25},{x:25,y:8},{x:18,y:40},{x:10,y:6},{x:12,y:45},
     {x:40,y:25},{x:50,y:8},{x:50,y:42},{x:60,y:15},{x:60,y:36}];
   const recovered=[{x:62,y:25},{x:58,y:8},{x:55,y:42},{x:45,y:15},{x:45,y:36},
@@ -535,6 +535,9 @@ test("fast breaks exploit a two-on-one, outlet from the rebounder, and settle ag
   assert.deepEqual(outlet.frames[0].ball,rebound[0]);
   assert.ok(outlet.frames.some(f=>f.phase==="Fast break · Outlet"));
   assert.ok(outlet.frames.some(f=>f.carrier!==0));
+  // A defender already back can take away the same early finish.
+  const covered=open.map(p=>({...p}));covered[5]={x:72,y:25};
+  assert.equal(resolveFastBreak(ps,0,0,covered,22,"steal").fastBreak.result,"settled");
   const settled=resolveFastBreak(ps,0,0,recovered,22,"steal");
   assert.equal(settled.fastBreak.result,"settled");
   assert.ok(settled.frames.some(f=>f.phase==="Fast break covered · Flow into offense"));
@@ -582,4 +585,52 @@ test("only live steals and defensive field-goal rebounds trigger fast breaks wit
     });
   }
   for(const kind of ["steal","rebound","rim","settled","dead turnover"])assert.ok(seen.has(kind),kind);
+});
+
+
+test("transition defense contains the ball, preserves rim cover and reacts to passes and penetration",()=>{
+  const ps=players.map(simulationPlayer);
+  const spots=[{x:65,y:18},{x:74,y:40},{x:44,y:7},{x:40,y:30},{x:25,y:44},
+    {x:71,y:20},{x:84,y:25},{x:64,y:42},{x:40,y:15},{x:40,y:36}];
+  const plan=transitionDefense(ps,0,0,spots,{x:10,y:2});
+  assert.equal(plan.roles.stopper,5);assert.equal(plan.roles.rim,6);
+  assert.ok(plan.goals[5].x>spots[0].x && plan.goals[5].x<75);
+  assert.ok(plan.goals[6].x>=83);assert.equal(plan.helping,false);
+  const drive=spots.map(p=>({...p}));drive[0]={x:79,y:18};drive[5]={x:73,y:20};
+  const help=transitionDefense(ps,0,0,drive,{x:10,y:0},plan.roles);
+  assert.deepEqual(help.roles,plan.roles);assert.equal(help.helping,true);
+  assert.ok(help.goals[6].y<23,"Rim help must step toward the driver");
+  const pass=transitionDefense(ps,0,1,spots,{x:10,y:0},plan.roles);
+  assert.equal(pass.roles.carrier,1);assert.notEqual(pass.roles.stopper,pass.roles.rim);
+  const mirror=transitionDefense([...ps.slice(5),...ps.slice(0,5)],1,5,
+    [...spots.slice(5),...spots.slice(0,5)].map(p=>({x:94-p.x,y:p.y})),{x:-10,y:2});
+  assert.equal(mirror.roles.stopper,(plan.roles.stopper+5)%10);
+  plan.goals.forEach((p,i)=>assert.ok(Math.hypot(94-p.x-mirror.goals[(i+5)%10].x,p.y-mirror.goals[(i+5)%10].y)<.001));
+});
+
+test("blocks require a reachable contest and can credit the rim helper",()=>{
+  const ps=players.map(simulationPlayer).map(p=>({...p,block:0}));
+  ps[5].block=.2;ps[6].block=4;ps[7].block=10;
+  const spots=Array.from({length:10},()=>({x:20,y:5}));
+  const shot={x:84,y:25};spots[5]={x:81,y:25};spots[6]={x:88,y:25};
+  const options=blockCandidates(ps,spots,shot,0,false);
+  assert.deepEqual(options.map(c=>c.i),[5,6]);
+  assert.ok(options[1].chance>options[0].chance,"Nearby rim protector should have a stronger contest than the guard");
+  assert.equal(blockCandidates(ps,spots,{x:60,y:25},0,true).length,0);
+  let checked=0;
+  for(let seed=0;seed<30;seed++) {
+    const game=simulate(teams,300,seed);
+    for(const play of game.plays.filter(p=>p.outcome==="blocked")) {
+      assert.ok(blockCandidates(game.players,play.to,play.shot,play.side,play.three).some(c=>c.i===play.defender));
+      const before=simulationState(game,replayTime(play,.879)).lines[play.defender].blk;
+      assert.equal(simulationState(game,replayTime(play,.881)).lines[play.defender].blk,before+1);
+      assert.equal(courtFrame(game,replayTime(play,.89)).event?.title,"BLOCK");
+      const contact=courtFrame(game,replayTime(play,.88)).ball;
+      assert.ok(Math.hypot(contact.x-play.to[play.defender].x,contact.y-play.to[play.defender].y)<2.3);
+      const a=courtFrame(game,replayTime(play,.88)-.00001).ball,b=courtFrame(game,replayTime(play,.88)+.00001).ball;
+      assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.01,"Block must deflect without teleporting to the hoop");
+      checked++;
+    }
+  }
+  assert.ok(checked>0);
 });

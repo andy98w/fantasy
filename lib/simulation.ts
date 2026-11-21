@@ -398,6 +398,52 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
     passAt:Math.min(.53,passStartSeconds/usedSeconds*.55),passEnd:Math.min(.55,passEndSeconds/usedSeconds*.55)};
 }
 
+type TransitionRoles = { carrier:number; stopper:number; rim:number };
+/** Keep jobs until the ball changes hands; predict the interception point, not the
+ * ball's last location. The rim helper commits only when containment is beaten. */
+export function transitionDefense(players:SimPlayer[], side:Side, carrier:number, spots:Point[], velocity:Point,
+  previous?:TransitionRoles) {
+  const defense=indices((1-side) as Side), offense=indices(side), hoop=basket(side);
+  const ball=facing(spots[carrier],side), vx=side===0?velocity.x:-velocity.x;
+  const intercept={x:clamp(ball.x+Math.max(4,vx*.35),4,86),y:clamp(ball.y+velocity.y*.3,4,46)};
+  let roles=previous;
+  if(!roles || roles.carrier!==carrier) {
+    const stopper=[...defense].sort((a,b)=>{
+      const cost=(i:number)=>distanceTo(facing(spots[i],side),intercept)+Math.max(0,ball.x-facing(spots[i],side).x)*1.5;
+      return cost(a)-cost(b);
+    })[0];
+    const rim=defense.filter(i=>i!==stopper).sort((a,b)=>
+      distanceTo(spots[a],hoop)-Math.min(3,players[a].block)-distanceTo(spots[b],hoop)+Math.min(3,players[b].block))[0];
+    roles={carrier,stopper,rim};
+  }
+  const goals=spots.map(p=>({...p})), stopper=facing(spots[roles.stopper],side);
+  // Shade the ball toward its current sideline, staying on the basket side.
+  goals[roles.stopper]=facing({x:intercept.x,y:intercept.y+(ball.y<25?1.5:-1.5)},side);
+  const beaten=ball.x>stopper.x+1.5 || distanceTo(spots[roles.stopper],spots[carrier])>7;
+  const helping=ball.x>73 && beaten;
+  const rimGoal=helping?{x:Math.min(87,ball.x+3.5),y:ball.y*.7+25*.3}:{x:85,y:clamp(ball.y,21,29)};
+  goals[roles.rim]=facing(rimGoal,side);
+  // Remaining defenders cover the most advanced runners, without duplicating a man.
+  const available=defense.filter(i=>i!==roles!.stopper && i!==roles!.rim);
+  const runners=offense.filter(i=>i!==carrier).sort((a,b)=>distanceTo(spots[a],hoop)-distanceTo(spots[b],hoop));
+  for(const runner of runners.slice(0,available.length)) {
+    available.sort((a,b)=>distanceTo(spots[a],spots[runner])-distanceTo(spots[b],spots[runner]));
+    const i=available.shift()!, p=facing(spots[runner],side);
+    goals[i]=facing({x:Math.min(87,p.x+3),y:p.y+(25-p.y)*.15},side);
+  }
+  return {roles,goals,helping};
+}
+
+/** Only nearby defenders can block; a helper may be more likely than the closest
+ * guard. No minimum lottery chance for someone too far away to contest. */
+export function blockCandidates(players:SimPlayer[], spots:Point[], shot:Point, side:Side, three:boolean) {
+  return indices((1-side) as Side).map(i=>{
+    const gap=distanceTo(spots[i],shot), reach=three?5:6.5;
+    const chance=gap>=reach?0:clamp(players[i].block*(three?.025:.085)*(1-gap/reach),0,.16);
+    return {i,chance};
+  }).filter(c=>c.chance>0);
+}
+
 /** Push from actual possession, reading the recovering defense before choosing a shot.
  * Explicit timed ball frames preserve outlets and advance passes through a set-offense fallback.
  */
@@ -410,6 +456,7 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
   const lanes=new Map([...offense].filter(i=>i!==owner).sort((a,b)=>start[a].y-start[b].y).map((i,n)=>[i,[7,17,34,44][n]]));
   const frames:MotionFrame[]=[{spots:spots.map(p=>({...p})),ball:{...ball},carrier,at:0,phase:trigger==="steal"?"Fast break · Push":"Rebound · Look upcourt"}];
   let result:FastBreak["result"]="settled";
+  let roles:TransitionRoles|undefined;
   const laneClear=(from:Point,to:Point)=>defense.every(i=>{
     const dx=to.x-from.x,dy=to.y-from.y, length=dx*dx+dy*dy;
     const t=clamp(((spots[i].x-from.x)*dx+(spots[i].y-from.y)*dy)/Math.max(1,length),0,1);
@@ -435,17 +482,10 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
       driveY=clamp(p.y+(local.y<=p.y?-7:7),6,44);
     }
     goals[carrier]=facing({x:86,y:driveY},side);
-    // The first defender protects the rim; the next stops the ball. Others recover
-    // to runners from their real locations, rather than snapping into matchups.
-    const back=[...defense].sort((a,b)=>distanceTo(spots[a],hoop)-distanceTo(spots[b],hoop));
-    goals[back[0]]=facing({x:85,y:25},side);
-    const stop=back.slice(1).sort((a,b)=>distanceTo(spots[a],spots[carrier])-distanceTo(spots[b],spots[carrier]))[0];
-    goals[stop]=facing({x:Math.min(86,local.x+4.5),y:local.y},side);
-    const runners=offense.filter(i=>i!==carrier).sort((a,b)=>distanceTo(spots[a],hoop)-distanceTo(spots[b],hoop));
-    back.filter(i=>i!==back[0] && i!==stop).forEach((i,n)=>{
-      const p=facing(spots[runners[n]],side);
-      goals[i]=facing({x:Math.min(87,p.x+4),y:p.y},side);
-    });
+    const coverage=transitionDefense(players,side,flight?.receiver??carrier,spots,velocities[flight?.receiver??carrier],roles);
+    roles=coverage.roles;
+    for(const i of defense)goals[i]=coverage.goals[i];
+    if(!flight)phase=coverage.helping?"Fast break · Rim help":"Fast break · Stop the ball";
     // A short reaction window belongs to the turnover/rebound, never to each read.
     if(elapsed<.25)for(const i of defense)goals[i]=spots[i];
     if(flight)goals[flight.receiver]=flight.to;
@@ -491,7 +531,7 @@ export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, s
   if(result!=="settled") {
     const shot={...spots[carrier]}, three=distanceTo(shot,hoop)>=23.75;
     return {shooter:carrier,shot,three,action:three?"pull-up" as const:"drive" as const,to:spots,frames,
-      onBall:defense.reduce((a,b)=>distanceTo(spots[a],shot)<distanceTo(spots[b],shot)?a:b),helper:null,
+      onBall:roles!.stopper,helper:roles!.rim,
       seconds:elapsed,ready:true,passAt:.1,passEnd:.2,passer:lastPasser,
       fastBreak:{trigger,result,passes},screen:undefined,movement:undefined};
   }
@@ -562,10 +602,12 @@ function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"sh
           for(const i of defense)goals[i]=i===inbounder?hoop:facing({x:65,y:8+(i%5)*8},play.side);
         } else if(play.rebounder!==null) {
           phase="Chasing rebound";
-          goals[play.rebounder]=facing({x:86,y:facing(play.to[play.rebounder],play.side).y<25?22:28},play.side);
+          goals[play.rebounder]=play.outcome==="blocked"?lerp(play.shot,play.to[play.defender],.65):facing({x:86,y:facing(play.to[play.rebounder],play.side).y<25?22:28},play.side);
         }
       }
     }
+    // A block contest happens at the release area, before rebounding recovery.
+    if(play.outcome==="blocked" && t<.88)goals[play.defender]=play.to[play.defender];
     const speeds=spots.map((_,i)=>play.outcome==="turnover" && t>=.6
       ? offense.includes(i)?14:i===play.defender?13:[16,14,11,9][runners.indexOf(i)]
       :12);
@@ -642,7 +684,7 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     const approachSeconds=clockExpired?Math.min(remaining,shotClockStart):motion.seconds;
     const { shooter, shot, three, action, to } = motion;
     const passer = transition ? transition.passer : handler !== shooter ? handler : null;
-    const defender = [...defense].sort((a,b) => distanceTo(to[a],shot)-distanceTo(to[b],shot))[0];
+    let defender = [...defense].sort((a,b) => distanceTo(to[a],shot)-distanceTo(to[b],shot))[0];
     const p = players[shooter], d = players[defender];
     const distance = distanceTo(shot,basket(side));
     const quality = shotQuality(p,shot,defense.map(i=>({spot:to[i],player:players[i]})),side,three);
@@ -668,7 +710,12 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
       text = `${d.name} fouls ${p.name}. ${points}/${freeThrows.length} at the line.`;
     } else {
       lines[shooter].fga++; if (three) lines[shooter].tpa++;
-      const blocked = rng() < clamp(d.block * (three ? .005 : .022) * clamp(1-quality.nearest/10,0,1), .002, .12);
+      const candidates=blockCandidates(players,to,shot,side,three);
+      const blocked = rng() < Math.min(.2,candidates.reduce((sum,c)=>sum+c.chance,0));
+      if(blocked) {
+        let draw=rng()*candidates.reduce((sum,c)=>sum+c.chance,0);
+        defender=candidates.find(c=>(draw-=c.chance)<0)?.i ?? candidates.at(-1)!.i;
+      }
       const made = !blocked && rng() < shotChance;
       outcome = blocked ? "blocked" : made ? "made" : "missed";
       if (blocked) lines[defender].blk++;
@@ -676,7 +723,7 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
         points = three ? 3 : 2; lines[shooter].fgm++; if (three) lines[shooter].tpm++;
         if (passer !== null) lines[passer].ast++;
         text = `${p.name} ${three ? "hits a three" : distance < 8 ? "finishes at the rim" : "hits the jumper"}${passer === null ? "." : ` · ${players[passer].name} assist.`}`;
-      } else text = blocked ? `${d.name} blocks ${p.name}.` : `${p.name} misses ${three ? "a three" : "a two"}.`;
+      } else text = blocked ? `${players[defender].name} blocks ${p.name}.` : `${p.name} misses ${three ? "a three" : "a two"}.`;
     }
     // Shot flight is independent of possession length; a long setup cannot make
     // the ball float. Other finish phases retain their own playback durations.
@@ -693,9 +740,10 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
       const oReb = offense.reduce((sum, i) => sum + players[i].rebound, 0), dReb = defense.reduce((sum, i) => sum + players[i].rebound, 0);
       retain = rng() < clamp(.25 * oReb / dReb, .12, .4);
       const candidates=retain ? offense : defense;
-      const closest=Math.min(...candidates.map(i=>distanceTo(reboundSpots[i],basket(side))));
-      const reachable=outcome==="foul"?candidates:candidates.filter(i=>distanceTo(reboundSpots[i],basket(side))<=closest+5);
-      rebounder = pick(reachable, i => players[i].rebound / (1 + distanceTo(reboundSpots[i],basket(side)) / 4), rng);
+      const looseBall=outcome==="blocked"?lerp(shot,to[defender],.65):basket(side);
+      const closest=Math.min(...candidates.map(i=>distanceTo(reboundSpots[i],looseBall)));
+      const reachable=outcome==="foul"?candidates:candidates.filter(i=>distanceTo(reboundSpots[i],looseBall)<=closest+5);
+      rebounder = pick(reachable, i => players[i].rebound / (1 + distanceTo(reboundSpots[i],looseBall) / 4), rng);
       lines[rebounder].reb++; text += ` ${players[rebounder].name} ${retain ? "offensive " : ""}rebound.`;
     }
     lines[shooter].pts += points; score[side] += points;
@@ -835,7 +883,7 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
       if (portion >= .85 && attempt < play.freeThrows.length-1) ball = lerp(hoop,spots[play.shooter],(portion-.85)/.15);
     }
   } else if (t < shotRelease(play)) ball=spots[play.shooter];
-  else if (t < .88) { const flight=(t-shotRelease(play))/(.88-shotRelease(play)); ball=lerp(play.shot,hoop,flight); height=motion ? Math.sin(flight*Math.PI)*3 : 0; phase="Shot in the air"; }
+  else if (t < .88) { const flight=(t-shotRelease(play))/(.88-shotRelease(play)); ball=lerp(play.shot,play.outcome==="blocked"?lerp(play.shot,play.to[play.defender],.65):hoop,flight); height=motion ? Math.sin(flight*Math.PI)*3 : 0; phase="Shot in the air"; }
   else ball=hoop;
   if (play.outcome === "turnover" && t >= .6) {
     phase=play.stolen?"Transition":"Out of bounds";
@@ -850,7 +898,7 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
   }
   const reboundStart=play.outcome === "foul" ? .96 : .88;
   if (play.rebounder !== null && t >= reboundStart) {
-    ball=lerp(hoop,spots[play.rebounder],(t-reboundStart)/(.98-reboundStart)); height=0;
+    ball=lerp(play.outcome==="blocked"?lerp(play.shot,play.to[play.defender],.65):hoop,spots[play.rebounder],(t-reboundStart)/(.98-reboundStart)); height=0;
     if (t >= .98) {phase="Rebound";event={title:Math.floor(play.rebounder/5)===play.side ? "OFFENSIVE REBOUND":"REBOUND",detail:game.players[play.rebounder].name,tone:"neutral"};}
   }
   if (time >= game.playbackDuration) {phase="Final";event=null;}

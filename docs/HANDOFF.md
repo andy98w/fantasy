@@ -481,3 +481,11 @@ Timed player/ball frames preserve multiple passes through playback, seeking and 
 This supersedes the earlier fast-break future-work note. Recovery speed, lanes and advantage decisions remain generic exhibition heuristics, not measured athlete tracking. No additional libraries, AI service or UI explanation text.
 
 Validation: controlled two-on-one, mirrored transition, rebound outlet and recovered-defense fixtures; seeded games verify trigger eligibility, actual ball ownership, continuous passes, dead-ball inbounds and existing clock/contact/accounting behavior. All 220 app tests, production build/TypeScript and standalone smoke passed. Local browser verification showed a rebound push with no console errors. Verify exact-commit CI, Railway and hosted UI before claiming release.
+
+## November 20 transition containment and contested blocks
+
+Fast-break defenders retain separate ball-stopper and rim-protector assignments until the carrier changes. The stopper anticipates the interception point and shades the driver toward the sideline; the rim helper steps up after containment is beaten. Other defenders cover distinct advanced runners. Passes prompt reassignment during flight. All movement still uses actual positions and the damped contact solver.
+
+Blocks now consider all nearby defenders, weighted by proximity and blocking production, so a rim helper can receive credit instead of automatically choosing the closest guard. Distant defenders have no block chance. Blocked shots visibly meet the contest and deflect toward a rebounder; rebound selection and pursuit use the contact location, with matching box-score and play-by-play attribution. These are generic exhibition heuristics, not calibrated athlete tracking or physical ball simulation. No new dependencies or extra UI explanation text.
+
+Validation: containment, help rotation, pass reassignment, mirrored movement, covered-break fallback, reachable block candidates and block/deflection/stat continuity regressions. All 222 app tests, production build/TypeScript and standalone smoke passed. Local browser playback showed a credited block and transition containment with no console errors. Verify exact-commit CI, Railway and hosted UI before claiming release.

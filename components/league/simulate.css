@@ -54,9 +54,6 @@
 .sim-log-row p { margin:0; }
 .sim-log-row time { color:var(--muted); }
 .sim-log-row strong { white-space:nowrap; }
-.sim-method { margin-top:24px; color:var(--muted); }
-.sim-method summary { color:var(--gold); cursor:pointer; }
-.sim-method p { max-width:85ch; line-height:1.7; }
 .sim-call { padding:12px 18px; border-bottom:1px solid var(--line-soft); color:var(--text); min-height:46px; font-size:13px; }
 .simulation { outline:none; scroll-margin-top:16px; }
 .sim-setup { max-width:1080px; margin:auto; }
@@ -96,3 +93,4 @@
   .sim-picker .analysis-picker-menu { min-width:0; width:100%; }
   .sim-call { padding:12px 0; }
 }
+.simulation:focus-visible { outline:none; }

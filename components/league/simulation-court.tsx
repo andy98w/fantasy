@@ -11,6 +11,8 @@ export default function SimulationCourt({ game, time, motion, onReady }: { game:
   useEffect(() => {
     let cancelled = false, instance: Phaser.Game | undefined;
     const images: HTMLImageElement[] = [];
+    const renderSize = () => Math.ceil(1000 * Math.max(1, Math.min(3, (host.current?.clientWidth ?? 1000) * Math.min(window.devicePixelRatio || 1, 2) / 1000)));
+    let resize: ResizeObserver | undefined;
     setError(false);
     import("phaser").then(({ default: P }) => {
       if (cancelled || !host.current) return;
@@ -20,6 +22,7 @@ export default function SimulationCourt({ game, time, motion, onReady }: { game:
         portraits: Phaser.GameObjects.Image[] = [];
 
         create() {
+          this.cameras.main.setZoom(this.scale.width / 1000).centerOn(500, 280);
           const g = this.add.graphics();
           g.fillStyle(0x192c32).fillRect(0, 0, 1000, 560);
           for (let x = 30; x < 970; x += 47) g.fillStyle(x % 94 ? 0x233b40 : 0x263e43).fillRect(x, 30, 47, 500);
@@ -45,8 +48,8 @@ export default function SimulationCourt({ game, time, motion, onReady }: { game:
           // Circular portrait textures use the same ESPN headshots as the roster.
           // Initials remain available when a photo is missing or cannot load.
           state.current.game.players.forEach((player, i) => {
-            const canvas = document.createElement("canvas"); canvas.width = canvas.height = 96;
-            const ctx = canvas.getContext("2d")!;
+            const canvas = document.createElement("canvas"); canvas.width = canvas.height = 192;
+            const ctx = canvas.getContext("2d")!; ctx.scale(2, 2);
             const paint = (photo?: HTMLImageElement) => {
               ctx.clearRect(0, 0, 96, 96); ctx.save(); ctx.beginPath(); ctx.arc(48, 48, 46, 0, Math.PI * 2); ctx.clip();
               ctx.fillStyle = i < 5 ? "#7cd9c4" : "#ed91aa"; ctx.fillRect(0, 0, 96, 96);
@@ -84,10 +87,18 @@ export default function SimulationCourt({ game, time, motion, onReady }: { game:
           ball.lineStyle(1.5, 0x7a461b).strokeCircle(x, y - frame.height * 10, 7 + frame.height).lineBetween(x - 6, y - frame.height * 10, x + 6, y - frame.height * 10).lineBetween(x, y - frame.height * 10 - 6, x, y - frame.height * 10 + 6);
         }
       }
-      instance = new P.Game({ type: P.CANVAS, parent: host.current, width: 1000, height: 560, backgroundColor: "#192c32",
-        scale: { mode: P.Scale.FIT, autoCenter: P.Scale.CENTER_BOTH }, scene: Court, audio: { noAudio: true }, banner: false, fps: { target: 30, forceSetTimeOut: true } });
+      instance = new P.Game({ type: P.CANVAS, parent: host.current, width: renderSize(), height: Math.round(renderSize() * .56), backgroundColor: "#192c32",
+        scale: { mode: P.Scale.FIT, autoCenter: P.Scale.CENTER_BOTH }, scene: Court, audio: { noAudio: true }, banner: false, fps: { target: 60 } });
+      resize = new ResizeObserver(() => {
+        if (!instance || cancelled) return;
+        const width = renderSize();
+        if (instance.scale.width === width) return;
+        instance.scale.resize(width, Math.round(width * .56));
+        instance.scene.getScenes(true).forEach(scene => scene.cameras.main.setZoom(width / 1000).centerOn(500, 280));
+      });
+      resize.observe(host.current);
     }).catch(() => { if (!cancelled) setError(true); });
-    return () => { cancelled = true; images.forEach(photo => { photo.onload = null; photo.onerror = null; }); instance?.destroy(true); };
+    return () => { cancelled = true; resize?.disconnect(); images.forEach(photo => { photo.onload = null; photo.onerror = null; }); instance?.destroy(true); };
   }, [retry]);
   return <div className="sim-court" role="img" aria-label="Animated exhibition basketball court. Score, play descriptions and player stats are available below.">
     <div ref={host} className="sim-canvas" />

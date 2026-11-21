@@ -7,6 +7,7 @@ export type SimPlayer = { id: number; name: string; nbaTeam: string; position: s
 export type SimPlay = {
   start: number; end: number; side: Side; handler: number; shooter: number; passer: number | null;
   defender: number; rebounder: number | null; outcome: "made" | "missed" | "blocked" | "turnover" | "foul";
+  action: "drive" | "pull-up" | "catch-and-shoot" | "cut"; shotChance: number;
   three: boolean; points: number; text: string; score: [number, number]; lines: SimLine[];
   from: Point[]; to: Point[]; shot: Point; freeThrows: boolean[];
 };
@@ -45,43 +46,99 @@ function pick(indices: number[], weight: (i: number) => number, rng: () => numbe
 const indices = (side: Side) => Array.from({ length: 5 }, (_, i) => i + side * 5);
 const facing = (p: Point, side: Side): Point => side === 0 ? p : { x: 94 - p.x, y: p.y };
 export const basket = (side: Side): Point => facing({ x: 88.75, y: 25 }, side);
-function formation(side: Side, rng: () => number) {
-  const slots = [{ x: 61, y: 25 }, { x: 69, y: 7 }, { x: 69, y: 43 }, { x: 83, y: 13 }, { x: 83, y: 37 }];
+const distanceTo = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const isBig = (p: SimPlayer) => /C|PF/.test(p.position);
+function formation(players: SimPlayer[], side: Side, handler: number, rng: () => number) {
+  const offense = indices(side), defense = indices((1 - side) as Side);
+  const big = [...offense].filter(i => i !== handler).sort((a, b) => (players[b].rebound + (isBig(players[b]) ? 5 : 0)) - (players[a].rebound + (isBig(players[a]) ? 5 : 0)))[0];
+  const wings = offense.filter(i => i !== handler && i !== big).sort((a,b) => players[b].threeShare - players[a].threeShare);
   const result: Point[] = Array(10);
-  for (let i = 0; i < 5; i++) {
-    const p = { x: slots[i].x + rng() * 2 - 1, y: slots[i].y + rng() * 2 - 1 };
-    result[side * 5 + i] = facing(p, side);
-    result[(1 - side) * 5 + i] = facing({ x: p.x + 3, y: p.y + (25 - p.y) * .12 }, side);
+  result[handler] = facing({ x:62, y:25 }, side);
+  result[big] = facing({ x:84, y:19 + rng()*12 }, side);
+  // Stronger perimeter shooters occupy the corners; non-shooters cut inside.
+  const wingSpots = [{x:87,y:3},{x:85,y:47},{x:68,y:8}];
+  wings.forEach((i, slot) => { const p = wingSpots[slot]; result[i] = facing(players[i].threeShare > .25 ? p : {x:78 + rng()*4,y:12 + slot*12}, side); });
+  const available = [...defense];
+  // Match interior players first, then put guards on ball handlers/wings.
+  for (const i of [big, handler, ...wings]) {
+    available.sort((a,b) => Math.abs(players[a].rebound - players[i].rebound) - Math.abs(players[b].rebound - players[i].rebound));
+    const defender = available.shift()!, p = result[i], hoop = basket(side), dist = distanceTo(p, hoop);
+    const gap = clamp(2 + rng()*5 - players[defender].steal*.3, 1.5, 7);
+    result[defender] = { x:p.x + (hoop.x-p.x)/dist*gap, y:p.y + (hoop.y-p.y)/dist*gap };
   }
   return result;
+}
+/** Possession-level heuristic: open shots beat contested ones; rim protection matters inside. */
+export function shotQuality(player: SimPlayer, shot: Point, defenders: {spot:Point; player:SimPlayer}[], side:Side, three:boolean) {
+  const hoopDistance = distanceTo(shot, basket(side));
+  const nearest = Math.min(...defenders.map(d => distanceTo(shot, d.spot)));
+  const contest = clamp((6 - nearest) / 6, 0, 1);
+  const protection = defenders.reduce((sum,d) => sum + d.player.block * Math.max(0, 1-distanceTo(shot,d.spot)/10),0);
+  const location = three ? 0 : hoopDistance < 8 ? .10 : -.08;
+  const chance = clamp((three ? player.threePct : player.twoPct) + location + .04*(1-contest) - contest*(three ? .13 : .12) - (three ? 0 : protection*.018), .12, .82);
+  return { chance, expected: chance*(three ? 3 : 2), nearest };
+}
+function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], rng:()=>number) {
+  const defense = indices((1-side) as Side), hoop = basket(side);
+  const defenders = defense.map(i => ({spot:to[i],player:players[i]}));
+  const candidates: {shooter:number; shot:Point; three:boolean; action:SimPlay["action"]; chance:number; value:number}[] = [];
+  const offer = (shooter:number, shot:Point, three:boolean, action:SimPlay["action"]) => {
+    const quality = shotQuality(players[shooter],shot,defenders,side,three);
+    const passDistance = distanceTo(to[handler],shot);
+    // A long pass is a little riskier; efficient, open shots are worth moving the ball for.
+    const passCost = shooter === handler ? 0 : .025 + passDistance*.002/Math.sqrt(players[handler].passing);
+    candidates.push({shooter,shot,three,action,chance:quality.chance,value:quality.expected-passCost});
+  };
+  for (const i of indices(side)) {
+    const p = players[i];
+    if (i === handler) {
+      offer(i, facing({x:84 + rng()*3,y:22 + rng()*6},side), false, "drive");
+      const three = p.threeShare > .25;
+      offer(i, facing({x:three ? 63:73,y:20+rng()*10},side), three, "pull-up");
+    } else {
+      const spot = to[i], dist = distanceTo(spot,hoop), corner = Math.abs(spot.y-25) >= 22;
+      const three = dist >= 23.75 || corner;
+      offer(i, spot, three, three || dist > 8 ? "catch-and-shoot" : "cut");
+    }
+  }
+  // Soft choice favors expected points without making the same play every time.
+  const selected = pick(candidates.map((_,i)=>i), i => Math.exp(candidates[i].value*5) * Math.pow(players[candidates[i].shooter].usage,.35), rng);
+  return candidates[selected];
 }
 export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1): Simulation {
   if (lineups.some(t => t.length !== 5) || new Set(lineups.flat().map(p => p.id)).size !== 10) throw new Error("Choose ten different players, five per team.");
   if (![120, 300, 600].includes(duration) || !Number.isSafeInteger(seed)) throw new Error("Invalid game settings.");
   const players = lineups.flat().map(simulationPlayer), rng = random(seed);
   const lines = players.map(emptyLine), score: [number, number] = [0, 0], plays: SimPlay[] = [];
-  let side: Side = rng() < .5 ? 0 : 1, clock = 0, from = formation(side, rng);
+  let side: Side = rng() < .5 ? 0 : 1, clock = 0;
+  let from = formation(players, side, pick(indices(side), i => players[i].passing, rng), rng);
   while (clock < duration) {
     const offense = indices(side), defense = indices((1 - side) as Side);
-    const handler = pick(offense, i => players[i].passing, rng), shooter = pick(offense, i => players[i].usage, rng);
+    const handler = pick(offense, i => players[i].passing * (/PG/.test(players[i].position) ? 1.4 : 1), rng);
+    const to = formation(players, side, handler, rng);
+    const decision = chooseShot(players, side, handler, to, rng);
+    const { shooter, shot, three, action } = decision;
     const passer = handler !== shooter ? handler : null;
-    const defender = pick(defense, i => 1 + players[i].steal + players[i].block, rng);
+    const defender = [...defense].sort((a,b) => distanceTo(to[a],shot)-distanceTo(to[b],shot))[0];
     const p = players[shooter], d = players[defender];
     const end = Math.min(duration, clock + 10 + Math.floor(rng() * 13));
-    const three = rng() < p.threeShare;
-    const angle = (rng() - .5) * Math.PI * .8;
-    const distance = three ? 24 + rng() * 3 : rng() < .58 ? 3 + rng() * 4 : 10 + rng() * 9;
-    const shot = facing({ x: 88.75 - Math.cos(angle) * distance, y: clamp(25 + Math.sin(angle) * distance, 3, 47) }, side);
-    const to = formation(side, rng); to[shooter] = shot;
-    to[defender] = { x: shot.x + (basket(side).x - shot.x) * .15, y: shot.y + (25 - shot.y) * .15 };
+    const distance = distanceTo(shot,basket(side));
+    to[shooter] = shot;
+    // Close out toward the chosen receiver; do not teleport a random defender onto them.
+    to[defender] = { x:to[defender].x+(shot.x-to[defender].x)*.2, y:to[defender].y+(shot.y-to[defender].y)*.2 };
+    const quality = shotQuality(p,shot,defense.map(i=>({spot:to[i],player:players[i]})),side,three);
+    const shotChance = quality.chance;
+    const ballPlayer = passer === null ? p : players[handler];
+    const pressure = clamp(1-quality.nearest/8,0,1);
+    const turnoverChance = clamp(.035 + ballPlayer.turnover*.012 + d.steal*.006 + pressure*.025 + (passer === null ? .015 : .025/Math.sqrt(ballPlayer.passing)), .04, .2);
     let outcome: SimPlay["outcome"], points = 0, rebounder: number | null = null, text: string, retain = false;
     const freeThrows: boolean[] = [];
-    if (rng() < clamp(.065 + p.turnover * .015 + d.steal * .008, .07, .2)) {
-      outcome = "turnover"; lines[shooter].to++;
+    if (rng() < turnoverChance) {
+      outcome = "turnover"; lines[passer ?? shooter].to++;
       const stolen = rng() < .7;
       if (stolen) lines[defender].stl++;
-      text = stolen ? `${d.name} steals from ${p.name}.` : `${p.name} loses it out of bounds.`;
-    } else if (rng() < .09) {
+      text = stolen ? `${d.name} steals from ${ballPlayer.name}.` : `${ballPlayer.name} loses it out of bounds.`;
+    } else if (rng() < (three ? .025 : distance < 8 ? .13 : .06)) {
       outcome = "foul"; lines[defender].pf++;
       for (let n = 0; n < (three ? 3 : 2); n++) freeThrows.push(rng() < p.ftPct);
       points = freeThrows.filter(Boolean).length;
@@ -89,8 +146,8 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
       text = `${d.name} fouls ${p.name}. ${points}/${freeThrows.length} at the line.`;
     } else {
       lines[shooter].fga++; if (three) lines[shooter].tpa++;
-      const blocked = rng() < clamp(d.block * .018, .008, .09);
-      const made = !blocked && rng() < (three ? p.threePct : p.twoPct);
+      const blocked = rng() < clamp(d.block * (three ? .005 : .022) * clamp(1-quality.nearest/10,0,1), .002, .12);
+      const made = !blocked && rng() < shotChance;
       outcome = blocked ? "blocked" : made ? "made" : "missed";
       if (blocked) lines[defender].blk++;
       if (made) {
@@ -103,11 +160,11 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     if (outcome === "missed" || outcome === "blocked" || (outcome === "foul" && !freeThrows.at(-1))) {
       const oReb = offense.reduce((sum, i) => sum + players[i].rebound, 0), dReb = defense.reduce((sum, i) => sum + players[i].rebound, 0);
       retain = rng() < clamp(.25 * oReb / dReb, .12, .4);
-      rebounder = pick(retain ? offense : defense, i => players[i].rebound, rng);
+      rebounder = pick(retain ? offense : defense, i => players[i].rebound / (1 + distanceTo(to[i],basket(side)) / 12), rng);
       lines[rebounder].reb++; text += ` ${players[rebounder].name} ${retain ? "offensive " : ""}rebound.`;
     }
     lines[shooter].pts += points; score[side] += points;
-    plays.push({ start: clock, end, side, handler, shooter, passer, defender, rebounder, outcome, three, points, text,
+    plays.push({ start: clock, end, side, handler, shooter, passer, defender, rebounder, outcome, action, shotChance, three, points, text,
       score: [...score], lines: lines.map(l => ({ ...l })), from, to, shot, freeThrows });
     from = to; clock = end; if (!retain) side = (1 - side) as Side;
   }
@@ -135,11 +192,12 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
   }
   const hoop = basket(play.side);
   let ball: Point, height = 0;
-  if (t < .32) ball = { x: spots[play.handler].x + 1.5, y: spots[play.handler].y + (motion ? Math.sin(time * 10) * .6 : 0) };
+  if (play.outcome === "turnover" && t >= .32) ball = lerp(spots[play.handler], spots[play.defender], (t - .32) / .33);
+  else if (t < .32) ball = { x: spots[play.handler].x + 1.5, y: spots[play.handler].y + (motion ? Math.sin(time * 10) * .6 : 0) };
   else if (t < .52) ball = lerp(spots[play.handler], spots[play.shooter], (t - .32) / .2);
   else if (t < .65) ball = spots[play.shooter];
   else if (play.outcome === "turnover") ball = lerp(spots[play.shooter], spots[play.defender], (t - .65) / .2);
   else if (t < .88) { const flight = (t - .65) / .23; ball = lerp(play.shot, hoop, flight); height = motion ? Math.sin(flight * Math.PI) * 3 : 0; }
   else ball = play.rebounder === null ? hoop : lerp(hoop, spots[play.rebounder], (t - .88) / .12);
-  return { play, spots, ball, height, phase: time >= game.duration ? "Final" : t < .32 ? "Bringing it up" : t < .52 ? "Moving the ball" : t < .65 ? "Creating a shot" : t < .88 ? play.outcome === "turnover" ? "Turnover" : "At the basket" : "Finishing the play" };
+  return { play, spots, ball, height, phase: time >= game.duration ? "Final" : t < .32 ? "Bringing it up" : t < .52 ? "Moving the ball" : t < .65 ? (play.action === "drive" ? "Driving to the rim" : play.action === "cut" ? "Cutting to the basket" : play.action === "catch-and-shoot" ? "Finding the open shot" : "Pulling up") : t < .88 ? play.outcome === "turnover" ? "Turnover" : "At the basket" : "Finishing the play" };
 }

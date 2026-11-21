@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -64,4 +64,34 @@ test("fantasy power does not control game results, and a running game retains it
   const saved = game.players[0].name;
   changed[0][0].name = "Changed upstream";
   assert.equal(game.players[0].name, saved);
+});
+
+
+test("shot decisions value space and account for nearby rim protection", () => {
+  const shooter = simulationPlayer(players[0]);
+  const defender = {...simulationPlayer(players[5]), block: 0};
+  const shot = {x:64,y:25};
+  const open = shotQuality(shooter,shot,[{spot:{x:74,y:25},player:defender}],0,true);
+  const contested = shotQuality(shooter,shot,[{spot:{x:65,y:25},player:defender}],0,true);
+  assert.ok(open.chance > contested.chance + .1);
+  const rim = {x:85,y:25}, spot = {x:87,y:25};
+  assert.ok(shotQuality(shooter,rim,[{spot,player:{...defender,block:4}}],0,false).chance < shotQuality(shooter,rim,[{spot,player:defender}],0,false).chance);
+  const mirrored = shotQuality(shooter,{x:30,y:25},[{spot:{x:20,y:25},player:defender}],1,true);
+  assert.equal(mirrored.chance,open.chance);
+});
+
+test("non-shooters avoid threes and play decisions stay attached to the actual defenders", () => {
+  const noThrees = (team: typeof players) => team.map(p=>({...p,stats:{...p.stats,"3PM":0}}));
+  const nonShooters: typeof teams = [noThrees(teams[0]), noThrees(teams[1])];
+  for (let seed=0;seed<20;seed++) {
+    const game = simulate(nonShooters,300,seed);
+    assert.ok(game.plays.every(p=>!p.three));
+    for (const play of game.plays) {
+      assert.ok(play.shotChance >= .12 && play.shotChance <= .82);
+      assert.equal(Math.floor(play.handler/5),play.side);
+      assert.equal(Math.floor(play.shooter/5),play.side);
+      assert.notEqual(Math.floor(play.defender/5),play.side);
+      if (play.passer !== null) assert.notEqual(play.passer,play.shooter);
+    }
+  }
 });

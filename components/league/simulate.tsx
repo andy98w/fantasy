@@ -90,6 +90,5 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
       </section>
       <section className="panel sim-log"><div className="panel-heading"><h2>Play-by-play</h2></div><div className="sim-log-items" tabIndex={0}>{snapshot.completed.length ? [...snapshot.completed].reverse().map(p => <div className={`sim-log-row sim-side-${p.side}`} key={p.end}><time>{clockText(game.duration-p.end)}</time><p>{p.text}</p><strong>{p.score.join("–")}</strong></div>) : <p className="empty-state">Waiting for the first possession.</p>}</div></section>
     </div>}
-    <details className="sim-method"><summary>Simulation rules</summary><p>Season stats shape shooting, usage, passing and rebounding. Three-point attempt share is estimated because the feed lacks attempts. Defensive positioning and movement are simplified. All selected players are assumed healthy; no substitutions, fatigue, foul-outs or overtime. Outcomes are fictional and are not fantasy forecasts. Only players with 3+ games and complete stats can be selected.</p></details>
   </div>;
 }

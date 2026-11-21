@@ -6,12 +6,13 @@ export type SimLine = { pts: number; reb: number; ast: number; stl: number; blk:
 export type SimPlayer = { id: number; name: string; nbaTeam: string; position: string; usage: number; passing: number; rebound: number; steal: number; block: number; turnover: number; threeShare: number; twoPct: number; threePct: number; ftPct: number };
 export type ScreenPlan = { screener:number; mode:"roll"|"pop"; coverage:"switch"|"drop"; direction:-1|1 };
 export type MovementPlan = { kind:"handoff"|"off-ball-screen"; receiver:number; screener:number; direction:-1|1 };
+export type FastBreak = { trigger:"steal"|"rebound"; result:"rim"|"pull-up"|"settled"; passes:number };
 type ShotIntent = {shooter:number; shot:Point; three:boolean; action:SimPlay["action"]; chance:number; value:number; screen?:ScreenPlan; movement?:MovementPlan};
 export type SimPlay = {
   start: number; end: number; approachSeconds:number; gameStart: number; gameEnd: number; side: Side; handler: number; shooter: number; passer: number | null;
   defender: number; rebounder: number | null; outcome: "made" | "missed" | "blocked" | "turnover" | "foul" | "violation" | "expired";
   action: "drive" | "pull-up" | "catch-and-shoot" | "cut"; shotChance: number;
-  screen?:ScreenPlan; movement?:MovementPlan; shotClockStart:number;
+  screen?:ScreenPlan; movement?:MovementPlan; fastBreak?:FastBreak; stolen:boolean; shotClockStart:number;
   three: boolean; points: number; text: string; score: [number, number]; lines: SimLine[];
   from: Point[]; to: Point[]; shot: Point; freeThrows: boolean[];
   frames: MotionFrame[]; finishFrames: MotionFrame[]; onBall: number; helper: number | null; passAt: number; passEnd: number;
@@ -174,7 +175,7 @@ function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], 
   }
   return candidates[selected];
 }
-export type MotionFrame = { spots: Point[]; phase: string };
+export type MotionFrame = { spots: Point[]; phase: string; at?:number; ball?:Point; carrier?:number };
 /** Fixed-step steering. No outcome is sampled until this possession has played out. */
 export function resolvePossession(players:SimPlayer[], side:Side, handler:number, setup:Point[], start:Point[], intent:ShotIntent, seconds:number) {
   const offense=indices(side), defense=indices((1-side) as Side), hoop=basket(side);
@@ -397,6 +398,120 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
     passAt:Math.min(.53,passStartSeconds/usedSeconds*.55),passEnd:Math.min(.55,passEndSeconds/usedSeconds*.55)};
 }
 
+/** Push from actual possession, reading the recovering defense before choosing a shot.
+ * Explicit timed ball frames preserve outlets and advance passes through a set-offense fallback.
+ */
+export function resolveFastBreak(players:SimPlayer[], side:Side, owner:number, start:Point[], seconds:number,
+  trigger:FastBreak["trigger"], rng:()=>number=()=>.5) {
+  const offense=indices(side), defense=indices((1-side) as Side), hoop=basket(side), dt=1/30;
+  let spots=start.map(p=>({...p})), velocities=spots.map(()=>({x:0,y:0}));
+  let carrier=owner, lastPasser:number|null=null, ball={...spots[owner]}, elapsed=0, passes=0, nextRead=.25;
+  let flight:{from:Point;to:Point;receiver:number;start:number;end:number;phase:string}|null=null;
+  const lanes=new Map([...offense].filter(i=>i!==owner).sort((a,b)=>start[a].y-start[b].y).map((i,n)=>[i,[7,17,34,44][n]]));
+  const frames:MotionFrame[]=[{spots:spots.map(p=>({...p})),ball:{...ball},carrier,at:0,phase:trigger==="steal"?"Fast break · Push":"Rebound · Look upcourt"}];
+  let result:FastBreak["result"]="settled";
+  const laneClear=(from:Point,to:Point)=>defense.every(i=>{
+    const dx=to.x-from.x,dy=to.y-from.y, length=dx*dx+dy*dy;
+    const t=clamp(((spots[i].x-from.x)*dx+(spots[i].y-from.y)*dy)/Math.max(1,length),0,1);
+    return distanceTo(spots[i],{x:from.x+dx*t,y:from.y+dy*t})>3.8;
+  });
+  const limit=Math.min(7,Math.max(0,seconds-1.2));
+  while((elapsed+dt<=limit || flight!==null) && elapsed+dt<=seconds-.2) {
+    elapsed+=dt;
+    const local=facing(spots[carrier],side), goals=spots.map(p=>({...p}));
+    let phase:string=flight?.phase??"Fast break · Push";
+    // Fill separate lanes: two wide runners, an interior runner and a trailing outlet.
+    for(const i of offense)if(i!==carrier) {
+      const y=lanes.get(i)??(spots[i].y<25?12:38);
+      goals[i]=facing({x:Math.abs(y-25)>15?82:85,y},side);
+    }
+    let driveY=25+(local.y<25?-3:3);
+    const blocker=defense.find(i=>{
+      const p=facing(spots[i],side);
+      return p.x>local.x && p.x-local.x<9 && Math.abs(p.y-local.y)<5;
+    });
+    if(blocker!==undefined) {
+      const p=facing(spots[blocker],side);
+      driveY=clamp(p.y+(local.y<=p.y?-7:7),6,44);
+    }
+    goals[carrier]=facing({x:86,y:driveY},side);
+    // The first defender protects the rim; the next stops the ball. Others recover
+    // to runners from their real locations, rather than snapping into matchups.
+    const back=[...defense].sort((a,b)=>distanceTo(spots[a],hoop)-distanceTo(spots[b],hoop));
+    goals[back[0]]=facing({x:85,y:25},side);
+    const stop=back.slice(1).sort((a,b)=>distanceTo(spots[a],spots[carrier])-distanceTo(spots[b],spots[carrier]))[0];
+    goals[stop]=facing({x:Math.min(86,local.x+4.5),y:local.y},side);
+    const runners=offense.filter(i=>i!==carrier).sort((a,b)=>distanceTo(spots[a],hoop)-distanceTo(spots[b],hoop));
+    back.filter(i=>i!==back[0] && i!==stop).forEach((i,n)=>{
+      const p=facing(spots[runners[n]],side);
+      goals[i]=facing({x:Math.min(87,p.x+4),y:p.y},side);
+    });
+    // A short reaction window belongs to the turnover/rebound, never to each read.
+    if(elapsed<.25)for(const i of defense)goals[i]=spots[i];
+    if(flight)goals[flight.receiver]=flight.to;
+    const speeds=spots.map((_,i)=>defense.includes(i)?15:i===carrier?13:16);
+    const moved=moveBodies(spots,velocities,goals,speeds,dt);
+    spots=moved.spots;velocities=moved.velocities;
+    if(flight) {
+      ball=lerp(flight.from,spots[flight.receiver],(elapsed-flight.start)/(flight.end-flight.start));
+      if(elapsed>=flight.end) {lastPasser=carrier;carrier=flight.receiver;flight=null;ball={...spots[carrier]};nextRead=elapsed+.2;}
+    } else ball={...spots[carrier]};
+    let finish=false, settle=false;
+    if(!flight && elapsed>=nextRead && elapsed<limit) {
+      nextRead=elapsed+.2;
+      const p=facing(spots[carrier],side), dist=distanceTo(spots[carrier],hoop);
+      const nearest=Math.min(...defense.map(i=>distanceTo(spots[i],spots[carrier])));
+      const ahead=defense.filter(i=>facing(spots[i],side).x>p.x-2).length;
+      const support=offense.filter(i=>facing(spots[i],side).x>p.x-10).length;
+      if(dist<9 && nearest>4.1) {result="rim";finish=true;phase="Fast break · Finish";}
+      else if(dist>=23.75 && dist<27 && nearest>9 && players[carrier].threeShare>.4 && support>ahead) {
+        result="pull-up";finish=true;phase="Fast break · Open three";
+      } else if(passes<2) {
+        const choices=offense.filter(i=>i!==carrier && i!==lastPasser).map(i=>{
+          const q=facing(spots[i],side), gap=Math.min(...defense.map(d=>distanceTo(spots[d],spots[i])));
+          const length=distanceTo(spots[i],spots[carrier]);
+          const outlet=trigger==="rebound" && passes===0 && p.x<40 && players[i].passing>players[carrier].passing;
+          const advanced=q.x>p.x+6 && gap>6;
+          const usable=length>5 && length<42 && q.x>p.x+2 && laneClear(spots[carrier],spots[i]);
+          return {i,usable:usable && (outlet || advanced),value:q.x-p.x+gap+players[i].passing*(outlet?2:0)};
+        }).filter(c=>c.usable).sort((a,b)=>b.value-a.value);
+        if(choices.length) {
+          const receiver=choices[0].i, length=distanceTo(spots[carrier],spots[receiver]);
+          passes++;phase=trigger==="rebound" && passes===1?"Fast break · Outlet":"Fast break · Hit ahead";
+          flight={from:{...ball},to:{...spots[receiver]},receiver,start:elapsed,end:elapsed+clamp(length/60,.25,.7),phase};
+        }
+      }
+      // With no immediate opening, preserve the ball and flow into a set.
+      settle=!finish && !flight && elapsed>2 && p.x>61 && ahead>=support;
+    }
+    frames.push({spots:spots.map(p=>({...p})),ball:{...ball},carrier,at:elapsed,phase});
+    if(finish)break;
+    if(settle)break;
+  }
+  if(result!=="settled") {
+    const shot={...spots[carrier]}, three=distanceTo(shot,hoop)>=23.75;
+    return {shooter:carrier,shot,three,action:three?"pull-up" as const:"drive" as const,to:spots,frames,
+      onBall:defense.reduce((a,b)=>distanceTo(spots[a],shot)<distanceTo(spots[b],shot)?a:b),helper:null,
+      seconds:elapsed,ready:true,passAt:.1,passEnd:.2,passer:lastPasser,
+      fastBreak:{trigger,result,passes},screen:undefined,movement:undefined};
+  }
+  // The push finishes any pass while everyone keeps running, then flows into a set.
+  const setup=formation(players,side,carrier,rng), intent=chooseShot(players,side,carrier,setup,rng);
+  if(seconds-elapsed<8) {delete intent.screen;delete intent.movement;}
+  const half=resolvePossession(players,side,carrier,setup,spots,intent,Math.max(.01,seconds-elapsed));
+  const offset=elapsed;
+  half.frames.forEach((frame,n)=>{
+    if(n===0)return;
+    const progress=n/(half.frames.length-1)*.55;
+    const at=offset+n/(half.frames.length-1)*half.seconds;
+    const ball=progress<half.passAt?frame.spots[carrier]:lerp(frame.spots[carrier],frame.spots[half.shooter],(progress-half.passAt)/(half.passEnd-half.passAt));
+    frames.push({...frame,at,ball:{...ball},carrier:progress<half.passEnd?carrier:half.shooter,
+      phase:n<15?"Fast break covered · Flow into offense":frame.phase});
+  });
+  return {...half,frames,seconds:offset+half.seconds,passer:half.shooter===carrier?null:carrier,
+    fastBreak:{trigger,result,passes},screen:intent.screen,movement:intent.movement};
+}
+
 /** Follow-through, box-outs and recovery use the same contact solver as live offense.
  * Everyone reacts to the shot before knowing its result; outcome-specific movement
  * begins only when the ball reaches the rim. The shooter stays at the release point.
@@ -508,10 +623,10 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
   let from: Point[] | null = tipSpots;
   while (clock < duration) {
     const offense = indices(side), defense = indices((1 - side) as Side);
-    const handler = plays.at(-1)?.outcome==="turnover" ? plays.at(-1)!.defender : pick(offense, i => players[i].passing * (/PG/.test(players[i].position) ? 1.4 : 1), rng);
-    if(!plays.length)tip.receiver=handler;
     const previous=plays.at(-1);
-    if(previous && (previous.outcome==="violation" || previous.outcome==="made" || (previous.outcome==="foul" && previous.freeThrows.at(-1)))) {
+    const handler = previous?.outcome==="turnover" ? previous.defender : previous?.rebounder ?? pick(offense, i => players[i].passing * (/PG/.test(players[i].position) ? 1.4 : 1), rng);
+    if(!plays.length)tip.receiver=handler;
+    if(previous && (previous.outcome==="violation" || (previous.outcome==="turnover" && !previous.stolen) || previous.outcome==="made" || (previous.outcome==="foul" && previous.freeThrows.at(-1)))) {
       const inbound=inboundSequence(playback,side,from!,endBall(previous),handler);
       inbounds.push(inbound);from=inbound.frames.at(-1)!.spots;playback=inbound.end;
     }
@@ -520,27 +635,29 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     const decision = chooseShot(players, side, handler, setup, rng);
     if(Math.min(remaining,shotClockStart)<8) {delete decision.screen;delete decision.movement;}
     const budget=Math.max(.01,Math.min(remaining,shotClockStart)-.2);
-    const motion = resolvePossession(players,side,handler,setup,from ?? setup,decision,budget);
+    const trigger=previous?.stolen?"steal":previous?.rebounder!==null && previous?.rebounder!==undefined && previous.side!==side && previous.outcome!=="foul"?"rebound":null;
+    const transition=trigger?resolveFastBreak(players,side,handler,from!,budget,trigger,rng):null;
+    const motion = transition ?? resolvePossession(players,side,handler,setup,from ?? setup,decision,budget);
     const clockExpired=!motion.ready || remaining<=.2;
     const approachSeconds=clockExpired?Math.min(remaining,shotClockStart):motion.seconds;
     const { shooter, shot, three, action, to } = motion;
-    const passer = handler !== shooter ? handler : null;
+    const passer = transition ? transition.passer : handler !== shooter ? handler : null;
     const defender = [...defense].sort((a,b) => distanceTo(to[a],shot)-distanceTo(to[b],shot))[0];
     const p = players[shooter], d = players[defender];
     const distance = distanceTo(shot,basket(side));
     const quality = shotQuality(p,shot,defense.map(i=>({spot:to[i],player:players[i]})),side,three);
     const shotChance = quality.chance;
-    const ballPlayer = passer === null ? p : players[handler];
+    const ballPlayer = passer === null ? p : players[passer];
     const pressure = clamp(1-quality.nearest/8,0,1);
     const turnoverChance = clamp(.035 + ballPlayer.turnover*.012 + d.steal*.006 + pressure*.025 + (passer === null ? .015 : .025/Math.sqrt(ballPlayer.passing)), .04, .2);
-    let outcome: SimPlay["outcome"], points = 0, rebounder: number | null = null, text: string, retain = false;
+    let outcome: SimPlay["outcome"], points = 0, rebounder: number | null = null, text: string, retain = false, stolen=false;
     const freeThrows: boolean[] = [];
     if(clockExpired) {
       outcome=remaining<shotClockStart?"expired":"violation";
       text=outcome==="violation"?"Shot clock violation · Team turnover.":"Game clock expires before the shot.";
     } else if (rng() < turnoverChance) {
       outcome = "turnover"; lines[passer ?? shooter].to++;
-      const stolen = rng() < .7;
+      stolen = rng() < .7;
       if (stolen) lines[defender].stl++;
       text = stolen ? `${d.name} steals from ${ballPlayer.name}.` : `${ballPlayer.name} loses it out of bounds.`;
     } else if (rng() < (three ? .025 : distance < 8 ? .13 : .06)) {
@@ -566,7 +683,8 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     const flightSeconds=clamp(.55+distance*.024,.65,1.25);
     const finishSeconds=outcome==="foul"?3+freeThrows.length*2:outcome==="turnover"?4:
       outcome==="violation" || outcome==="expired"?1:(.2+flightSeconds)*.45/.33;
-    const liveLength=Math.min(remaining,approachSeconds+(["foul","violation","expired"].includes(outcome)?0:finishSeconds));
+    const deadBall=["foul","violation","expired"].includes(outcome) || (outcome==="turnover" && !stolen);
+    const liveLength=Math.min(remaining,approachSeconds+(deadBall?0:finishSeconds));
     const followThrough=outcome==="foul"?[]:finishPossession(players,{side,to,shooter,shot,outcome,defender,rebounder:null},finishSeconds);
     const rimFrame=followThrough[Math.floor((.88-.55)/.45*(followThrough.length-1))];
     const reboundSpots=rimFrame?.spots ?? to;
@@ -583,15 +701,16 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     lines[shooter].pts += points; score[side] += points;
     // Dead-ball playback adds time to the movie, never to the game clock.
     const gameEnd=Math.min(duration,clock+liveLength), end=playback+approachSeconds+finishSeconds;
-    const play:SimPlay={ start:playback, end, approachSeconds, shotClockStart, gameStart:clock, gameEnd, side, handler, shooter, passer, defender, rebounder, outcome, action, screen:decision.screen, movement:decision.movement, shotChance, three, points, text,
+    const play:SimPlay={ start:playback, end, approachSeconds, shotClockStart, gameStart:clock, gameEnd, side, handler, shooter, passer, defender, rebounder, outcome, stolen, action,
+      screen:transition?transition.screen:decision.screen,movement:transition?transition.movement:decision.movement,fastBreak:transition?.fastBreak,shotChance, three, points, text,
       score: [...score], lines: lines.map(l => ({ ...l })), from:from ?? setup, to, shot, freeThrows,
       frames:motion.frames,finishFrames:[],onBall:motion.onBall,helper:motion.helper,passAt:motion.passAt,passEnd:motion.passEnd };
     if(outcome!=="foul")play.finishFrames=rebounder===null?followThrough:finishPossession(players,play,finishSeconds);
-    if(outcome==="violation" || outcome==="expired")play.finishFrames=[{spots:to,phase:outcome==="violation"?"Shot clock violation":"Final"}];
+    if(outcome==="violation" || outcome==="expired" || (outcome==="turnover" && !stolen))play.finishFrames=[{spots:to,phase:outcome==="violation"?"Shot clock violation":outcome==="turnover"?"Out of bounds":"Final"}];
     plays.push(play);
     nextShotClock=retain?14:24;
     if(outcome!=="foul" && rebounder!==null)nextShotClock-=Math.max(0,gameEnd-(clock+replayTime(play,.98)-play.start));
-    if(outcome==="turnover")nextShotClock-=Math.max(0,gameEnd-(clock+replayTime(play,.6)-play.start));
+    if(stolen)nextShotClock-=Math.max(0,gameEnd-(clock+replayTime(play,.6)-play.start));
     from = endSpots(play); clock = gameEnd; playback=end; if (!retain) side = (1 - side) as Side;
   }
   return { tip, inbounds, players, plays, duration, playbackDuration:playback, seed };
@@ -654,7 +773,7 @@ function freeThrowSpots(play:SimPlay) {
 function endSpots(play:SimPlay) { return play.outcome === "foul" ? freeThrowSpots(play) : play.finishFrames.at(-1)?.spots ?? play.to; }
 function endBall(play:SimPlay) {
   const spots = endSpots(play);
-  return play.rebounder !== null ? spots[play.rebounder] : play.outcome === "turnover" ? spots[play.defender] : play.outcome==="violation" || play.outcome==="expired"? spots[play.shooter]:basket(play.side);
+  return play.rebounder !== null ? spots[play.rebounder] : play.stolen ? spots[play.defender] : play.outcome==="turnover" || play.outcome==="violation" || play.outcome==="expired"? spots[play.shooter]:basket(play.side);
 }
 export function courtFrame(game: Simulation, time: number, motion = true) {
   if(time<game.tip.duration) {
@@ -677,7 +796,14 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
   const t = motion ? progress : Math.floor(progress*20)/20;
   const finishing=t>=.55 && play.finishFrames.length>0;
   const frames=finishing?play.finishFrames:play.frames;
-  const framePosition=clamp(finishing?(t-.55)/.45:t/.55,0,1)*(frames.length-1), frameIndex=Math.floor(framePosition);
+  let framePosition=clamp(finishing?(t-.55)/.45:t/.55,0,1)*(frames.length-1);
+  if(t<.55 && frames[0].at!==undefined) {
+    const elapsed=clamp(t/.55,0,1)*play.approachSeconds;
+    const next=frames.findIndex(f=>f.at!>elapsed);
+    const index=next<0?frames.length-1:Math.max(0,next-1);
+    framePosition=index+(next>0?(elapsed-frames[index].at!)/(frames[next].at!-frames[index].at!):0);
+  }
+  const frameIndex=Math.floor(framePosition);
   const a=frames[frameIndex], b=frames[Math.min(frameIndex+1,frames.length-1)];
   let spots=a.spots.map((p,i)=>lerp(p,b.spots[i],framePosition-frameIndex));
   if (play.outcome === "foul" && t >= .55) {
@@ -687,9 +813,10 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
   const hoop = basket(play.side);
   let ball:Point, height=0, event:CourtEvent|null=null;
   let phase = a.phase;
-  if (t < .12) ball = lerp(game.inbounds.find(p=>p.end===play.start)?.frames.at(-1)?.ball ?? (previous ? endBall(previous) : game.tip.spots[game.tip.receiver]),spots[play.handler],t/.12);
-  else if((play.outcome==="violation" || play.outcome==="expired") && t>=.55) ball=spots[play.shooter];
-  else if (play.outcome === "turnover" && t >= .32) ball = lerp(spots[play.handler],spots[play.defender],(t-.32)/.28);
+  if(t<.55 && a.ball && b.ball)ball=lerp(a.ball,b.ball,framePosition-frameIndex);
+  else if (t < .12) ball = lerp(game.inbounds.find(p=>p.end===play.start)?.frames.at(-1)?.ball ?? (previous ? endBall(previous) : game.tip.spots[game.tip.receiver]),spots[play.handler],t/.12);
+  else if((play.outcome==="violation" || play.outcome==="expired" || (play.outcome==="turnover" && !play.stolen)) && t>=.55) ball=spots[play.shooter];
+  else if (play.outcome === "turnover" && t >= .55) ball = lerp(play.frames.at(-1)?.ball ?? play.to[play.shooter],spots[play.defender],(t-.55)/.05);
   else if (t < play.passAt) ball = spots[play.handler];
   else if (t < play.passEnd) ball = lerp(spots[play.handler],spots[play.shooter],(t-play.passAt)/(play.passEnd-play.passAt));
   else if (play.outcome === "foul") {
@@ -711,8 +838,8 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
   else if (t < .88) { const flight=(t-shotRelease(play))/(.88-shotRelease(play)); ball=lerp(play.shot,hoop,flight); height=motion ? Math.sin(flight*Math.PI)*3 : 0; phase="Shot in the air"; }
   else ball=hoop;
   if (play.outcome === "turnover" && t >= .6) {
-    phase="Transition";
-    if(time-replayTime(play,.6)<.8)event={title:"TURNOVER",detail:game.players[play.passer ?? play.shooter].name,tone:"missed"};
+    phase=play.stolen?"Transition":"Out of bounds";
+    if(!play.stolen || time-replayTime(play,.6)<.8)event={title:"TURNOVER",detail:game.players[play.passer ?? play.shooter].name,tone:"missed"};
   }
   if (["made","missed","blocked"].includes(play.outcome) && t >= .88) {
     phase=play.outcome === "made" ? "Basket" : play.outcome === "blocked" ? "Block" : "Miss";
@@ -727,9 +854,9 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
     if (t >= .98) {phase="Rebound";event={title:Math.floor(play.rebounder/5)===play.side ? "OFFENSIVE REBOUND":"REBOUND",detail:game.players[play.rebounder].name,tone:"neutral"};}
   }
   if (time >= game.playbackDuration) {phase="Final";event=null;}
-  const changedHands=play.outcome==="turnover" && t>=.6;
+  const changedHands=play.stolen && t>=.6;
   return {play,spots,ball,height,phase,event,possessionSide:changedHands?(1-play.side) as Side:play.side,
-    focus:changedHands || event?.title==="FOUL"?play.defender: t<play.passAt?play.handler:play.shooter};
+    focus:changedHands || event?.title==="FOUL"?play.defender:t<.55 && a.carrier!==undefined?a.carrier:t<play.passAt?play.handler:play.shooter};
 }
 
 /** Elapsed live game time; the replay can be longer because of dead balls. */
@@ -751,7 +878,7 @@ export function shotClock(game:Simulation,time:number):number|null {
   const t=playProgress(play,time), elapsed=Math.max(0,time-play.start);
   if(play.outcome==="violation")return Math.max(0,play.shotClockStart-Math.min(elapsed,play.approachSeconds));
   if(t>=.98 && play.rebounder!==null)return (Math.floor(play.rebounder/5)===play.side?14:24)-(play.outcome==="foul"?0:Math.max(0,time-replayTime(play,.98)));
-  if(play.outcome==="turnover" && t>=.6)return Math.max(0,24-(time-replayTime(play,.6)));
+  if(play.outcome==="turnover" && t>=.6)return play.stolen?Math.max(0,24-(time-replayTime(play,.6))):24;
   if(play.outcome==="foul" && t>=.55)return Math.max(0,play.shotClockStart-play.approachSeconds);
   if(["made","missed","blocked"].includes(play.outcome) && t>=shotRelease(play))return null;
   return Math.max(0,play.shotClockStart-elapsed);

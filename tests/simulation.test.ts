@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -190,7 +190,7 @@ test("drives can draw help and pass out before defenders recover",()=>{
   for(let seed=0;seed<15;seed++) for(const play of simulate(teams,120,seed).plays) {
     const phases=play.frames.map(f=>f.phase);
     helped ||= phases.includes("Help defense");
-    if(phases.includes("Kick-out")) {
+    if(phases.includes("Kick-out") && !play.fastBreak) {
       kicked=true; assert.notEqual(play.handler,play.shooter); assert.equal(play.passer,play.handler);
       assert.ok(play.passAt>=.11 && play.passEnd>play.passAt);
     }
@@ -344,7 +344,7 @@ test("turnovers flow into staggered lanes and retain the new ball handler",()=>{
   for(let seed=0;seed<60;seed++) {
     const game=simulate(teams,120,seed);
     game.plays.forEach((play,index)=>{
-      if(play.outcome!=="turnover" || play.end-play.start<10)return;
+      if(!play.stolen || play.end-play.start<10)return;
       const length=play.end-play.start;
       const change=courtFrame(game,replayTime(play,.6)+.001);
       assert.equal(change.event?.title,"TURNOVER");
@@ -378,7 +378,7 @@ test("made baskets have a visible pickup and inbound before the clock resumes",(
         assert.ok(Math.hypot(frame.spots[i].x-frame.spots[j].x,frame.spots[i].y-frame.spots[j].y)>3.7);
       const before=game.plays.find(p=>p.end===inbound.start)!;
       const next=game.plays.find(p=>p.start===inbound.end)!;
-      assert.ok(before.outcome==="made" || before.outcome==="violation" || before.freeThrows.at(-1));
+      assert.ok(before.outcome==="made" || before.outcome==="violation" || (before.outcome==="turnover" && !before.stolen) || before.freeThrows.at(-1));
       const start=courtFrame(game,inbound.start),release=courtFrame(game,inbound.release);
       const baselineX=inbound.side===0?2:92;
       assert.ok(Math.abs(release.spots[inbound.inbounder].x-baselineX)<.6);
@@ -442,7 +442,7 @@ test("screen reads vary between handler, roller and kick-out without replacing t
     completed++;
     finishes.add(play.shooter===play.handler?"handler":play.shooter===play.screen.screener?"screener":"kick-out");
     assert.ok(play.passEnd>play.passAt);
-    if(play.passer!==null)assert.equal(play.passer,play.handler);
+    if(play.passer!==null && !play.fastBreak)assert.equal(play.passer,play.handler);
   }
   assert.deepEqual([...finishes].sort(),["handler","kick-out","screener"]);
   assert.equal(modes.size,2);assert.equal(coverage.size,2);assert.equal(sides.size,2);
@@ -476,7 +476,7 @@ test("handoffs exchange at close range and off-ball screens plant before the rec
 
 test("possession clock resets on control, pauses on dead balls, and legal shots beat the buzzer",()=>{
   const seen=new Set<string>();
-  for(let seed=0;seed<30;seed++) {
+  for(let seed=0;seed<100;seed++) {
     const game=simulate(teams,120,seed);
     assert.equal(shotClock(game,0),24);
     for(const inbound of game.inbounds)assert.equal(shotClock(game,(inbound.start+inbound.end)/2),24);
@@ -512,4 +512,74 @@ test("possession clock resets on control, pauses on dead balls, and legal shots 
     assert.equal(shotClock(game,game.playbackDuration),null);
   }
   assert.deepEqual([...seen].sort(),["defensive rebound","foul","offensive rebound","violation"]);
+});
+
+test("fast breaks exploit a two-on-one, outlet from the rebounder, and settle against recovered defense",()=>{
+  const ps=players.map(simulationPlayer);
+  const open=[{x:50,y:18},{x:65,y:35},{x:20,y:7},{x:20,y:30},{x:25,y:44},
+    {x:72,y:25},{x:35,y:8},{x:30,y:42},{x:10,y:15},{x:10,y:36}];
+  const rebound=[{x:8,y:25},{x:25,y:8},{x:18,y:40},{x:10,y:6},{x:12,y:45},
+    {x:40,y:25},{x:50,y:8},{x:50,y:42},{x:60,y:15},{x:60,y:36}];
+  const recovered=[{x:62,y:25},{x:58,y:8},{x:55,y:42},{x:45,y:15},{x:45,y:36},
+    {x:67,y:25},{x:80,y:8},{x:80,y:42},{x:86,y:18},{x:86,y:33}];
+  const attack=resolveFastBreak(ps,0,0,open,22,"steal");
+  assert.equal(attack.fastBreak.result,"rim");
+  assert.equal(attack.shooter,1);assert.equal(attack.passer,0);
+  assert.ok(attack.seconds<4,"The open runner should finish before half-court setup");
+  assert.ok(attack.frames.some(f=>f.phase==="Fast break · Hit ahead"));
+  const mirror=resolveFastBreak([...ps.slice(5),...ps.slice(0,5)],1,5,
+    [...open.slice(5),...open.slice(0,5)].map(p=>({x:94-p.x,y:p.y})),22,"steal");
+  assert.equal(mirror.fastBreak.result,"rim");assert.equal(mirror.shooter,6);
+  assert.ok(Math.abs(mirror.seconds-attack.seconds)<.04);
+  const outlet=resolveFastBreak(ps,0,0,rebound,22,"rebound");
+  assert.deepEqual(outlet.frames[0].ball,rebound[0]);
+  assert.ok(outlet.frames.some(f=>f.phase==="Fast break · Outlet"));
+  assert.ok(outlet.frames.some(f=>f.carrier!==0));
+  const settled=resolveFastBreak(ps,0,0,recovered,22,"steal");
+  assert.equal(settled.fastBreak.result,"settled");
+  assert.ok(settled.frames.some(f=>f.phase==="Fast break covered · Flow into offense"));
+  for(const result of [attack,mirror,outlet,settled]) {
+    assert.deepEqual(result.frames.at(-1)!.ball,result.to[result.shooter]);
+    for(let n=1;n<result.frames.length;n++) {
+      const a=result.frames[n-1],b=result.frames[n],dt=b.at!-a.at!;
+      assert.ok(dt>0);
+      assert.ok(Math.hypot(a.ball!.x-b.ball!.x,a.ball!.y-b.ball!.y)<80*dt+.1,"Outlet or fallback teleported the ball");
+      for(let i=0;i<10;i++)assert.ok(Math.hypot(a.spots[i].x-b.spots[i].x,a.spots[i].y-b.spots[i].y)<18*dt+.05);
+    }
+  }
+});
+
+test("only live steals and defensive field-goal rebounds trigger fast breaks with real ball ownership",()=>{
+  const seen=new Set<string>();
+  for(let seed=0;seed<25;seed++) {
+    const game=simulate(teams,300,seed);
+    game.plays.forEach((play,n)=>{
+      const previous=game.plays[n-1];
+      if(!previous) {assert.equal(play.fastBreak,undefined);return;}
+      const expected=previous.stolen?"steal":previous.rebounder!==null && previous.side!==play.side && previous.outcome!=="foul"?"rebound":null;
+      if(!expected) {
+        assert.equal(play.fastBreak,undefined);
+        if(previous.outcome==="turnover" && !previous.stolen) {
+          seen.add("dead turnover");assert.ok(game.inbounds.some(i=>i.start===previous.end && i.end===play.start));
+        }
+        return;
+      }
+      seen.add(expected);seen.add(play.fastBreak!.result);
+      assert.equal(play.fastBreak?.trigger,expected);
+      assert.equal(play.handler,expected==="steal"?previous.defender:previous.rebounder);
+      assert.deepEqual(play.frames[0].ball,play.from[play.handler]);
+      assert.ok(!game.inbounds.some(i=>i.start===previous.end && i.end===play.start));
+      for(const frame of play.frames.filter((_,i)=>i%15===0)) {
+        const rendered=courtFrame(game,play.start+frame.at!);
+        assert.ok(Math.hypot(rendered.ball.x-frame.ball!.x,rendered.ball.y-frame.ball!.y)<.001);
+      }
+      const before=courtFrame(game,play.start-.000001),after=courtFrame(game,play.start);
+      assert.ok(Math.hypot(before.ball.x-after.ball.x,before.ball.y-after.ball.y)<.01);
+      if(play.fastBreak!.result!=="settled") {
+        assert.equal(play.screen,undefined);assert.equal(play.movement,undefined);
+        assert.ok(play.approachSeconds<=7.8);
+      }
+    });
+  }
+  for(const kind of ["steal","rebound","rim","settled","dead turnover"])assert.ok(seen.has(kind),kind);
 });

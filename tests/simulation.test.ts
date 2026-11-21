@@ -172,7 +172,7 @@ test("moving bodies stay separated and shot odds use the positions shown on cour
   for(let seed=0;seed<12;seed++) {
     const game=simulate(teams,120,seed);
     for(const play of game.plays) {
-      for(const frame of play.frames) for(let i=0;i<10;i++) for(let j=i+1;j<10;j++) {
+      for(const frame of [...play.frames,...play.finishFrames]) for(let i=0;i<10;i++) for(let j=i+1;j<10;j++) {
         assert.ok(Math.hypot(frame.spots[i].x-frame.spots[j].x,frame.spots[i].y-frame.spots[j].y)>3.7);
       }
       const defenders=game.players.map((player,i)=>({player,spot:play.to[i],i})).filter(d=>Math.floor(d.i/5)!==play.side);
@@ -247,8 +247,9 @@ test("contact preserves sideways movement and a crowded boundary stays stable",(
 test("crowded possessions avoid repeated abrupt frame reversals",()=>{
   let reversals=0, movements=0;
   for(let seed=0;seed<12;seed++) for(const play of simulate(teams,120,seed).plays) {
-    for(let t=2;t<play.frames.length;t++) for(let i=0;i<10;i++) {
-      const [a,b,c]=[t-2,t-1,t].map(n=>play.frames[n].spots[i]);
+    const frames=[...play.frames,...play.finishFrames];
+    for(let t=2;t<frames.length;t++) for(let i=0;i<10;i++) {
+      const [a,b,c]=[t-2,t-1,t].map(n=>frames[n].spots[i]);
       const v={x:b.x-a.x,y:b.y-a.y}, w={x:c.x-b.x,y:c.y-b.y};
       const speed=Math.hypot(v.x,v.y), nextSpeed=Math.hypot(w.x,w.y);
       if(speed>.03 && nextSpeed>.03 && v.x*w.x+v.y*w.y<-.5*speed*nextSpeed)reversals++;
@@ -258,4 +259,57 @@ test("crowded possessions avoid repeated abrupt frame reversals",()=>{
   // Allow real tactical changes, but reject alternating-frame collision vibration.
   // The previous positional-push solver reversed on nearly half of these samples.
   assert.ok(reversals/movements<.002,`${reversals} abrupt reversals in ${movements} samples`);
+});
+
+
+test("off-ball players cut and relocate even after arriving at their formation",()=>{
+  const ps=players.map(simulationPlayer);
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const intent={shooter:0,shot:{x:63,y:25},three:true,action:"pull-up" as const,chance:.3,value:.9};
+  const result=resolvePossession(ps,0,0,setup,setup,intent,8);
+  const before=result.frames[Math.floor(result.frames.length*.4)].spots;
+  const movers=[1,2,3,4].filter(i=>Math.hypot(before[i].x-result.to[i].x,before[i].y-result.to[i].y)>4);
+  assert.ok(movers.length>=3,`Only ${movers.length} off-ball players repositioned`);
+  // Tactical coordinates mirror correctly when attacking the other basket.
+  const mirrored=setup.map(p=>({x:94-p.x,y:p.y}));
+  const mirrorPlayers=[...ps.slice(5),...ps.slice(0,5)];
+  const reordered=[...mirrored.slice(5),...mirrored.slice(0,5)];
+  const reverse=resolvePossession(mirrorPlayers,1,5,reordered,reordered,{...intent,shooter:5,shot:{x:31,y:25}},8);
+  result.to.forEach((p,i)=>assert.ok(Math.hypot(94-p.x-reverse.to[(i+5)%10].x,p.y-reverse.to[(i+5)%10].y)<.05));
+});
+
+test("shots keep off-ball players moving while the ball follows its fixed release point",()=>{
+  let checked=0;
+  for(let seed=0;seed<8;seed++) {
+    const game=simulate(teams,120,seed);
+    for(const play of game.plays.filter(p=>["made","missed","blocked"].includes(p.outcome) && p.end-p.start>10)) {
+      const at=(t:number)=>courtFrame(game,play.start+(play.end-play.start)*t);
+      const early=at(.70),late=at(.86);
+      const movers=early.spots.filter((p,i)=>i!==play.shooter && Math.hypot(p.x-late.spots[i].x,p.y-late.spots[i].y)>1);
+      assert.ok(movers.length>=4,`Only ${movers.length} players moved during shot flight`);
+      const flight=(.8-.65)/.23,hoop={x:play.side===0?88.75:5.25,y:25};
+      const ball=at(.8).ball;
+      assert.ok(Math.hypot(ball.x-(play.shot.x+(hoop.x-play.shot.x)*flight),ball.y-(play.shot.y+(hoop.y-play.shot.y)*flight))<.00001);
+      for(const boundary of [.55,.65,.72,.88,.98]) {
+        const a=at(boundary-.000001),b=at(boundary+.000001);
+        a.spots.forEach((p,i)=>assert.ok(Math.hypot(p.x-b.spots[i].x,p.y-b.spots[i].y)<.01));
+      }
+      checked++;
+    }
+  }
+  assert.ok(checked>20);
+});
+
+
+test("rebound winners come from teammates within reach of the rim",()=>{
+  for(let seed=0;seed<12;seed++) {
+    const game=simulate(teams,120,seed);
+    for(const play of game.plays.filter(p=>p.rebounder!==null && p.outcome!=="foul")) {
+      const frame=courtFrame(game,play.start+(play.end-play.start)*.875),hoop={x:play.side===0?88.75:5.25,y:25};
+      const distance=(i:number)=>Math.hypot(frame.spots[i].x-hoop.x,frame.spots[i].y-hoop.y);
+      const side=Math.floor(play.rebounder!/5),team=Array.from({length:5},(_,i)=>side*5+i);
+      assert.ok(distance(play.rebounder!)<=Math.min(...team.map(distance))+5.5);
+    }
+  }
 });

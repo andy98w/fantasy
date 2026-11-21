@@ -15,6 +15,7 @@
 @import "../components/league/shot-chart.css";
 @import "../components/league/power-movers.css";
 @import "../components/league/mcp-connect.css";
+@import "../components/league/simulate.css";
 
 :root {
   color-scheme: dark;

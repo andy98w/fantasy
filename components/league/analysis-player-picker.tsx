@@ -4,8 +4,8 @@ import type { Player } from "@/lib/schema";
 import { matchesSearch } from "@/lib/table";
 import { PixelIcon } from "../ui/pixel-icon";
 
-export function AnalysisPlayerPicker({ players, value, onChange }: {
-  players: Player[]; value?: number; onChange: (id: number) => void;
+export function AnalysisPlayerPicker({ players, value, onChange, label = "Find a player" }: {
+  players: Player[]; value?: number; onChange: (id: number) => void; label?: string;
 }) {
   const id = useId(), input = useRef<HTMLInputElement>(null), list = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
@@ -21,9 +21,9 @@ export function AnalysisPlayerPicker({ players, value, onChange }: {
   }}>
     <div className="search-field">
       <PixelIcon name="search" size={14} />
-      <input ref={input} role="combobox" aria-label="Find a player" aria-autocomplete="list" aria-expanded={open}
+      <input ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open}
         aria-controls={open ? id : undefined} aria-activedescendant={open && options[index] ? `${id}-${options[index].id}` : undefined}
-        placeholder="Find a player" autoComplete="off" value={open ? query : selected ? `${selected.name} · ${selected.nbaTeam}` : ""}
+        placeholder={label} autoComplete="off" value={open ? query : selected ? `${selected.name} · ${selected.nbaTeam}` : ""}
         onFocus={() => { setOpen(true); setActive(0); }}
         onClick={() => setOpen(true)}
         onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}

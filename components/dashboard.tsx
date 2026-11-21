@@ -1,4 +1,5 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import type { Player, Snapshot } from "@/lib/schema";
 import { dashboardRoute, dashboardHash } from "@/lib/dashboard-route";
@@ -39,6 +40,8 @@ import {
   PageHeading,
   Notice,
 } from "./ui/primitives";
+
+const Simulate = dynamic(() => import("./league/simulate"), { loading: () => <p>Loading simulator…</p> });
 
 export default function Dashboard({
   data,
@@ -369,6 +372,7 @@ export default function Dashboard({
         <div hidden={view !== "trades"}>
           <TradeHub data={data} active={view === "trades"} />
         </div>
+        {view === "simulate" && <Simulate players={data.players} onPlayer={player => setSelectedId(player.id)} />}
         {view === "analysis" && <PlayerAnalysis data={data} today={today} />}
         {view === "forecast" && <Forecast data={data} today={today} />}
         {view === "records" && <Records data={data} onTeam={openTeam} />}

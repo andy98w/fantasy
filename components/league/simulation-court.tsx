@@ -78,6 +78,8 @@ export default function SimulationCourt({ game, clock, motion, onReady }: { game
             const x = 30 + p.x * 10, y = 30 + p.y * 10;
             g.fillStyle(0x000000, .25).fillEllipse(x + 2, y + 6, 30, 18);
             if (i === frame.focus && time > 0 && time < game.playbackDuration) g.lineStyle(2, 0xffcd75, .8).strokeCircle(x, y, 19);
+            if(frame.play?.screen?.screener===i && frame.phase.startsWith("Screen ·"))
+              g.lineStyle(3, 0xffcd75, .9).lineBetween(x-16,y+23,x+16,y+23);
             this.portraits[i].setPosition(x, y);
           });
           const x = 30 + frame.ball.x * 10, y = 30 + frame.ball.y * 10;

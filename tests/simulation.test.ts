@@ -398,3 +398,53 @@ test("made baskets have a visible pickup and inbound before the clock resumes",(
   }
   assert.equal(sides.size,2);assert.ok(checked>20);
 });
+
+test("screens set before use, then roll or pop with distinct defensive coverages",()=>{
+  const ps=players.map(simulationPlayer);
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  for(const mode of ["roll","pop"] as const)for(const coverage of ["switch","drop"] as const) {
+    const intent={shooter:0,shot:{x:78,y:25},three:false,action:"drive" as const,chance:0,value:0,
+      screen:{screener:4,mode,coverage,direction:1 as const}};
+    const result=resolvePossession(ps,0,0,setup,setup,intent,12);
+    const frames=result.frames, use=frames.findIndex(f=>f.phase.startsWith("Screen ·"));
+    const read=frames.findIndex(f=>f.phase===`Pick-and-${mode}`);
+    assert.ok(use>0 && read>use,"The guard must wait for the screen before using it");
+    const set=frames[use].spots[4];
+    assert.ok(Math.hypot(set.x-67,set.y-29.5)<.7);
+    const before=frames[use-6].spots[4];
+    assert.ok(Math.hypot(set.x-before.x,set.y-before.y)<.3,"Screen must be planted");
+    const route=frames[Math.min(read+35,frames.length-1)].spots[4];
+    assert.ok(mode==="roll"?route.x>set.x+3:route.x<set.x-1,"Screener must roll toward the rim or pop to the perimeter");
+    assert.ok(frames[read].spots[0].y>32,"Guard must turn the screen's outside corner");
+    const mirrored=resolvePossession(ps.slice(5).concat(ps.slice(0)),1,5,setup.slice(5).concat(setup.slice(0)).map(p=>({x:94-p.x,y:p.y})),
+      setup.slice(5).concat(setup.slice(0)).map(p=>({x:94-p.x,y:p.y})),
+      {...intent,shooter:5,shot:{x:16,y:25},screen:{...intent.screen,screener:9}},12);
+    // Geometry and phases do not depend on which basket the offense attacks.
+    const mirrorUse=mirrored.frames.find(f=>f.phase.startsWith("Screen ·"))!;
+    const mirrorRead=mirrored.frames.find(f=>f.phase===`Pick-and-${mode}`)!;
+    assert.ok(Math.hypot(mirrorUse.spots[9].x-(94-set.x),mirrorUse.spots[9].y-set.y)<.7);
+    assert.ok(mirrorRead.spots[5].y>32);
+    const mirrorRoute=mirrored.frames[Math.min(mirrored.frames.indexOf(mirrorRead)+35,mirrored.frames.length-1)].spots[9];
+    assert.ok(mode==="roll"?mirrorRoute.x<mirrorUse.spots[9].x-3:mirrorRoute.x>mirrorUse.spots[9].x+1);
+    assert.ok(mirrored.frames.some(f=>f.phase===`Pick-and-${mode}`));
+    assert.ok(mirrored.frames.every(f=>f.spots.every(p=>p.x>=2 && p.x<=92 && p.y>=2 && p.y<=48)));
+  }
+});
+
+test("screen reads vary between handler, roller and kick-out without replacing the whole playbook",()=>{
+  const finishes=new Set<string>(), modes=new Set<string>(), coverage=new Set<string>(), sides=new Set<number>();
+  let screens=0, ordinary=0, completed=0;
+  for(let seed=0;seed<20;seed++)for(const play of simulate(teams,120,seed).plays) {
+    if(!play.screen){ordinary++;continue;}
+    screens++;modes.add(play.screen.mode);coverage.add(play.screen.coverage);sides.add(play.side);
+    if(!play.frames.some(f=>f.phase.startsWith("Pick-and-")))continue;
+    completed++;
+    finishes.add(play.shooter===play.handler?"handler":play.shooter===play.screen.screener?"screener":"kick-out");
+    assert.ok(play.passEnd>play.passAt);
+    if(play.passer!==null)assert.equal(play.passer,play.handler);
+  }
+  assert.deepEqual([...finishes].sort(),["handler","kick-out","screener"]);
+  assert.equal(modes.size,2);assert.equal(coverage.size,2);assert.equal(sides.size,2);
+  assert.ok(screens>20 && ordinary>screens && completed>screens*.8);
+});

@@ -4,10 +4,13 @@ export type Side = 0 | 1;
 export type Point = { x: number; y: number };
 export type SimLine = { pts: number; reb: number; ast: number; stl: number; blk: number; to: number; pf: number; fgm: number; fga: number; tpm: number; tpa: number; ftm: number; fta: number };
 export type SimPlayer = { id: number; name: string; nbaTeam: string; position: string; usage: number; passing: number; rebound: number; steal: number; block: number; turnover: number; threeShare: number; twoPct: number; threePct: number; ftPct: number };
+export type ScreenPlan = { screener:number; mode:"roll"|"pop"; coverage:"switch"|"drop"; direction:-1|1 };
+type ShotIntent = {shooter:number; shot:Point; three:boolean; action:SimPlay["action"]; chance:number; value:number; screen?:ScreenPlan};
 export type SimPlay = {
   start: number; end: number; gameStart: number; gameEnd: number; side: Side; handler: number; shooter: number; passer: number | null;
   defender: number; rebounder: number | null; outcome: "made" | "missed" | "blocked" | "turnover" | "foul";
   action: "drive" | "pull-up" | "catch-and-shoot" | "cut"; shotChance: number;
+  screen?:ScreenPlan;
   three: boolean; points: number; text: string; score: [number, number]; lines: SimLine[];
   from: Point[]; to: Point[]; shot: Point; freeThrows: boolean[];
   frames: MotionFrame[]; finishFrames: MotionFrame[]; onBall: number; helper: number | null; passAt: number; passEnd: number;
@@ -128,7 +131,7 @@ export function shotQuality(player: SimPlayer, shot: Point, defenders: {spot:Poi
   const chance = clamp((three ? player.threePct : player.twoPct) + location + .04*(1-contest) - contest*(three ? .13 : .12) - (three ? 0 : protection*.018), .12, .82);
   return { chance, expected: chance*(three ? 3 : 2), nearest };
 }
-function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], rng:()=>number) {
+function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], rng:()=>number):ShotIntent {
   const defense = indices((1-side) as Side), hoop = basket(side);
   const defenders = defense.map(i => ({spot:to[i],player:players[i]}));
   const candidates: {shooter:number; shot:Point; three:boolean; action:SimPlay["action"]; chance:number; value:number}[] = [];
@@ -153,11 +156,18 @@ function chooseShot(players:SimPlayer[], side:Side, handler:number, to:Point[], 
   }
   // Soft choice favors expected points without making the same play every time.
   const selected = pick(candidates.map((_,i)=>i), i => Math.exp(candidates[i].value*5) * Math.pow(players[candidates[i].shooter].usage,.35), rng);
+  if(rng()<.42) {
+    const candidates=indices(side).filter(i=>i!==handler);
+    const screener=pick(candidates,i=>players[i].rebound+(isBig(players[i])?8:1),rng);
+    const mode=players[screener].threeShare>.3 && rng()<.55 ? "pop" : "roll";
+    return {shooter:handler,shot:facing({x:78,y:25},side),three:false,action:"drive",chance:0,value:0,
+      screen:{screener,mode,coverage:rng()<.35?"switch":"drop",direction:rng()<.5?-1:1}};
+  }
   return candidates[selected];
 }
 export type MotionFrame = { spots: Point[]; phase: string };
 /** Fixed-step steering. No outcome is sampled until this possession has played out. */
-export function resolvePossession(players:SimPlayer[], side:Side, handler:number, setup:Point[], start:Point[], intent:ReturnType<typeof chooseShot>, seconds:number) {
+export function resolvePossession(players:SimPlayer[], side:Side, handler:number, setup:Point[], start:Point[], intent:ShotIntent, seconds:number) {
   const offense=indices(side), defense=indices((1-side) as Side), hoop=basket(side);
   const assignments=new Map<number,number>(), available=[...defense];
   for (const i of [handler,...offense.filter(i=>i!==handler)]) {
@@ -165,13 +175,19 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
     assignments.set(i,available.shift()!);
   }
   const onBall=assignments.get(handler)!;
+  const screen=intent.screen;
+  const screenOrigin=facing(setup[handler],side);
+  const screenSpot=screen ? facing({x:screenOrigin.x+5,y:screenOrigin.y+screen.direction*4.5},side) : null;
+  let screenStage:"setup"|"using"|"reading"|"done"=screen?"setup":"done";
+  let plantedFor=0, screenUsedAt=0, readAt=0, turnedCorner=false;
+  const screenDefender=screen?assignments.get(screen.screener)!:null;
   let spots=start.map(p=>({...p})), shooter=intent.shooter, action=intent.action, target={...intent.shot};
   let velocities=spots.map(()=>({x:0,y:0}));
   let helper:number|null=null, contained=0, passed=false, phase="Getting set";
   const frames:MotionFrame[]=[{spots:spots.map(p=>({...p})),phase}];
   const steps=Math.max(120,Math.ceil(seconds*30)), dt=seconds/steps;
   const driveSide=intent.shot.y<=25 ? -1 : 1;
-  const support=offense.filter(i=>i!==handler && i!==intent.shooter);
+  const support=offense.filter(i=>i!==handler && i!==intent.shooter && i!==screen?.screener);
   const cutter=[...support].sort((a,b)=>(players[b].rebound*(1-players[b].threeShare))-(players[a].rebound*(1-players[a].threeShare)))[0];
   const attackStart=Math.max(.2,1-4.5/seconds);
   let attackTick:number|null=null, readyFor=0, usedSeconds=seconds;
@@ -205,7 +221,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
         goals[i]=facing(destination,side);
       }
       phase=action==="drive" ? "Driving" : action==="pull-up" ? "Pull-up" : action==="cut" ? "Cutting" : passed ? "Kick-out" : "Moving the ball";
-      if(action==="drive") {
+      if(action==="drive" && screenStage==="done") {
         const h=spots[handler], d=spots[onBall], gap=distanceTo(h,d);
         const ahead=(d.x-h.x)*(hoop.x-h.x)+(d.y-h.y)*(hoop.y-h.y)>0;
         // Probe around the defender's outside shoulder, never straight through their body.
@@ -233,7 +249,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
           }
         }
       }
-      if(action!=="drive") goals[shooter]=target;
+      if(action!=="drive" && screenStage==="done") goals[shooter]=target;
       if(passed || (action==="pull-up" && intent.action==="drive")) goals[handler]={...spots[handler]};
     }
     for(const i of offense) {
@@ -245,6 +261,60 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
       if(attacking && i===shooter && action!=="drive") goals[defender]=approach(attacker,hoop,4.2);
     }
     if(attacking && helper!==null && action==="drive") goals[helper]=approach(spots[handler],hoop,4.5);
+    if(screen && screenSpot && screenStage!=="done") {
+      const s=screen.screener, dir=screen.direction, origin=facing(screenSpot,side);
+      const exit=facing({x:origin.x+1,y:origin.y+dir*5},side);
+      const pocket=facing({x:origin.x+10,y:origin.y+dir*2},side);
+      goals[handler]=setup[handler]; goals[s]=screenSpot;
+      phase="Setting screen";
+      if(screenStage==="setup") {
+        // Set feet before the guard uses the screen; a moving body is not a screen.
+        const settled=distanceTo(spots[s],screenSpot)<.6 && Math.hypot(velocities[s].x,velocities[s].y)<1
+          && distanceTo(spots[handler],setup[handler])<1.5;
+        plantedFor=settled?plantedFor+dt:0;
+        if(plantedFor>=.25) {screenStage="using";screenUsedAt=elapsed;}
+      }
+      if(screenStage==="using" || screenStage==="reading") {
+        if(distanceTo(spots[handler],exit)<1.3)turnedCorner=true;
+        goals[handler]=turnedCorner?pocket:exit;
+        phase=screen.coverage==="switch"?"Screen · Switch":"Screen · Drop coverage";
+        if(screenStage==="using" && turnedCorner && elapsed-screenUsedAt>.6) {screenStage="reading";readAt=elapsed;}
+        if(screenStage==="reading") {
+          goals[s]=facing(screen.mode==="roll"?{x:85,y:25-dir*3}:{x:63,y:25-dir*13},side);
+          phase=screen.mode==="roll"?"Pick-and-roll":"Pick-and-pop";
+        }
+        if(screen.coverage==="switch") {
+          goals[screenDefender!]=approach(spots[handler],hoop,4.2);
+          goals[onBall]=approach(spots[s],hoop,4.2);
+        } else {
+          // Chase around the planted body, while the big protects the paint.
+          const chased=facing(spots[onBall],side);
+          goals[onBall]=chased.y*dir< (origin.y+dir*8)*dir && !turnedCorner
+            ? facing({x:origin.x-4.5,y:origin.y+dir*8},side)
+            : approach(spots[handler],hoop,3.9);
+          goals[screenDefender!]=facing({x:81,y:25+dir*3},side);
+        }
+        if(screenStage==="reading" && elapsed-readAt>=1.6) {
+          const defenders=defense.map(i=>({spot:spots[i],player:players[i]}));
+          const options=offense.map(i=>{
+            const spot=spots[i], three=distanceTo(spot,hoop)>=23.75 || Math.abs(spot.y-25)>=22;
+            const q=shotQuality(players[i],spot,defenders,side,three);
+            const passCost=i===handler?0:.04+distanceTo(spots[handler],spot)*.003/Math.sqrt(players[handler].passing);
+            return {i,three,value:q.expected-passCost};
+          }).filter(o=>!o.three || players[o.i].threeShare>.25).sort((a,b)=>b.value-a.value);
+          shooter=options[0]?.i??handler; target={...spots[shooter]};
+          action=distanceTo(target,hoop)<10?"cut":shooter===handler?"pull-up":"catch-and-shoot";
+          passed=shooter!==handler; passStartSeconds=elapsed;passEndSeconds=elapsed+.45;
+          if(screen.coverage==="switch") {assignments.set(handler,screenDefender!);assignments.set(s,onBall);}
+          screenStage="done";
+        }
+      }
+      // A broken setup or late clock becomes an actual-position attempt, not a teleport.
+      if(elapsed>seconds-.6 && screenStage!=="done") {
+        shooter=handler;target={...spots[handler]};action="pull-up";screenStage="done";
+        phase="Screen covered · Pull-up";
+      }
+    }
     // Retain actual contact-adjusted velocity so the next tick cannot bounce back.
     const speeds=spots.map((_,i)=>defense.includes(i) ? attacking ? 11 : 16 : i===handler ? 11.5 : 14);
     const movement=moveBodies(spots,velocities,goals,speeds,dt);
@@ -255,7 +325,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
     // than waiting for a random possession timer after reaching the shot spot.
     const hasBall=shooter===handler || elapsed>=passEndSeconds;
     const arrived=distanceTo(spots[shooter],target)<1 || (action==="drive" && distanceTo(spots[shooter],hoop)<7);
-    readyFor=attacking && hasBall && arrived ? readyFor+dt : 0;
+    readyFor=attacking && screenStage==="done" && hasBall && arrived ? readyFor+dt : 0;
     if(readyFor>=.12) {usedSeconds=elapsed;break;}
   }
   const shot={...spots[shooter]}, dist=distanceTo(shot,hoop);
@@ -386,6 +456,8 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     const transition=from ? Math.max(...from.map((p,i)=>distanceTo(p,setup[i])))/14 : 0;
     let liveLength = Math.min(duration-clock,Math.max(10+Math.floor(rng()*13),(transition+4.5)/.55));
     const decision = chooseShot(players, side, handler, setup, rng);
+    if(duration-clock<14)delete decision.screen;
+    if(decision.screen)liveLength=Math.min(duration-clock,Math.max(liveLength,(transition+7)/.55));
     const motion = resolvePossession(players,side,handler,setup,from ?? setup,decision,liveLength*.55);
     liveLength=Math.min(duration-clock,motion.seconds/.55);
     const { shooter, shot, three, action, to } = motion;
@@ -439,7 +511,7 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     lines[shooter].pts += points; score[side] += points;
     // Dead-ball playback adds time to the movie, never to the game clock.
     const gameEnd=clock+liveLength, end=playback+(outcome==="foul" ? liveLength/.55 : liveLength);
-    const play:SimPlay={ start:playback, end, gameStart:clock, gameEnd, side, handler, shooter, passer, defender, rebounder, outcome, action, shotChance, three, points, text,
+    const play:SimPlay={ start:playback, end, gameStart:clock, gameEnd, side, handler, shooter, passer, defender, rebounder, outcome, action, screen:decision.screen, shotChance, three, points, text,
       score: [...score], lines: lines.map(l => ({ ...l })), from:from ?? setup, to, shot, freeThrows,
       frames:motion.frames,finishFrames:[],onBall:motion.onBall,helper:motion.helper,passAt:motion.passAt,passEnd:motion.passEnd };
     if(outcome!=="foul")play.finishFrames=rebounder===null?followThrough:finishPossession(players,play,(end-playback)*.45);

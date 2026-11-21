@@ -95,3 +95,43 @@ test("non-shooters avoid threes and play decisions stay attached to the actual d
     }
   }
 });
+
+test("fouls appear at the whistle and free throws reveal one attempt at a time", () => {
+  const game = simulate(teams,600,11);
+  const foul = game.plays.find(p=>p.outcome === "foul");
+  assert.ok(foul);
+  const at = (progress:number) => foul.start+(foul.end-foul.start)*progress;
+  const before = simulationState(game,at(.54));
+  const whistle = simulationState(game,at(.56));
+  assert.equal(courtFrame(game,at(.56)).event?.title,"FOUL");
+  assert.equal(whistle.lines[foul.defender].pf,before.lines[foul.defender].pf+1);
+  assert.equal(whistle.lines[foul.shooter].fta,before.lines[foul.shooter].fta);
+  const firstResult = simulationState(game,at(.65+.31*.81/foul.freeThrows.length));
+  assert.equal(firstResult.lines[foul.shooter].fta,before.lines[foul.shooter].fta+1);
+  assert.equal(firstResult.lines[foul.shooter].ftm,before.lines[foul.shooter].ftm+Number(foul.freeThrows[0]));
+  assert.ok(courtFrame(game,at(.7)).event?.title.startsWith("FREE THROW"));
+  assert.deepEqual(simulationState(game,at(.999)).score,foul.score);
+  assert.deepEqual(simulationState(game,at(.999)).lines,foul.lines);
+  assert.deepEqual(simulationState(game,at(.54)),before); // Seeking back removes future stats.
+});
+
+test("possession changes preserve ball and player positions, including after free throws", () => {
+  const game = simulate(teams,600,11);
+  for (let i=1;i<game.plays.length;i++) {
+    const at=game.plays[i].start;
+    const before=courtFrame(game,at-.00001), after=courtFrame(game,at);
+    for (let n=0;n<10;n++) assert.ok(Math.hypot(before.spots[n].x-after.spots[n].x,before.spots[n].y-after.spots[n].y)<.01);
+    assert.ok(Math.hypot(before.ball.x-after.ball.x,before.ball.y-after.ball.y)<.01);
+  }
+});
+
+test("live shot results and totals agree before a possession finishes", () => {
+  const game=simulate(teams,600,11);
+  for (const play of game.plays) {
+    const at=(p:number)=>play.start+(play.end-play.start)*p;
+    assert.equal(courtFrame(game,at(.3)).event,null);
+    const state=simulationState(game,at(.999));
+    assert.deepEqual(state.score,play.score);
+    assert.deepEqual(state.lines,play.lines);
+  }
+});

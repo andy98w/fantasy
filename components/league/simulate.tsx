@@ -66,11 +66,13 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
       <div className="sim-watch-toolbar"><Button onClick={() => { setPlaying(false); setGame(null); setCourtReady(false); seek(0); }}>← Edit teams</Button><Button disabled={!ready} onClick={start}>New game</Button></div>
       <section className="sim-arena" aria-label="Exhibition game">
         <div className="sim-scoreboard">
-          <div className="sim-score-teal"><span>Teal</span><strong>{snapshot?.score[0] ?? 0}</strong></div>
+          <div className="sim-score-teal"><div className="sim-team-label"><span>Teal</span><small>Fouls {snapshot?.lines.slice(0,5).reduce((n,p)=>n+p.pf,0) ?? 0}</small></div><strong>{snapshot?.score[0] ?? 0}</strong></div>
           <div className="sim-clock"><strong>{clockText(Math.max(0, game.duration - time))}</strong><span>{!courtReady ? "Loading court…" : finished ? snapshot?.score[0] === snapshot?.score[1] ? "Final · Tie" : "Final" : playing ? "Playing" : "Paused"}</span></div>
-          <div className="sim-score-pink"><strong>{snapshot?.score[1] ?? 0}</strong><span>Pink</span></div>
+          <div className="sim-score-pink"><strong>{snapshot?.score[1] ?? 0}</strong><div className="sim-team-label"><span>Pink</span><small>Fouls {snapshot?.lines.slice(5).reduce((n,p)=>n+p.pf,0) ?? 0}</small></div></div>
         </div>
-        <div className="sim-stage"><Court key={game.seed} game={game} time={time} motion={motion} onReady={onCourtReady} /></div>
+        <div className="sim-stage"><Court key={game.seed} game={game} clock={elapsed} motion={motion} onReady={onCourtReady} />
+          {current?.event && <div className={`sim-event sim-event-${current.event.tone}`} role="status"><strong>{current.event.title}</strong><span>{current.event.detail}</span></div>}
+        </div>
         <div className="sim-transport">
           <div className="sim-timeline"><input type="range" aria-label="Game timeline" disabled={!courtReady} min={0} max={game.duration} step={.1} value={time} onChange={e => { setPlaying(false); seek(Number(e.target.value)); }} /><span>{clockText(time)} / {clockText(game.duration)}</span></div>
           <div className="sim-playback">
@@ -81,7 +83,7 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
           </div>
         </div>
       </section>
-      <div className="sim-call" aria-live="polite">{snapshot?.completed.at(-1)?.text ?? `${teamNames[current?.play.side ?? 0]} ball · ${courtReady ? current?.phase : "Ready for tip-off"}`}</div>
+      <div className="sim-call" aria-live="polite">{current?.event ? `${current.event.title} · ${current.event.detail}` : finished ? "Game complete" : `${teamNames[current?.play.side ?? 0]} ball · ${courtReady ? current?.phase : "Ready for tip-off"}`}</div>
       <div className="sim-cast" aria-label="Players on court">{[0, 1].map(side => <div className={`sim-cast-team sim-side-${side}`} key={side}>{game.players.slice(side * 5, side * 5 + 5).map(p => <button key={p.id} title={p.name} aria-label={`View ${p.name}`} onClick={() => { const original = players.find(v => v.id === p.id); setPlaying(false); if (original) onPlayer(original); }}><PlayerAvatar player={p} /><span>{p.name}</span></button>)}</div>)}</div>
     </>}
     {game && snapshot && <div className="sim-results">

@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import type Phaser from "phaser";
 import { courtFrame, type Simulation } from "@/lib/simulation";
 
-export default function SimulationCourt({ game, time, motion, onReady }: { game: Simulation; time: number; motion: boolean; onReady: () => void }) {
-  const host = useRef<HTMLDivElement>(null), state = useRef({ game, time, motion });
-  state.current = { game, time, motion };
+export default function SimulationCourt({ game, clock, motion, onReady }: { game: Simulation; clock: { current: number }; motion: boolean; onReady: () => void }) {
+  const host = useRef<HTMLDivElement>(null), state = useRef({ game, clock, motion });
+  state.current = { game, clock, motion };
   const ready = useRef(onReady); ready.current = onReady;
   const [error, setError] = useState(false), [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -72,12 +72,12 @@ export default function SimulationCourt({ game, time, motion, onReady }: { game:
         }
         update() {
           if (!this.ink) return;
-          const { game, time, motion } = state.current, frame = courtFrame(game, time, motion), g = this.ink;
+          const { game, clock, motion } = state.current, time = clock.current, frame = courtFrame(game, time, motion), g = this.ink;
           g.clear();
           frame.spots.forEach((p, i) => {
             const x = 30 + p.x * 10, y = 30 + p.y * 10;
             g.fillStyle(0x000000, .25).fillEllipse(x + 2, y + 6, 30, 18);
-            if (i === frame.play.shooter && time > 0 && time < game.duration) g.lineStyle(2, 0xffcd75, .8).strokeCircle(x, y, 19);
+            if (i === (frame.event?.title === "FOUL" ? frame.play.defender : frame.play.shooter) && time > 0 && time < game.duration) g.lineStyle(2, 0xffcd75, .8).strokeCircle(x, y, 19);
             this.portraits[i].setPosition(x, y);
           });
           const x = 30 + frame.ball.x * 10, y = 30 + frame.ball.y * 10;

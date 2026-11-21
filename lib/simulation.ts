@@ -170,34 +170,105 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
   }
   return { players, plays, duration, seed };
 }
+const playProgress = (play: SimPlay, time: number) => clamp((time-play.start)/(play.end-play.start),0,1);
+const freeThrowProgress = (play: SimPlay, t: number) => clamp((t-.65)/.31,0,1)*play.freeThrows.length;
 export function simulationState(game: Simulation, time: number) {
   const completed = game.plays.filter(p => p.end <= time);
   const latest = completed.at(-1);
-  return { score: latest?.score ?? [0, 0] as [number, number], lines: latest?.lines ?? game.players.map(emptyLine), completed };
+  const score: [number,number] = latest ? [...latest.score] : [0,0];
+  const lines = latest ? latest.lines.map(l=>({...l})) : game.players.map(emptyLine);
+  const play = game.plays[completed.length];
+  if (play && time >= play.start) {
+    const t = playProgress(play,time), line = lines[play.shooter];
+    let points = 0;
+    if (play.outcome === "foul") {
+      if (t >= .55) lines[play.defender].pf++;
+      const ft = freeThrowProgress(play,t);
+      play.freeThrows.forEach((made,i) => { if (ft >= i+.8) { line.fta++; if (made) {line.ftm++; points++;} } });
+    } else if (play.outcome === "turnover") {
+      if (t >= .6) {
+        lines[play.passer ?? play.shooter].to++;
+        if (play.lines[play.defender].stl > lines[play.defender].stl) lines[play.defender].stl++;
+      }
+    } else {
+      if (t >= .65) { line.fga++; if (play.three) line.tpa++; }
+      if (t >= .88 && play.outcome === "made") {
+        points = play.points; line.fgm++; if (play.three) line.tpm++;
+        if (play.passer !== null) lines[play.passer].ast++;
+      }
+      if (t >= .88 && play.outcome === "blocked") lines[play.defender].blk++;
+    }
+    if (t >= .98 && play.rebounder !== null) lines[play.rebounder].reb++;
+    line.pts += points; score[play.side] += points;
+  }
+  return { score, lines, completed };
 }
 const lerp = (a: Point, b: Point, t: number): Point => ({ x: a.x + (b.x - a.x) * clamp(t, 0, 1), y: a.y + (b.y - a.y) * clamp(t, 0, 1) });
+type CourtEvent = { title:string; detail:string; tone:"foul"|"made"|"missed"|"neutral" };
+function freeThrowSpots(play:SimPlay) {
+  const result = play.to.map(p=>({...p}));
+  result[play.shooter] = facing({x:75,y:25},play.side);
+  const offense = indices(play.side).filter(i=>i!==play.shooter), defense = indices((1-play.side) as Side);
+  const lane = [{x:86,y:18},{x:86,y:32},{x:81,y:18},{x:81,y:32},{x:77,y:18},{x:77,y:32}];
+  [defense[0],defense[1],offense[0],offense[1],defense[2],defense[3]].forEach((i,n)=>{result[i]=facing(lane[n],play.side);});
+  [offense[2],offense[3],defense[4]].forEach((i,n)=>{result[i]=facing({x:62,y:12+n*13},play.side);});
+  return result;
+}
+// Boundaries share the same end positions: moving into a new possession must not teleport players.
+function endSpots(play:SimPlay) { return play.outcome === "foul" ? freeThrowSpots(play) : play.to; }
+function endBall(play:SimPlay) {
+  const spots = endSpots(play);
+  return play.rebounder !== null ? spots[play.rebounder] : play.outcome === "turnover" ? spots[play.defender] : basket(play.side);
+}
 export function courtFrame(game: Simulation, time: number, motion = true) {
-  const play = game.plays.find(p => time < p.end) ?? game.plays.at(-1)!;
-  const progress = clamp((time - play.start) / (play.end - play.start), 0, 1);
-  const t = motion ? progress : Math.floor(progress * 4) / 4;
-  const spots = play.to.map((p, i) => lerp(play.from[i], p, t / .55));
-  // Keep lanes through transitions and separate nearby bodies without a physics engine.
-  if (motion && t > .55 && t < .88) spots.forEach((p, i) => { if (i !== play.shooter) p.y = clamp(p.y + Math.sin(time * 1.5 + i) * .7, 2, 48); });
-  for (let pass = 0; pass < 3; pass++) for (let i = 0; i < spots.length; i++) for (let j = i + 1; j < spots.length; j++) {
-    const dx = spots[j].x - spots[i].x, dy = spots[j].y - spots[i].y, d = Math.hypot(dx, dy);
-    if (d < 3.6) { const nx = d > .01 ? dx / d : 0, ny = d > .01 ? dy / d : 1, shift = (3.6 - d) / 2;
-      spots[i] = { x: clamp(spots[i].x - nx * shift, 2, 92), y: clamp(spots[i].y - ny * shift, 2, 48) };
-      spots[j] = { x: clamp(spots[j].x + nx * shift, 2, 92), y: clamp(spots[j].y + ny * shift, 2, 48) };
-    }
+  const index = game.plays.findIndex(p=>time<p.end);
+  const playIndex = index < 0 ? game.plays.length-1 : index, play = game.plays[playIndex], previous = game.plays[playIndex-1];
+  const progress = playProgress(play,time);
+  const t = motion ? progress : Math.floor(progress*20)/20;
+  const move = clamp(t/.55,0,1), eased = move*move*(3-2*move);
+  const start = previous ? endSpots(previous) : play.from;
+  let spots = play.to.map((p,i)=>lerp(start[i],p,eased));
+  // Give each runner a lane. The curve starts and ends at zero to avoid sudden jumps.
+  if (motion && move > 0 && move < 1) spots.forEach((p,i)=>{p.y=clamp(p.y+Math.sin(move*Math.PI)*(i%5-2)*1.6,2,48);});
+  if (play.outcome === "foul" && t >= .55) {
+    const setup = clamp((t-.55)/.1,0,1);
+    spots = freeThrowSpots(play).map((p,i)=>lerp(play.to[i],p,setup));
   }
   const hoop = basket(play.side);
-  let ball: Point, height = 0;
-  if (play.outcome === "turnover" && t >= .32) ball = lerp(spots[play.handler], spots[play.defender], (t - .32) / .33);
-  else if (t < .32) ball = { x: spots[play.handler].x + 1.5, y: spots[play.handler].y + (motion ? Math.sin(time * 10) * .6 : 0) };
-  else if (t < .52) ball = lerp(spots[play.handler], spots[play.shooter], (t - .32) / .2);
-  else if (t < .65) ball = spots[play.shooter];
-  else if (play.outcome === "turnover") ball = lerp(spots[play.shooter], spots[play.defender], (t - .65) / .2);
-  else if (t < .88) { const flight = (t - .65) / .23; ball = lerp(play.shot, hoop, flight); height = motion ? Math.sin(flight * Math.PI) * 3 : 0; }
-  else ball = play.rebounder === null ? hoop : lerp(hoop, spots[play.rebounder], (t - .88) / .12);
-  return { play, spots, ball, height, phase: time >= game.duration ? "Final" : t < .32 ? "Bringing it up" : t < .52 ? "Moving the ball" : t < .65 ? (play.action === "drive" ? "Driving to the rim" : play.action === "cut" ? "Cutting to the basket" : play.action === "catch-and-shoot" ? "Finding the open shot" : "Pulling up") : t < .88 ? play.outcome === "turnover" ? "Turnover" : "At the basket" : "Finishing the play" };
+  let ball:Point, height=0, event:CourtEvent|null=null;
+  let phase = t < .32 ? "Bringing it up" : t < .52 ? "Moving the ball" : play.action === "drive" ? "Driving to the rim" : play.action === "cut" ? "Cutting to the basket" : "Creating a shot";
+  if (previous && t < .12) ball = lerp(endBall(previous),spots[play.handler],t/.12);
+  else if (play.outcome === "turnover" && t >= .32) ball = lerp(spots[play.handler],spots[play.defender],(t-.32)/.28);
+  else if (t < .32) ball = spots[play.handler];
+  else if (t < .52) ball = lerp(spots[play.handler],spots[play.shooter],(t-.32)/.2);
+  else if (play.outcome === "foul") {
+    ball = spots[play.shooter];
+    if (t >= .55 && t < .65) {
+      phase = "Foul";
+      event = {title:"FOUL",detail:`${game.players[play.defender].name} · ${play.freeThrows.length} free throws`,tone:"foul"};
+    } else if (t >= .65) {
+      const ft = freeThrowProgress(play,t), attempt = Math.min(play.freeThrows.length-1,Math.floor(ft)), portion = ft-attempt;
+      const release = clamp((portion-.15)/.65,0,1);
+      ball = lerp(spots[play.shooter],hoop,release);
+      height = motion ? Math.sin(release*Math.PI)*2 : 0;
+      phase = "Free throws";
+      event = {title:`FREE THROW ${attempt+1} / ${play.freeThrows.length}`,detail:`${game.players[play.shooter].name}${portion>=.8 ? play.freeThrows[attempt] ? " · Made" : " · Missed" : ""}`,tone:portion>=.8 ? play.freeThrows[attempt] ? "made" : "missed" : "neutral"};
+      // Between attempts the official returns the ball; preserve continuity on replay/seeking.
+      if (portion >= .85 && attempt < play.freeThrows.length-1) ball = lerp(hoop,spots[play.shooter],(portion-.85)/.15);
+    }
+  } else if (t < .65) ball=spots[play.shooter];
+  else if (t < .88) { const flight=(t-.65)/.23; ball=lerp(spots[play.shooter],hoop,flight); height=motion ? Math.sin(flight*Math.PI)*3 : 0; phase="Shot in the air"; }
+  else ball=hoop;
+  if (play.outcome === "turnover" && t >= .6) { phase="Turnover"; event={title:"TURNOVER",detail:game.players[play.passer ?? play.shooter].name,tone:"missed"}; }
+  if (play.outcome !== "foul" && play.outcome !== "turnover" && t >= .88) {
+    phase=play.outcome === "made" ? "Basket" : play.outcome === "blocked" ? "Block" : "Miss";
+    event={title:play.outcome === "made" ? `+${play.points}` : play.outcome === "blocked" ? "BLOCK" : "MISS",detail:game.players[play.outcome === "blocked" ? play.defender : play.shooter].name,tone:play.outcome === "made" ? "made" : "missed"};
+  }
+  const reboundStart=play.outcome === "foul" ? .96 : .88;
+  if (play.rebounder !== null && t >= reboundStart) {
+    ball=lerp(hoop,spots[play.rebounder],(t-reboundStart)/(.98-reboundStart)); height=0;
+    if (t >= .98) {phase="Rebound";event={title:Math.floor(play.rebounder/5)===play.side ? "OFFENSIVE REBOUND":"REBOUND",detail:game.players[play.rebounder].name,tone:"neutral"};}
+  }
+  if (time >= game.duration) {phase="Final";event=null;}
+  return {play,spots,ball,height,phase,event};
 }

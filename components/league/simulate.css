@@ -101,3 +101,6 @@
 
 .sim-team-label { display:flex; flex-direction:column; gap:4px; }
 .sim-team-label small { font:12px var(--body); color:var(--muted); }
+
+.sim-clock .sim-shot-clock { display:inline-block; min-width:32px; padding:3px 6px; margin-right:12px; border:1px solid var(--border); color:var(--gold); font-size:19px; font-variant-numeric:tabular-nums; vertical-align:middle; }
+.sim-clock .sim-shot-clock.urgent { color:var(--pink); border-color:var(--pink); }

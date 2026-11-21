@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Player } from "@/lib/schema";
-import { canSimulate, gameElapsed, courtFrame, simulate, simulationState, type Simulation, type Side } from "@/lib/simulation";
+import { canSimulate, gameElapsed, shotClock, courtFrame, simulate, simulationState, type Simulation, type Side } from "@/lib/simulation";
 import { AnalysisPlayerPicker } from "./analysis-player-picker";
 import { PlayerAvatar } from "./avatars";
 import { Button, Tabs, Empty } from "../ui/primitives";
@@ -41,6 +41,7 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
   const seek = (value: number) => { elapsed.current = value; setTime(value); };
   const start = () => { if (!ready) return; setGame(simulate(lineups, Number(duration), crypto.getRandomValues(new Uint32Array(1))[0])); seek(0); setEdit(null); setCourtReady(false); setPlaying(false); };
   if (eligible.length < 10) return <Empty>Simulate needs ten players with at least three games and complete season stats.</Empty>;
+  const possessionClock=game?shotClock(game,time):null;
   const snapshot = game ? simulationState(game, time) : null, finished = !!game && time >= game.playbackDuration;
   const current = game ? courtFrame(game, time, motion) : null;
   const choose = (id: number) => { if (!edit) return; setIds(old => old.map((team, side) => side === edit[0] ? team.map((value, slot) => slot === edit[1] ? id : value) : team)); setEdit(null); };
@@ -66,7 +67,7 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
       <section className="sim-arena" aria-label="Exhibition game">
         <div className="sim-scoreboard">
           <div className="sim-score-teal"><div className="sim-team-label"><span>Teal</span><small>Fouls {snapshot?.lines.slice(0,5).reduce((n,p)=>n+p.pf,0) ?? 0}</small></div><strong>{snapshot?.score[0] ?? 0}</strong></div>
-          <div className="sim-clock"><strong>{clockText(Math.max(0, game.duration - gameElapsed(game,time)))}</strong><span>{!courtReady ? "Loading court…" : finished ? snapshot?.score[0] === snapshot?.score[1] ? "Final · Tie" : "Final" : playing ? "Playing" : "Paused"}</span></div>
+          <div className="sim-clock"><div className={`sim-shot-clock${possessionClock!==null && possessionClock<=5?" urgent":""}`} aria-label={`Shot clock: ${possessionClock===null?"off":Math.ceil(possessionClock)}`}>{possessionClock===null?"—":Math.ceil(possessionClock)}</div><strong>{clockText(Math.max(0, game.duration - gameElapsed(game,time)))}</strong><span>{!courtReady ? "Loading court…" : finished ? snapshot?.score[0] === snapshot?.score[1] ? "Final · Tie" : "Final" : playing ? "Playing" : "Paused"}</span></div>
           <div className="sim-score-pink"><strong>{snapshot?.score[1] ?? 0}</strong><div className="sim-team-label"><span>Pink</span><small>Fouls {snapshot?.lines.slice(5).reduce((n,p)=>n+p.pf,0) ?? 0}</small></div></div>
         </div>
         <div className="sim-stage"><Court key={game.seed} game={game} clock={elapsed} motion={motion} onReady={onCourtReady} />

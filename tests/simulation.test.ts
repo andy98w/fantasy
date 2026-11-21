@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper, matchDefenders, mismatchEdge, readScreen } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease, replayTime, shotClock, resolveFastBreak, transitionDefense, blockCandidates, playerStyle, supportRoute, chooseShot, defensiveStyle, defensiveGap, screenSwitchChance, selectHelper, matchDefenders, mismatchEdge, readScreen, rememberAttacks, planMismatchResponse } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -809,4 +809,77 @@ test("matched defenders change seeded play choices and screen coverage changes t
   assert.ok(switched.frames.some(f=>f.phase==="Kick-out"),"A hunt can draw help and become a pass");
   assert.notDeepEqual(switched.to,dropped.to);
   assert.ok(switched.ready && dropped.ready);
+});
+
+test("defensive memory counts distinct possessions, ages out, and selects reachable coverage",()=>{
+  const {roster,spots,guard,rim}=mismatchFixture();
+  const ps=roster.map((p,i)=>i===5?rim:i===9?guard:p);
+  const points=spots.map((p,i)=>i===4?{x:77,y:15}:i===9?{x:76,y:18}:p);
+  const assignments=matchDefenders(0,0,points), attack={attacker:0,defender:5};
+  let history=rememberAttacks([], [attack,attack]);
+  assert.equal(history[0].length,1);
+  assert.equal(planMismatchResponse(ps,0,0,points,assignments,history),null);
+  history=rememberAttacks(history,[attack]);
+  assert.equal(planMismatchResponse(ps,0,0,points,assignments,history)?.kind,"switch-back");
+  const distant=points.map((p,i)=>i>5?{x:10,y:i*4}:p);
+  assert.equal(planMismatchResponse(ps,0,0,distant,assignments,history),null,"Cannot summon unreachable help");
+  for(let i=0;i<8;i++)history=rememberAttacks(history,[]);
+  assert.equal(history.length,8);
+  assert.equal(planMismatchResponse(ps,0,0,points,assignments,history),null);
+});
+
+test("repeated attacks trigger physical switch-backs or doubles with a kick-out and recovery",()=>{
+  const {roster,spots,guard,rim,wing}=mismatchFixture();
+  const history=[[{attacker:0,defender:5}],[{attacker:0,defender:5}]];
+  for(const kind of ["switch-back","double"] as const) {
+    const points=spots.map((p,i)=>i===9?{x:70,y:15}:i===4?{x:77,y:kind==="switch-back"?20:15}:p);
+    const ps=roster.map((p,i)=>i===5?rim:i===9?guard:i===4&&kind==="double"?{...wing,threeShare:.7,threePct:.55,twoPct:.65}:p);
+    const intent={shooter:0,shot:{x:85,y:28},three:false,action:"drive" as const,chance:0,value:0};
+    const baseline=resolvePossession(ps,0,0,points,points,intent,23.8);
+    assert.equal(baseline.responses.length,0);
+    const adjusted=resolvePossession(ps,0,0,points,points,intent,23.8,history);
+    assert.equal(adjusted.responses[0]?.kind,kind);
+    assert.ok(adjusted.ready);assert.notDeepEqual(adjusted.to,baseline.to);
+    if(kind==="double") {
+      assert.ok(adjusted.frames.some(f=>f.phase==="Double team · Kick-out"));
+      assert.ok(adjusted.frames.some(f=>f.phase==="Recovering from double"));
+      assert.notEqual(adjusted.shooter,0);
+    } else {
+      const complete=adjusted.frames.find(f=>f.phase==="Switch-back complete");
+      assert.ok(complete,"Replacement must actually arrive and exchange assignments");
+      const r=adjusted.responses[0];
+      assert.ok(Math.hypot(complete.spots[r.defender].x-complete.spots[r.carrier].x,complete.spots[r.defender].y-complete.spots[r.carrier].y)<7);
+    }
+    for(let f=1;f<adjusted.frames.length;f++)for(let i=0;i<10;i++) {
+      const a=adjusted.frames[f-1].spots[i],b=adjusted.frames[f].spots[i];
+      assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.8,"Adjustment must move through real frames without teleporting");
+    }
+    const mirrored=points.slice(5).concat(points.slice(0)).map(p=>({x:94-p.x,y:p.y}));
+    const mirrorHistory=history.map(turn=>turn.map(a=>({attacker:(a.attacker+5)%10,defender:(a.defender+5)%10})));
+    const mirror=resolvePossession(ps.slice(5).concat(ps.slice(0)),1,5,mirrored,mirrored,{...intent,shooter:5,shot:{x:9,y:28}},23.8,mirrorHistory);
+    assert.equal(mirror.responses[0]?.kind,kind);
+    assert.ok(mirror.ready);
+    assert.equal(mirror.responses[0].defender,(adjusted.responses[0].defender+5)%10);
+    assert.ok(mirror.frames.some(f=>f.phase===(kind==="double"?"Double team":"Switching back")));
+  }
+});
+
+test("denied handoffs abandon blocked waypoints before the clock and keep the real ball holder",()=>{
+  const ps=players.map(simulationPlayer);
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const m=resolvePossession(ps,0,0,setup,setup,{shooter:4,shot:setup[4],three:true,action:"catch-and-shoot",chance:.4,value:1.2,
+    movement:{kind:"handoff",receiver:4,screener:0,direction:1}},23.8);
+  assert.ok(m.frames.some(f=>f.phase.startsWith("Route denied")));
+  assert.ok(m.ready && m.seconds<10,"Do not burn 23 seconds waiting for the planned exchange");
+  assert.deepEqual(m.shot,m.to[m.shooter]);
+  let handoffs=0, denied=0;
+  for(let seed=0;seed<12;seed++)for(const p of simulate(teams,600,seed).plays) {
+    if(p.movement?.kind!=="handoff" || p.fastBreak)continue;
+    handoffs++;
+    const finish=p.frames.filter(f=>f.phase==="Handoff · Turn the corner");
+    assert.ok(finish.length*p.approachSeconds/(p.frames.length-1)<6.2,"A denied corner must trigger a read rather than wait for the buzzer");
+    if(p.frames.some(f=>f.phase.startsWith("Route denied")))denied++;
+  }
+  assert.ok(handoffs>15 && denied>0);
 });

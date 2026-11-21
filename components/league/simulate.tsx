@@ -82,7 +82,7 @@ export default function Simulate({ players, onPlayer }: { players: Player[]; onP
           </div>
         </div>
       </section>
-      <div className="sim-call" aria-live="polite">{current?.event ? [current.event.title,current.event.detail].filter(Boolean).join(" · ") : finished ? "Game complete" : `${teamNames[current?.play.side ?? 0]} ball · ${courtReady ? current?.phase : "Ready for tip-off"}`}</div>
+      <div className="sim-call" aria-live="polite">{current?.event ? [current.event.title,current.event.detail].filter(Boolean).join(" · ") : finished ? "Game complete" : `${teamNames[current?.possessionSide ?? 0]} ball · ${courtReady ? current?.phase : "Ready for tip-off"}`}</div>
       <div className="sim-cast" aria-label="Players on court">{[0, 1].map(side => <div className={`sim-cast-team sim-side-${side}`} key={side}>{game.players.slice(side * 5, side * 5 + 5).map(p => <button key={p.id} title={p.name} aria-label={`View ${p.name}`} onClick={() => { const original = players.find(v => v.id === p.id); setPlaying(false); if (original) onPlayer(original); }}><PlayerAvatar player={p} /><span>{p.name}</span></button>)}</div>)}</div>
     </>}
     {game && snapshot && <div className="sim-results">

@@ -443,3 +443,13 @@ Stored finish trajectories continue after the shot decision: two offensive rebou
 These are generic tactical heuristics, not a measured playbook or physics-based ball/rebound model. No screens, pick-and-rolls, fatigue or substitutions yet. No extra UI copy or new dependencies.
 
 Validation: 20 simulation tests cover off-ball travel from an already-set formation, mirrored routes, movement during shot flight, fixed release geometry, timeline continuity, reachable rebound winners, and contact separation/reversal checks through finish trajectories. Local browser checks confirmed relocating players and movement during the shot/rebound sequence, with no console errors. All 211 app tests, production build with TypeScript and standalone smoke passed. Verify exact-commit CI and Railway before claiming release.
+
+## November 20 prompt shots, turnover lanes and baseline inbounds
+
+Ready shooters now end the approach when they arrive with the ball instead of waiting out the full possession budget. The shooting gather is capped at 0.2 seconds; supporting players start box-out/recovery movement immediately. Shot-attempt stats use the same release timestamp as the rendered ball.
+
+Turnovers send players into staggered lanes toward the opposite basket, with lead runners, a carrier and trailers at different speeds. The next possession keeps that carrier. The turnover banner lasts 0.8 seconds and the possession callout switches to the new team immediately.
+
+After made baskets and made final free throws, a distinct replay segment shows a teammate collecting the ball, moving to the baseline and passing to the receiver. The same movement/contact solver generates these frames. Playback advances while the exhibition clock and stats remain frozen until the catch; the following possession starts at the actual received-ball positions. This remains simplified exhibition timing, not full NBA clock rules. Out-of-bounds turnover restarts, officials and inbound violations are not modeled by this change.
+
+Regression coverage includes prompt release/FGA timing, mirrored turnover transitions and carrier continuity, inbound pickup/pass geometry, stopped inbound clocks, boundary continuity, separation and existing collision stability. Local browser checks verified shot flight and visible baseline inbounding without console errors. All 214 app tests, production build/TypeScript and standalone smoke passed. Verify exact-commit CI, Railway and hosted UI before claiming release.

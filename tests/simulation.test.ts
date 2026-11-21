@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { snapshotSchema } from "../lib/schema";
 import demo from "../lib/demo.json";
-import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies } from "../lib/simulation";
+import { canSimulate, courtFrame, simulate, simulationState, simulationPlayer, shotQuality, resolvePossession, gameElapsed, moveBodies, shotRelease } from "../lib/simulation";
 const players = snapshotSchema.parse(demo).players.filter(canSimulate).slice(0, 10);
 const teams: [typeof players, typeof players] = [players.slice(0, 5), players.slice(5)];
 
@@ -24,6 +24,7 @@ test("exhibition score, shot accounting and rebounds stay consistent across diff
   for (let seed = 0; seed < 100; seed++) {
     const game = simulate(teams, 300, seed);
     assert.equal(game.plays.at(-1)?.gameEnd, 300);
+    for(const inbound of game.inbounds)assert.ok(inbound.release>=inbound.start && inbound.release<inbound.end);
     const final = simulationState(game, game.playbackDuration);
     for (const side of [0, 1]) assert.equal(final.score[side], final.lines.slice(side*5, side*5+5).reduce((sum, l) => sum+l.pts, 0));
     for (const l of final.lines) {
@@ -266,16 +267,16 @@ test("off-ball players cut and relocate even after arriving at their formation",
   const ps=players.map(simulationPlayer);
   const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
     {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
-  const intent={shooter:0,shot:{x:63,y:25},three:true,action:"pull-up" as const,chance:.3,value:.9};
+  const intent={shooter:0,shot:{x:80,y:25},three:false,action:"cut" as const,chance:.3,value:.9};
   const result=resolvePossession(ps,0,0,setup,setup,intent,8);
-  const before=result.frames[Math.floor(result.frames.length*.4)].spots;
+  const before=result.frames[0].spots;
   const movers=[1,2,3,4].filter(i=>Math.hypot(before[i].x-result.to[i].x,before[i].y-result.to[i].y)>4);
   assert.ok(movers.length>=3,`Only ${movers.length} off-ball players repositioned`);
   // Tactical coordinates mirror correctly when attacking the other basket.
   const mirrored=setup.map(p=>({x:94-p.x,y:p.y}));
   const mirrorPlayers=[...ps.slice(5),...ps.slice(0,5)];
   const reordered=[...mirrored.slice(5),...mirrored.slice(0,5)];
-  const reverse=resolvePossession(mirrorPlayers,1,5,reordered,reordered,{...intent,shooter:5,shot:{x:31,y:25}},8);
+  const reverse=resolvePossession(mirrorPlayers,1,5,reordered,reordered,{...intent,shooter:5,shot:{x:14,y:25}},8);
   result.to.forEach((p,i)=>assert.ok(Math.hypot(94-p.x-reverse.to[(i+5)%10].x,p.y-reverse.to[(i+5)%10].y)<.05));
 });
 
@@ -285,10 +286,11 @@ test("shots keep off-ball players moving while the ball follows its fixed releas
     const game=simulate(teams,120,seed);
     for(const play of game.plays.filter(p=>["made","missed","blocked"].includes(p.outcome) && p.end-p.start>10)) {
       const at=(t:number)=>courtFrame(game,play.start+(play.end-play.start)*t);
-      const early=at(.70),late=at(.86);
+      // Measure the first second of shot preparation/flight, before players reach box-out spots.
+      const early=at(.55),late=at(.55+1/(play.end-play.start));
       const movers=early.spots.filter((p,i)=>i!==play.shooter && Math.hypot(p.x-late.spots[i].x,p.y-late.spots[i].y)>1);
       assert.ok(movers.length>=4,`Only ${movers.length} players moved during shot flight`);
-      const flight=(.8-.65)/.23,hoop={x:play.side===0?88.75:5.25,y:25};
+      const flight=(.8-shotRelease(play))/(.88-shotRelease(play)),hoop={x:play.side===0?88.75:5.25,y:25};
       const ball=at(.8).ball;
       assert.ok(Math.hypot(ball.x-(play.shot.x+(hoop.x-play.shot.x)*flight),ball.y-(play.shot.y+(hoop.y-play.shot.y)*flight))<.00001);
       for(const boundary of [.55,.65,.72,.88,.98]) {
@@ -312,4 +314,87 @@ test("rebound winners come from teammates within reach of the rim",()=>{
       assert.ok(distance(play.rebounder!)<=Math.min(...team.map(distance))+5.5);
     }
   }
+});
+
+test("ready shooters release promptly and shot attempts appear at release",()=>{
+  const ps=players.map(simulationPlayer);
+  const setup=[{x:62,y:25},{x:85,y:3},{x:85,y:47},{x:70,y:9},{x:84,y:18},
+    {x:66,y:25},{x:85,y:7},{x:85,y:43},{x:73,y:12},{x:87,y:19}];
+  const result=resolvePossession(ps,0,0,setup,setup,{shooter:0,shot:{x:63,y:25},three:true,action:"pull-up",chance:.3,value:.9},10);
+  assert.ok(result.seconds<1.5,`Ready shooter waited ${result.seconds}s`);
+  let checked=0;
+  for(let seed=0;seed<8;seed++) {
+    const game=simulate(teams,120,seed);
+    for(const play of game.plays) {
+      assert.ok(play.passAt<play.passEnd && play.passEnd<=.55);
+      if(!["made","missed","blocked"].includes(play.outcome))continue;
+      const length=play.end-play.start,release=shotRelease(play);
+      assert.ok((release-.55)*length<=.200001);
+      const before=simulationState(game,play.start+length*release-.00001).lines[play.shooter];
+      const after=simulationState(game,play.start+length*release+.00001).lines[play.shooter];
+      assert.equal(after.fga,before.fga+1);
+      checked++;
+    }
+  }
+  assert.ok(checked>20);
+});
+
+test("turnovers flow into staggered lanes and retain the new ball handler",()=>{
+  const sides=new Set<number>(); let checked=0;
+  for(let seed=0;seed<60;seed++) {
+    const game=simulate(teams,120,seed);
+    game.plays.forEach((play,index)=>{
+      if(play.outcome!=="turnover" || play.end-play.start<10)return;
+      const length=play.end-play.start;
+      const change=courtFrame(game,play.start+length*.6+.001);
+      assert.equal(change.event?.title,"TURNOVER");
+      assert.equal(change.possessionSide,1-play.side);
+      const running=courtFrame(game,play.start+length*.6+.9);
+      assert.equal(running.event,null);
+      assert.equal(running.phase,"Transition");
+      assert.equal(running.focus,play.defender);
+      assert.ok(Math.hypot(running.ball.x-running.spots[play.defender].x,running.ball.y-running.spots[play.defender].y)<.000001);
+      const end=play.finishFrames.at(-1)!.spots;
+      const xs=end.map(p=>play.side===0?p.x:94-p.x);
+      assert.ok(Math.max(...xs)-Math.min(...xs)>15,"Players formed a midcourt line");
+      assert.ok(xs.some(x=>x<40),"Nobody advanced beyond midcourt");
+      const next=game.plays[index+1];
+      if(next)assert.equal(next.handler,play.defender);
+      sides.add(play.side);checked++;
+    });
+  }
+  assert.equal(sides.size,2);
+  assert.ok(checked>=10);
+});
+
+test("made baskets have a visible pickup and inbound before the clock resumes",()=>{
+  let checked=0;const sides=new Set<number>();
+  for(let seed=0;seed<12;seed++) {
+    const game=simulate(teams,120,seed);
+    for(const inbound of game.inbounds) {
+      assert.ok(inbound.release>=inbound.start && inbound.release<inbound.end);
+      assert.notEqual(inbound.inbounder,inbound.receiver);
+      for(const frame of inbound.frames)for(let i=0;i<10;i++)for(let j=i+1;j<10;j++)
+        assert.ok(Math.hypot(frame.spots[i].x-frame.spots[j].x,frame.spots[i].y-frame.spots[j].y)>3.7);
+      const before=game.plays.find(p=>p.end===inbound.start)!;
+      const next=game.plays.find(p=>p.start===inbound.end)!;
+      assert.ok(before.outcome==="made" || before.freeThrows.at(-1));
+      const start=courtFrame(game,inbound.start),release=courtFrame(game,inbound.release);
+      const baselineX=inbound.side===0?2:92;
+      assert.ok(Math.abs(release.spots[inbound.inbounder].x-baselineX)<.6);
+      assert.ok(Math.hypot(release.ball.x-release.spots[inbound.inbounder].x,release.ball.y-release.spots[inbound.inbounder].y)<.6);
+      assert.equal(start.phase,"Collecting ball");
+      assert.equal(gameElapsed(game,inbound.start),gameElapsed(game,inbound.end));
+      assert.deepEqual(simulationState(game,inbound.release).lines,before.lines);
+      for(const boundary of [inbound.start,inbound.release,inbound.end]) {
+        const a=courtFrame(game,boundary-.000001),b=courtFrame(game,boundary+.000001);
+        assert.ok(Math.hypot(a.ball.x-b.ball.x,a.ball.y-b.ball.y)<.01);
+        a.spots.forEach((p,i)=>assert.ok(Math.hypot(p.x-b.spots[i].x,p.y-b.spots[i].y)<.01));
+      }
+      assert.equal(next.handler,inbound.receiver);
+      assert.ok(gameElapsed(game,inbound.end+.1)>before.gameEnd);
+      sides.add(inbound.side);checked++;
+    }
+  }
+  assert.equal(sides.size,2);assert.ok(checked>20);
 });

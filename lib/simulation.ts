@@ -13,7 +13,8 @@ export type SimPlay = {
   frames: MotionFrame[]; finishFrames: MotionFrame[]; onBall: number; helper: number | null; passAt: number; passEnd: number;
 };
 export type TipOff = { spots:Point[]; jumpers:number[]; winner:Side; receiver:number; contact:number; duration:number };
-export type Simulation = { tip:TipOff; players: SimPlayer[]; plays: SimPlay[]; duration: number; playbackDuration: number; seed: number };
+export type Inbound = { start:number; end:number; side:Side; inbounder:number; receiver:number; release:number; frames:(MotionFrame & {ball:Point})[] };
+export type Simulation = { inbounds:Inbound[]; tip:TipOff; players: SimPlayer[]; plays: SimPlay[]; duration: number; playbackDuration: number; seed: number };
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 export const emptyLine = (): SimLine => ({ pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, to: 0, pf: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0 });
 export function canSimulate(player: Player) {
@@ -166,21 +167,28 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
   const onBall=assignments.get(handler)!;
   let spots=start.map(p=>({...p})), shooter=intent.shooter, action=intent.action, target={...intent.shot};
   let velocities=spots.map(()=>({x:0,y:0}));
-  let helper:number|null=null, contained=0, passed=false, passAt=.32, phase="Getting set";
+  let helper:number|null=null, contained=0, passed=false, phase="Getting set";
   const frames:MotionFrame[]=[{spots:spots.map(p=>({...p})),phase}];
   const steps=Math.max(120,Math.ceil(seconds*30)), dt=seconds/steps;
   const driveSide=intent.shot.y<=25 ? -1 : 1;
   const support=offense.filter(i=>i!==handler && i!==intent.shooter);
   const cutter=[...support].sort((a,b)=>(players[b].rebound*(1-players[b].threeShare))-(players[a].rebound*(1-players[a].threeShare)))[0];
   const attackStart=Math.max(.2,1-4.5/seconds);
+  let attackTick:number|null=null, readyFor=0, usedSeconds=seconds;
+  let passStartSeconds=seconds*.32/.55, passEndSeconds=seconds*.52/.55;
   const approach=(a:Point,b:Point,limit:number)=>{const d=distanceTo(a,b); return d<=limit ? {...b} : {x:a.x+(b.x-a.x)*limit/d,y:a.y+(b.y-a.y)*limit/d};};
   for(let tick=1;tick<=steps;tick++) {
-    const progress=tick/steps, attacking=progress>=attackStart;
+    const progress=tick/steps, elapsed=tick*dt;
+    if(attackTick===null && (progress>=attackStart || (elapsed>=.5 && distanceTo(spots[handler],setup[handler])<4 && distanceTo(spots[shooter],target)<8))) {
+      attackTick=tick;
+      passStartSeconds=elapsed; passEndSeconds=Math.min(seconds,elapsed+.45);
+    }
+    const attacking=attackTick!==null;
     const goals=setup.map(p=>({...p}));
     if(attacking) {
       // Coordinated support routes: a cutter clears the lane after crossing it;
       // perimeter players lift/drift into a new passing angle. No idle oscillation.
-      const movement=clamp((progress-attackStart)/(1-attackStart),0,1);
+      const movement=clamp((tick-attackTick!)*dt/4.5,0,1);
       for(const i of support) {
         if(i===shooter)continue; // A kick-out receiver holds the chosen catch point.
         const origin=facing(setup[i],side), upper=origin.y<25;
@@ -219,7 +227,7 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
           const finish=shotQuality(players[handler],h,defense.map(i=>({spot:spots[i],player:players[i]})),side,false);
           if(progress<.86 && options.length && options[0].q.expected > finish.expected+.08) {
             shooter=options[0].i; target={...spots[shooter]}; action="catch-and-shoot"; passed=true;
-            passAt=progress*.55; phase="Kick-out";
+            passStartSeconds=elapsed; passEndSeconds=Math.min(seconds,elapsed+.45); phase="Kick-out";
           } else if(contained>3.1 || progress>.9) {
             shooter=handler; target={...h}; action=distanceTo(h,hoop)<12 ? "drive" : "pull-up"; phase=action==="drive" ? "Finishing through contact" : "Drive stopped · Pull-up";
           }
@@ -243,17 +251,24 @@ export function resolvePossession(players:SimPlayer[], side:Side, handler:number
     velocities=movement.velocities;
     const next=movement.spots;
     spots=next; frames.push({spots:spots.map(p=>({...p})),phase});
+    // Release as soon as the shooter has arrived and received the ball, rather
+    // than waiting for a random possession timer after reaching the shot spot.
+    const hasBall=shooter===handler || elapsed>=passEndSeconds;
+    const arrived=distanceTo(spots[shooter],target)<1 || (action==="drive" && distanceTo(spots[shooter],hoop)<7);
+    readyFor=attacking && hasBall && arrived ? readyFor+dt : 0;
+    if(readyFor>=.12) {usedSeconds=elapsed;break;}
   }
   const shot={...spots[shooter]}, dist=distanceTo(shot,hoop);
   const three=dist>=23.75 || Math.abs(shot.y-25)>=22;
-  return {shooter,shot,three,action,to:spots,frames,onBall,helper,passAt:passed?passAt:.32,passEnd:passed?Math.min(.54,passAt+.06):.52};
+  return {shooter,shot,three,action,to:spots,frames,onBall,helper,seconds:usedSeconds,
+    passAt:Math.min(.53,passStartSeconds/usedSeconds*.55),passEnd:Math.min(.55,passEndSeconds/usedSeconds*.55)};
 }
 
 /** Follow-through, box-outs and recovery use the same contact solver as live offense.
  * Everyone reacts to the shot before knowing its result; outcome-specific movement
  * begins only when the ball reaches the rim. The shooter stays at the release point.
  */
-function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"shooter"|"shot"|"outcome"|"rebounder">, seconds:number):MotionFrame[] {
+function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"shooter"|"shot"|"outcome"|"rebounder"|"defender">, seconds:number):MotionFrame[] {
   const offense=indices(play.side), defense=indices((1-play.side) as Side), hoop=basket(play.side);
   const crashers=[...offense].filter(i=>i!==play.shooter).sort((a,b)=>
     players[b].rebound/(1+distanceTo(play.to[b],hoop)/12)-players[a].rebound/(1+distanceTo(play.to[a],hoop)/12)).slice(0,2);
@@ -262,6 +277,15 @@ function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"sh
     available.sort((a,b)=>distanceTo(play.to[a],play.to[i])-distanceTo(play.to[b],play.to[i]));
     assignments.set(i,available.shift()!);
   }
+  const runners=[...defense].filter(i=>i!==play.defender).sort((a,b)=>play.to[a].y-play.to[b].y);
+  const transitionGoals=play.to.map(p=>({...p}));
+  transitionGoals[play.defender]=facing({x:32,y:25},play.side);
+  runners.forEach((i,n)=>{transitionGoals[i]=facing([{x:18,y:6},{x:25,y:16},{x:38,y:35},{x:43,y:44}][n],play.side);});
+  const recovering=[...offense].sort((a,b)=>play.to[a].y-play.to[b].y);
+  [...defense].sort((a,b)=>transitionGoals[a].y-transitionGoals[b].y).forEach((i,n)=>{
+    const runner=facing(transitionGoals[i],play.side);
+    transitionGoals[recovering[n]]=facing({x:runner.x-5,y:runner.y},play.side);
+  });
   let spots=play.to.map(p=>({...p})), velocities=spots.map(()=>({x:0,y:0}));
   const frames:MotionFrame[]=[{spots,phase:"Gathering"}];
   const steps=Math.max(30,Math.ceil(seconds*30)), dt=seconds/steps;
@@ -270,8 +294,8 @@ function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"sh
     let phase="Gathering";
     if(play.outcome==="turnover" && t>=.6) {
       phase="Changing ends";
-      for(const i of [...offense,...defense]) goals[i]=facing({x:Math.floor(i/5)===play.side?52:45,y:clamp(play.to[i].y,7,43)},play.side);
-    } else if(play.outcome!=="turnover" && t>=.65) {
+      for(const i of [...offense,...defense])goals[i]=transitionGoals[i];
+    } else if(play.outcome!=="turnover") {
       phase="Boxing out";
       for(const i of offense) {
         const p=facing(play.to[i],play.side);
@@ -280,7 +304,7 @@ function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"sh
         // Establish position between the offensive rebounder and the rim.
         goals[defender]={x:man.x+(hoop.x-man.x)/Math.max(1,gap)*Math.min(4.5,gap),y:man.y+(hoop.y-man.y)/Math.max(1,gap)*Math.min(4.5,gap)};
       }
-      if(t<.72)goals[play.shooter]=play.shot; // Brief shooting follow-through.
+      if((t-.55)*seconds/.45<.4)goals[play.shooter]=play.shot; // Brief shooting follow-through.
       if(t>=.88) {
         if(play.outcome==="made") {
           phase="Getting back";
@@ -294,18 +318,51 @@ function finishPossession(players:SimPlayer[], play:Pick<SimPlay,"side"|"to"|"sh
         }
       }
     }
-    const next=moveBodies(spots,velocities,goals,spots.map(()=>12),dt);
+    const speeds=spots.map((_,i)=>play.outcome==="turnover" && t>=.6
+      ? offense.includes(i)?14:i===play.defender?13:[16,14,11,9][runners.indexOf(i)]
+      :12);
+    const next=moveBodies(spots,velocities,goals,speeds,dt);
     spots=next.spots;velocities=next.velocities;
     frames.push({spots:spots.map(p=>({...p})),phase});
   }
   return frames;
 }
 
+/** A dead-ball pickup and baseline pass, with the clock stopped until the catch. */
+function inboundSequence(start:number, side:Side, from:Point[], ballStart:Point, receiver:number):Inbound {
+  const offense=indices(side), defense=indices((1-side) as Side);
+  const inbounder=[...offense].filter(i=>i!==receiver).sort((a,b)=>distanceTo(from[a],ballStart)-distanceTo(from[b],ballStart))[0];
+  const baseline=facing({x:2,y:25},side), goals=from.map(p=>({...p}));
+  goals[receiver]=facing({x:18,y:25},side);
+  offense.filter(i=>i!==inbounder && i!==receiver).forEach((i,n)=>{goals[i]=facing([{x:26,y:7},{x:32,y:40},{x:38,y:15}][n],side);});
+  defense.forEach((i,n)=>{goals[i]=facing({x:48+(n%2)*6,y:6+n*9},side);});
+  let spots=from.map(p=>({...p})), velocities=spots.map(()=>({x:0,y:0})), ball={...ballStart};
+  let collected=false, setFor=0, release=-1, passFrom:Point|null=null, passTo:Point|null=null;
+  const dt=1/30, frames:Inbound["frames"]=[{spots,ball,phase:"Collecting ball"}];
+  for(let tick=1;tick<=900;tick++) {
+    const elapsed=tick*dt;
+    goals[inbounder]=collected?baseline:ballStart;
+    if(release>=0)goals[receiver]=passTo!;
+    const movement=moveBodies(spots,velocities,goals,spots.map(()=>12),dt);
+    spots=movement.spots;velocities=movement.velocities;
+    if(!collected && distanceTo(spots[inbounder],ballStart)<.5)collected=true;
+    if(collected)ball=lerp(ball,spots[inbounder],Math.min(1,dt*20));
+    const ready=collected && distanceTo(spots[inbounder],baseline)<.5 && distanceTo(spots[receiver],goals[receiver])<.8;
+    setFor=ready?setFor+dt:0;
+    if(release<0 && setFor>=.25) {release=elapsed;passFrom={...ball};passTo={...spots[receiver]};}
+    if(release>=0)ball=lerp(passFrom!,spots[receiver],(elapsed-release)/.6);
+    frames.push({spots:spots.map(p=>({...p})),ball:{...ball},phase:release>=0?"Inbound pass":collected?"Inbounding":"Collecting ball"});
+    if(release>=0 && elapsed-release>=.6)break;
+  }
+  if(release<0 || (frames.length-1)*dt-release<.6)throw new Error("Could not complete inbound setup. Start a new game.");
+  return {start,end:start+(frames.length-1)*dt,side,inbounder,receiver,release:start+release,frames};
+}
+
 export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1): Simulation {
   if (lineups.some(t => t.length !== 5) || new Set(lineups.flat().map(p => p.id)).size !== 10) throw new Error("Choose ten different players, five per team.");
   if (![120, 300, 600].includes(duration) || !Number.isSafeInteger(seed)) throw new Error("Invalid game settings.");
   const players = lineups.flat().map(simulationPlayer), rng = random(seed);
-  const lines = players.map(emptyLine), score: [number, number] = [0, 0], plays: SimPlay[] = [];
+  const lines = players.map(emptyLine), score: [number, number] = [0, 0], plays: SimPlay[] = [], inbounds:Inbound[]=[];
   let side: Side = rng() < .5 ? 0 : 1, clock = 1.8, playback = 3;
   const jumpers=([0,1] as Side[]).map(s=>indices(s).sort((a,b)=>(players[b].rebound+(isBig(players[b])?5:0))-(players[a].rebound+(isBig(players[a])?5:0)))[0]);
   const tipSpots:Point[]=Array(10);
@@ -318,13 +375,19 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
   let from: Point[] | null = tipSpots;
   while (clock < duration) {
     const offense = indices(side), defense = indices((1 - side) as Side);
-    const handler = pick(offense, i => players[i].passing * (/PG/.test(players[i].position) ? 1.4 : 1), rng);
+    const handler = plays.at(-1)?.outcome==="turnover" ? plays.at(-1)!.defender : pick(offense, i => players[i].passing * (/PG/.test(players[i].position) ? 1.4 : 1), rng);
     if(!plays.length)tip.receiver=handler;
+    const previous=plays.at(-1);
+    if(previous && (previous.outcome==="made" || (previous.outcome==="foul" && previous.freeThrows.at(-1)))) {
+      const inbound=inboundSequence(playback,side,from!,endBall(previous),handler);
+      inbounds.push(inbound);from=inbound.frames.at(-1)!.spots;playback=inbound.end;
+    }
     const setup = formation(players, side, handler, rng);
     const transition=from ? Math.max(...from.map((p,i)=>distanceTo(p,setup[i])))/14 : 0;
-    const liveLength = Math.min(duration-clock,Math.max(10+Math.floor(rng()*13),(transition+4.5)/.55));
+    let liveLength = Math.min(duration-clock,Math.max(10+Math.floor(rng()*13),(transition+4.5)/.55));
     const decision = chooseShot(players, side, handler, setup, rng);
     const motion = resolvePossession(players,side,handler,setup,from ?? setup,decision,liveLength*.55);
+    liveLength=Math.min(duration-clock,motion.seconds/.55);
     const { shooter, shot, three, action, to } = motion;
     const passer = handler !== shooter ? handler : null;
     const defender = [...defense].sort((a,b) => distanceTo(to[a],shot)-distanceTo(to[b],shot))[0];
@@ -360,7 +423,7 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
         text = `${p.name} ${three ? "hits a three" : distance < 8 ? "finishes at the rim" : "hits the jumper"}${passer === null ? "." : ` · ${players[passer].name} assist.`}`;
       } else text = blocked ? `${d.name} blocks ${p.name}.` : `${p.name} misses ${three ? "a three" : "a two"}.`;
     }
-    const followThrough=outcome==="foul"?[]:finishPossession(players,{side,to,shooter,shot,outcome,rebounder:null},liveLength*.45);
+    const followThrough=outcome==="foul"?[]:finishPossession(players,{side,to,shooter,shot,outcome,defender,rebounder:null},liveLength*.45);
     const rimFrame=followThrough[Math.floor((.88-.55)/.45*(followThrough.length-1))];
     const reboundSpots=rimFrame?.spots ?? to;
     // Rebound every missed field goal and missed final free throw, including at the horn.
@@ -383,9 +446,11 @@ export function simulate(lineups: [Player[], Player[]], duration = 120, seed = 1
     plays.push(play);
     from = endSpots(play); clock = gameEnd; playback=end; if (!retain) side = (1 - side) as Side;
   }
-  return { tip, players, plays, duration, playbackDuration:playback, seed };
+  return { tip, inbounds, players, plays, duration, playbackDuration:playback, seed };
 }
 const playProgress = (play: SimPlay, time: number) => clamp((time-play.start)/(play.end-play.start),0,1);
+// A brief gather is measured in seconds, not a percentage of possession length.
+export const shotRelease = (play:SimPlay) => .55+Math.min(.2/(play.end-play.start),.1);
 const freeThrowProgress = (play: SimPlay, t: number) => clamp((t-.65)/.31,0,1)*play.freeThrows.length;
 export function simulationState(game: Simulation, time: number) {
   const completed = game.plays.filter(p => p.end <= time);
@@ -406,7 +471,7 @@ export function simulationState(game: Simulation, time: number) {
         if (play.lines[play.defender].stl > lines[play.defender].stl) lines[play.defender].stl++;
       }
     } else {
-      if (t >= .65) { line.fga++; if (play.three) line.tpa++; }
+      if (t >= shotRelease(play)) { line.fga++; if (play.three) line.tpa++; }
       if (t >= .88 && play.outcome === "made") {
         points = play.points; line.fgm++; if (play.three) line.tpm++;
         if (play.passer !== null) lines[play.passer].ast++;
@@ -440,7 +505,15 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
     const tip=game.tip, tapped=time>=tip.contact, progress=clamp((time-tip.contact)/(tip.duration-tip.contact),0,1);
     const ball=lerp({x:47,y:25},tip.spots[tip.receiver],progress);
     return {play:game.plays[0],spots:tip.spots.map(p=>({...p})),ball,height:motion? tapped ? Math.sin(progress*Math.PI)*1.5 : Math.sin(clamp(time/tip.contact,0,1)*Math.PI)*4:0,
-      focus:tapped?tip.receiver:null,phase:tapped?"Tip won":"Tip-off",event:{title:tapped?`${tip.winner===0?"TEAL":"PINK"} BALL`:"TIP-OFF",detail:tapped?game.players[tip.jumpers[tip.winner]].name:"",tone:"neutral" as const}};
+      possessionSide:tip.winner,focus:tapped?tip.receiver:null,phase:tapped?"Tip won":"Tip-off",event:{title:tapped?`${tip.winner===0?"TEAL":"PINK"} BALL`:"TIP-OFF",detail:tapped?game.players[tip.jumpers[tip.winner]].name:"",tone:"neutral" as const}};
+  }
+  const inbound=game.inbounds.find(p=>time>=p.start && time<p.end);
+  if(inbound) {
+    const position=clamp((time-inbound.start)/(inbound.end-inbound.start),0,1)*(inbound.frames.length-1);
+    const a=inbound.frames[Math.floor(position)],b=inbound.frames[Math.min(Math.floor(position)+1,inbound.frames.length-1)];
+    const fraction=position-Math.floor(position);
+    return {play:game.plays.find(p=>p.start>=inbound.end)!,spots:a.spots.map((p,i)=>lerp(p,b.spots[i],fraction)),ball:lerp(a.ball,b.ball,fraction),height:0,
+      phase:a.phase,event:null,possessionSide:inbound.side,focus:time<inbound.release?inbound.inbounder:inbound.receiver};
   }
   const index = game.plays.findIndex(p=>time<p.end);
   const playIndex = index < 0 ? game.plays.length-1 : index, play = game.plays[playIndex], previous = game.plays[playIndex-1];
@@ -458,7 +531,7 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
   const hoop = basket(play.side);
   let ball:Point, height=0, event:CourtEvent|null=null;
   let phase = a.phase;
-  if (t < .12) ball = lerp(previous ? endBall(previous) : game.tip.spots[game.tip.receiver],spots[play.handler],t/.12);
+  if (t < .12) ball = lerp(game.inbounds.find(p=>p.end===play.start)?.frames.at(-1)?.ball ?? (previous ? endBall(previous) : game.tip.spots[game.tip.receiver]),spots[play.handler],t/.12);
   else if (play.outcome === "turnover" && t >= .32) ball = lerp(spots[play.handler],spots[play.defender],(t-.32)/.28);
   else if (t < play.passAt) ball = spots[play.handler];
   else if (t < play.passEnd) ball = lerp(spots[play.handler],spots[play.shooter],(t-play.passAt)/(play.passEnd-play.passAt));
@@ -477,10 +550,13 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
       // Between attempts the official returns the ball; preserve continuity on replay/seeking.
       if (portion >= .85 && attempt < play.freeThrows.length-1) ball = lerp(hoop,spots[play.shooter],(portion-.85)/.15);
     }
-  } else if (t < .65) ball=spots[play.shooter];
-  else if (t < .88) { const flight=(t-.65)/.23; ball=lerp(play.shot,hoop,flight); height=motion ? Math.sin(flight*Math.PI)*3 : 0; phase="Shot in the air"; }
+  } else if (t < shotRelease(play)) ball=spots[play.shooter];
+  else if (t < .88) { const flight=(t-shotRelease(play))/(.88-shotRelease(play)); ball=lerp(play.shot,hoop,flight); height=motion ? Math.sin(flight*Math.PI)*3 : 0; phase="Shot in the air"; }
   else ball=hoop;
-  if (play.outcome === "turnover" && t >= .6) { phase="Turnover"; event={title:"TURNOVER",detail:game.players[play.passer ?? play.shooter].name,tone:"missed"}; }
+  if (play.outcome === "turnover" && t >= .6) {
+    phase="Transition";
+    if((t-.6)*(play.end-play.start)<.8)event={title:"TURNOVER",detail:game.players[play.passer ?? play.shooter].name,tone:"missed"};
+  }
   if (play.outcome !== "foul" && play.outcome !== "turnover" && t >= .88) {
     phase=play.outcome === "made" ? "Basket" : play.outcome === "blocked" ? "Block" : "Miss";
     event={title:play.outcome === "made" ? `+${play.points}` : play.outcome === "blocked" ? "BLOCK" : "MISS",detail:game.players[play.outcome === "blocked" ? play.defender : play.shooter].name,tone:play.outcome === "made" ? "made" : "missed"};
@@ -491,7 +567,9 @@ export function courtFrame(game: Simulation, time: number, motion = true) {
     if (t >= .98) {phase="Rebound";event={title:Math.floor(play.rebounder/5)===play.side ? "OFFENSIVE REBOUND":"REBOUND",detail:game.players[play.rebounder].name,tone:"neutral"};}
   }
   if (time >= game.playbackDuration) {phase="Final";event=null;}
-  return {play,spots,ball,height,phase,event,focus:event?.title==="FOUL"?play.defender: t<play.passAt?play.handler:play.shooter};
+  const changedHands=play.outcome==="turnover" && t>=.6;
+  return {play,spots,ball,height,phase,event,possessionSide:changedHands?(1-play.side) as Side:play.side,
+    focus:changedHands || event?.title==="FOUL"?play.defender: t<play.passAt?play.handler:play.shooter};
 }
 
 /** Elapsed live game time; the replay can be longer because of dead balls. */
